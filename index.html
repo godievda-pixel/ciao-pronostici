@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0f171f">
+<title>Ciao, Pronostici!</title>
+<!-- Ciao Pronostici v7 — detach Mini App from Tilda rendering lifecycle -->
+<style>
+html,body{
+  opacity:1!important;
+  visibility:visible!important;
+  background:#0f171f!important;
+}
+html.ciao-pronostici-page,body.ciao-pronostici-page{
+  opacity:1!important;
+  visibility:visible!important;
+}
+</style>
+<script>
+(function(){
+  function postEvent(eventType,eventData){
+    if(eventData===undefined) eventData='';
+    try{
+      if(window.TelegramWebviewProxy && typeof window.TelegramWebviewProxy.postEvent==='function'){
+        window.TelegramWebviewProxy.postEvent(eventType,JSON.stringify(eventData));
+        return true;
+      }
+    }catch(e){}
+    try{
+      if(window.external && typeof window.external.notify==='function'){
+        window.external.notify(JSON.stringify({eventType:eventType,eventData:eventData}));
+        return true;
+      }
+    }catch(e){}
+    try{
+      if(window.parent && window.parent!==window){
+        window.parent.postMessage(JSON.stringify({eventType:eventType,eventData:eventData}),'*');
+        return true;
+      }
+    }catch(e){}
+    return false;
+  }
+
+  function params(){
+    var out={};
+    try{
+      [location.hash.replace(/^#/,''),location.search.replace(/^\?/, '')].forEach(function(raw){
+        var p=new URLSearchParams(raw);
+        p.forEach(function(v,k){ if(out[k]===undefined) out[k]=v; });
+      });
+    }catch(e){}
+    return out;
+  }
+  var p=params();
+  window.Telegram=window.Telegram||{};
+  var existing=window.Telegram.WebApp||{};
+  var shim={
+    initData: existing.initData || p.tgWebAppData || '',
+    version: existing.version || p.tgWebAppVersion || '',
+    platform: existing.platform || p.tgWebAppPlatform || '',
+    ready:function(){ postEvent('web_app_ready'); },
+    expand:function(){ postEvent('web_app_expand'); },
+    disableVerticalSwipes:function(){ postEvent('web_app_setup_swipe_behavior',{allow_vertical_swipe:false}); },
+    setHeaderColor:function(){},
+    setBackgroundColor:function(){},
+    onEvent:function(){},
+    HapticFeedback:{notificationOccurred:function(){}},
+    showAlert:function(msg){ try{alert(msg);}catch(e){} },
+    get viewportHeight(){ return window.innerHeight; },
+    get viewportStableHeight(){ return window.innerHeight; }
+  };
+  window.Telegram.WebApp=Object.assign(shim,existing);
+  window.__ciaoNativePost=postEvent;
+
+  // Official SDK semantics: web_app_ready has an empty-string payload.
+  postEvent('web_app_ready');
+  postEvent('web_app_expand');
+  try{ window.Telegram.WebApp.disableVerticalSwipes(); }catch(e){}
+})();
+</script>
+
+<style>
+html,body {
+  margin:0!important;
+  padding:0!important;
+  width:100%!important;
+  min-height:100%!important;
+  background:#0f171f!important;
+  overflow:hidden!important;
+}
+/* GitHub Pages: no Tilda shell exists, keep app visible immediately */
+#ciao-miniapp-root {
+  display:block!important;
+  opacity:1!important;
+  visibility:visible!important;
+}
+</style>
+</head>
+<body class="ciao-pronostici-page">
+<!-- Ciao, Pronostici! Mini App v7 — detached from Tilda shell -->
+<script>
+(function(){
+  document.documentElement.classList.add('ciao-pronostici-page');
+  if(document.body) document.body.classList.add('ciao-pronostici-page');
+  else document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('ciao-pronostici-page'),{once:true});
+})();
+</script>
+<style>
+html.ciao-pronostici-page,body.ciao-pronostici-page{
+  width:100%!important;height:100%!important;min-height:100%!important;
+  margin:0!important;padding:0!important;overflow:hidden!important;
+  background:#0f171f!important;overscroll-behavior:none!important;
+}
+body.ciao-pronostici-page #allrecords{min-height:100dvh!important;background:#0f171f!important;}
+body.ciao-pronostici-page .t-tildalabel,
+body.ciao-pronostici-page #tildacopy,
+body.ciao-pronostici-page .t-cookiealert{display:none!important;}
+body.ciao-pronostici-page > #ciao-miniapp-root{
+  display:block!important;
+  opacity:1!important;
+  visibility:visible!important;
+}
+</style>
+<script>
+(function(){
+  function nativePost(type,data){
+    if(data===undefined) data='';
+    try{if(window.TelegramWebviewProxy&&typeof window.TelegramWebviewProxy.postEvent==='function'){window.TelegramWebviewProxy.postEvent(type,JSON.stringify(data));return true;}}catch(e){}
+    try{if(window.external&&typeof window.external.notify==='function'){window.external.notify(JSON.stringify({eventType:type,eventData:data}));return true;}}catch(e){}
+    return false;
+  }
+  window.__ciaoNativePost=nativePost;
+  nativePost('web_app_ready');
+  nativePost('web_app_expand');
+  try{var i=new Image();i.style.display='none';i.src='https://dkefzepiiudehhzbbrjn.supabase.co/functions/v1/ciao-miniapp-api?boot=page210244509-v7&t='+Date.now();document.documentElement.appendChild(i);}catch(e){}
+})();
+</script>
+
+<style>#ciao-miniapp-root{color-scheme:dark;--bg:#0f171f;--card:#182532;--card2:#1d2c3a;--text:#f7f8fa;--muted:#96a6b5;--line:rgba(255,255,255,.08);--green:#159447;--red:#cc2e43;--gold:#e7ba52;--blue:#2f7dd3}#ciao-miniapp-root *{box-sizing:border-box}#ciao-miniapp-root,#ciao-miniapp-root{margin:0;min-height:100%;background:var(--tg-theme-bg-color,var(--bg));color:var(--tg-theme-text-color,var(--text));font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}#ciao-miniapp-root{padding:env(safe-area-inset-top) 0 calc(84px + env(safe-area-inset-bottom));overscroll-behavior:none}#ciao-miniapp-root .app{max-width:720px;margin:0 auto}#ciao-miniapp-root .header{padding:18px 16px 10px;position:sticky;top:0;z-index:10;background:linear-gradient(to bottom,var(--tg-theme-bg-color,var(--bg)) 70%,transparent)}#ciao-miniapp-root .brand{display:flex;align-items:center;gap:10px}#ciao-miniapp-root .flag{width:30px;height:20px;border-radius:5px;overflow:hidden;display:grid;grid-template-columns:1fr 1fr 1fr;box-shadow:0 0 0 1px rgba(255,255,255,.1)}#ciao-miniapp-root .flag i:nth-child(1){background:#169b62}#ciao-miniapp-root .flag i:nth-child(2){background:#fff}#ciao-miniapp-root .flag i:nth-child(3){background:#ce2b37}#ciao-miniapp-root .brand h1{font-size:22px;margin:0;font-weight:800;letter-spacing:-.4px}#ciao-miniapp-root .brand small{display:block;color:var(--tg-theme-hint-color,var(--muted));font-size:12px;margin-top:2px}#ciao-miniapp-root .content{padding:6px 12px 24px}#ciao-miniapp-root .hero{background:linear-gradient(145deg,#172b25,#182532 55%,#2b2024);border:1px solid var(--line);border-radius:22px;padding:16px;margin-bottom:12px}#ciao-miniapp-root .hero-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}#ciao-miniapp-root .hero h2{font-size:18px;margin:0 0 5px}#ciao-miniapp-root .hero p{margin:0;color:var(--muted);font-size:13px}#ciao-miniapp-root .rank{font-weight:800;font-size:20px}#ciao-miniapp-root .rounds{display:flex;gap:7px;overflow:auto;padding:4px 1px 12px;scrollbar-width:none}#ciao-miniapp-root .rounds::-webkit-scrollbar{display:none}#ciao-miniapp-root .round-chip{min-width:48px;height:38px;border:none;border-radius:12px;background:var(--card);color:var(--text);font-weight:700;font-size:13px}#ciao-miniapp-root .round-chip.active{background:var(--green)}#ciao-miniapp-root .round-chip.locked{opacity:.38}#ciao-miniapp-root .section-title{display:flex;align-items:center;justify-content:space-between;margin:7px 3px 9px}#ciao-miniapp-root .section-title h3{margin:0;font-size:17px}#ciao-miniapp-root .section-title span{font-size:12px;color:var(--muted)}#ciao-miniapp-root .matches{display:grid;gap:8px}#ciao-miniapp-root .match{background:var(--card);border:1px solid var(--line);border-radius:17px;padding:12px}#ciao-miniapp-root .match.closed{opacity:.66}#ciao-miniapp-root .match-head{display:flex;justify-content:space-between;gap:10px;align-items:center}#ciao-miniapp-root .teams{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;min-width:0;flex:1}#ciao-miniapp-root .team{display:flex;align-items:center;gap:7px;min-width:0}#ciao-miniapp-root .team.away{justify-content:flex-end;text-align:right}#ciao-miniapp-root .team-name{font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#ciao-miniapp-root .logo{width:26px;height:26px;object-fit:contain;flex:0 0 26px}#ciao-miniapp-root .dash{color:var(--muted)}#ciao-miniapp-root .score{display:flex;align-items:center;gap:6px;margin-top:11px}#ciao-miniapp-root .score-side{flex:1;display:grid;grid-template-columns:36px 1fr 36px;gap:6px}#ciao-miniapp-root .score button{border:0;border-radius:10px;background:var(--card2);color:var(--text);font-size:22px;height:38px}#ciao-miniapp-root .score-value{height:38px;border-radius:10px;background:rgba(255,255,255,.06);display:grid;place-items:center;font-size:18px;font-weight:800}#ciao-miniapp-root .colon{font-weight:800;color:var(--muted)}#ciao-miniapp-root .meta{font-size:11px;color:var(--muted);margin-top:8px;display:flex;justify-content:space-between;gap:8px}#ciao-miniapp-root .saved{color:#55c983}#ciao-miniapp-root .result{color:var(--gold)}#ciao-miniapp-root .savebar{margin-top:12px;display:flex;gap:8px}#ciao-miniapp-root .save{width:100%;border:0;border-radius:14px;padding:13px 14px;background:var(--green);color:white;font-weight:800;font-size:15px}#ciao-miniapp-root .save:disabled{opacity:.45}#ciao-miniapp-root .card{background:var(--card);border:1px solid var(--line);border-radius:17px;padding:14px;margin-bottom:8px}#ciao-miniapp-root .list-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}#ciao-miniapp-root .list-row:last-child{border-bottom:0}#ciao-miniapp-root .pos{width:30px;font-weight:800;color:var(--muted)}#ciao-miniapp-root .person{flex:1;font-weight:700}#ciao-miniapp-root .pts{font-weight:900}#ciao-miniapp-root .me{color:#66d494}#ciao-miniapp-root .calendar-row{padding:10px 0;border-bottom:1px solid var(--line)}#ciao-miniapp-root .calendar-row:last-child{border-bottom:0}#ciao-miniapp-root .cal-time{font-size:12px;color:var(--muted);margin-bottom:4px}#ciao-miniapp-root .cal-match{display:flex;align-items:center;gap:7px;font-weight:700}#ciao-miniapp-root .settings-row{display:flex;justify-content:space-between;align-items:center;gap:12px}#ciao-miniapp-root .switch{width:52px;height:30px;background:#4a5560;border-radius:999px;padding:3px;border:0}#ciao-miniapp-root .switch i{display:block;width:24px;height:24px;border-radius:50%;background:white;transition:.18s}#ciao-miniapp-root .switch.on{background:var(--green)}#ciao-miniapp-root .switch.on i{transform:translateX(22px)}#ciao-miniapp-root .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}#ciao-miniapp-root .stat{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:13px}#ciao-miniapp-root .stat b{font-size:22px;display:block}#ciao-miniapp-root .stat span{font-size:12px;color:var(--muted)}#ciao-miniapp-root .empty{text-align:center;color:var(--muted);padding:24px 10px}#ciao-miniapp-root .nav{position:fixed;left:0;right:0;bottom:0;padding:7px 9px calc(7px + env(safe-area-inset-bottom));background:color-mix(in srgb,var(--tg-theme-bg-color,var(--bg)) 92%,transparent);backdrop-filter:blur(18px);border-top:1px solid var(--line);z-index:20}#ciao-miniapp-root .nav-inner{max-width:720px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr);gap:2px}#ciao-miniapp-root .nav button{border:0;background:transparent;color:var(--muted);font-size:10px;padding:5px 1px;border-radius:11px}#ciao-miniapp-root .nav button b{display:block;font-size:19px;line-height:22px;font-weight:400}#ciao-miniapp-root .nav button.active{color:var(--tg-theme-link-color,#54a8ff);background:rgba(84,168,255,.08)}#ciao-miniapp-root .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:84px;z-index:30;background:#fff;color:#111;padding:10px 14px;border-radius:12px;font-weight:700;font-size:13px;opacity:0;pointer-events:none;transition:.2s;white-space:nowrap;max-width:90%;overflow:hidden;text-overflow:ellipsis}#ciao-miniapp-root .toast.show{opacity:1}#ciao-miniapp-root .loader{display:grid;place-items:center;height:55vh;color:var(--muted)}#ciao-miniapp-root .spinner{width:32px;height:32px;border:3px solid rgba(255,255,255,.15);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;margin-bottom:12px}@keyframes spin{to{transform:rotate(360deg)}}@media (min-width:600px){#ciao-miniapp-root .content{padding-left:20px;padding-right:20px}#ciao-miniapp-root .matches{grid-template-columns:1fr 1fr}}
+#ciao-miniapp-root{position:fixed!important;inset:0!important;z-index:2147483000!important;width:100%!important;height:100dvh!important;max-height:100dvh!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch!important;overscroll-behavior:none!important;margin:0!important;}
+#ciao-miniapp-root button,#ciao-miniapp-root input{font-family:inherit!important;}
+</style>
+
+<style id="ciao-v3-fixes">
+#ciao-miniapp-root{
+  --ciao-vh:100dvh;
+  --ciao-nav-h:64px;
+  --ciao-safe-bottom:env(safe-area-inset-bottom,0px);
+  height:var(--ciao-vh)!important;
+  max-height:var(--ciao-vh)!important;
+  padding:0!important;
+  overflow:hidden!important;
+}
+#ciao-miniapp-root .app{height:100%;display:flex;flex-direction:column;overflow:hidden}
+#ciao-miniapp-root .header{flex:0 0 auto;padding:12px 14px 8px;position:relative;background:var(--tg-theme-bg-color,var(--bg))}
+#ciao-miniapp-root .brand h1{font-size:20px}
+#ciao-miniapp-root .brand small{font-size:11px}
+#ciao-miniapp-root .content{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:4px 12px calc(var(--ciao-nav-h) + var(--ciao-safe-bottom) + 92px);scroll-padding-bottom:calc(var(--ciao-nav-h) + var(--ciao-safe-bottom) + 100px);overscroll-behavior-y:contain}
+#ciao-miniapp-root .hero{padding:12px 14px;border-radius:16px;margin-bottom:8px}
+#ciao-miniapp-root .hero h2{font-size:16px}.hero p{font-size:11px}
+#ciao-miniapp-root .rank{font-size:18px}
+#ciao-miniapp-root .rounds{padding:2px 1px 8px;gap:6px}
+#ciao-miniapp-root .round-chip{min-width:44px;height:34px;border-radius:10px;font-size:12px}
+#ciao-miniapp-root .section-title{margin:4px 3px 7px}
+#ciao-miniapp-root .section-title h3{font-size:15px}
+#ciao-miniapp-root .match{border-radius:15px;padding:9px 10px}
+#ciao-miniapp-root .matches{gap:7px}
+#ciao-miniapp-root .logo{width:23px;height:23px;flex-basis:23px}
+#ciao-miniapp-root .team-name{font-size:13px}
+#ciao-miniapp-root .score{margin-top:8px;gap:5px}
+#ciao-miniapp-root .score-side{grid-template-columns:34px 1fr 34px;gap:5px}
+#ciao-miniapp-root .score button,#ciao-miniapp-root .score-value{height:36px}
+#ciao-miniapp-root .score button{font-size:20px}
+#ciao-miniapp-root .score-value{font-size:17px}
+#ciao-miniapp-root .meta{font-size:10px;margin-top:6px;align-items:flex-start}
+#ciao-miniapp-root .meta>span:first-child{white-space:nowrap}
+#ciao-miniapp-root .savebar{
+  position:absolute;
+  left:50%;
+  bottom:calc(var(--ciao-nav-h) + var(--ciao-safe-bottom) + 8px);
+  transform:translateX(-50%);
+  width:min(calc(100% - 24px),696px);
+  z-index:18;
+  margin:0;
+  padding:8px 0 4px;
+  background:linear-gradient(to top,var(--tg-theme-bg-color,var(--bg)) 78%,transparent);
+  pointer-events:none;
+} 
+#ciao-miniapp-root .savebar .save{pointer-events:auto}
+#ciao-miniapp-root .save{min-height:46px;border-radius:14px;box-shadow:0 8px 22px rgba(0,0,0,.28)}
+#ciao-miniapp-root .nav{
+  position:absolute;left:0;right:0;bottom:0;
+  min-height:var(--ciao-nav-h);
+  padding:6px 8px calc(6px + var(--ciao-safe-bottom));
+}
+#ciao-miniapp-root .nav button{font-size:9px;padding:4px 1px}
+#ciao-miniapp-root .nav button b{font-size:18px;line-height:20px}
+#ciao-miniapp-root .toast{bottom:calc(var(--ciao-nav-h) + var(--ciao-safe-bottom) + 14px)}
+@media (max-width:380px){
+ #ciao-miniapp-root .header{padding-left:10px;padding-right:10px}
+ #ciao-miniapp-root .content{padding-left:8px;padding-right:8px}
+ #ciao-miniapp-root .team-name{font-size:12px}
+ #ciao-miniapp-root .score-side{grid-template-columns:31px 1fr 31px}
+ #ciao-miniapp-root .meta{font-size:9px}
+}
+@media (min-width:600px){
+ #ciao-miniapp-root .content{padding-left:14px;padding-right:14px}
+ #ciao-miniapp-root .matches{grid-template-columns:1fr 1fr}
+}
+@media (max-height:700px){
+ #ciao-miniapp-root .header{padding-top:8px;padding-bottom:5px}
+ #ciao-miniapp-root .brand h1{font-size:18px}
+ #ciao-miniapp-root .hero{padding:9px 11px}
+ #ciao-miniapp-root .match{padding:8px 9px}
+ #ciao-miniapp-root .score{margin-top:6px}
+ #ciao-miniapp-root .score button,#ciao-miniapp-root .score-value{height:33px}
+}
+</style>
+<div id="ciao-miniapp-root">
+<div class="app">
+  <div class="header"><div class="brand"><span class="flag"><i></i><i></i><i></i></span><div><h1>Ciao, Pronostici!</h1><small>Serie A 2026/27</small></div></div></div>
+  <main id="ciao-main" class="content"><div class="loader"><div><div class="spinner"></div>Загрузка…</div></div></main>
+</div>
+<div class="nav"><div class="nav-inner">
+  <button data-tab="predict" class="active"><b>⚽</b>Прогноз</button>
+  <button data-tab="mine"><b>📋</b>Мои</button>
+  <button data-tab="table"><b>🏆</b>Таблица</button>
+  <button data-tab="calendar"><b>🗓</b>Календарь</button>
+  <button data-tab="profile"><b>👤</b>Профиль</button>
+</div></div>
+<div id="ciao-toast" class="toast"></div>
+</div>
+<script>
+(() => {
+  const root = document.getElementById('ciao-miniapp-root');
+
+  // КРИТИЧНО ДЛЯ TILDA/iOS:
+  // T123 живёт внутри .t-rec/#allrecords, которые Tilda может держать opacity:0
+  // до завершения своей загрузки. Выносим приложение прямо в body.
+  try {
+    if (root && document.body && root.parentNode !== document.body) {
+      document.body.appendChild(root);
+    }
+    root.style.setProperty('display','block','important');
+    root.style.setProperty('opacity','1','important');
+    root.style.setProperty('visibility','visible','important');
+    document.documentElement.style.setProperty('opacity','1','important');
+    document.documentElement.style.setProperty('visibility','visible','important');
+    document.body.style.setProperty('opacity','1','important');
+    document.body.style.setProperty('visibility','visible','important');
+    document.body.style.setProperty('background','#0f171f','important');
+
+    const all = document.getElementById('allrecords');
+    if (all) {
+      all.style.setProperty('display','none','important');
+      all.style.setProperty('opacity','0','important');
+      all.style.setProperty('visibility','hidden','important');
+    }
+  } catch(e) {}
+
+  const tg = window.Telegram?.WebApp || {};
+  function applyViewport(){
+    const live=Number(window.Telegram?.WebApp?.viewportHeight||0);
+    const stable=Number(window.Telegram?.WebApp?.viewportStableHeight||0);
+    const h=Math.max(320, live||stable||window.innerHeight||document.documentElement.clientHeight||600);
+    root.style.setProperty('--ciao-vh', h+'px');
+    const area=window.Telegram?.WebApp?.contentSafeAreaInset||window.Telegram?.WebApp?.safeAreaInset||{};
+    if(Number.isFinite(Number(area.bottom))) root.style.setProperty('--ciao-safe-bottom',Math.max(0,Number(area.bottom))+'px');
+    const nav=root.querySelector('.nav');
+    if(nav){requestAnimationFrame(()=>root.style.setProperty('--ciao-nav-h',Math.max(56,Math.ceil(nav.getBoundingClientRect().height))+'px'));}
+  }
+  const main = root.querySelector('#ciao-main');
+  const DIAG='https://dkefzepiiudehhzbbrjn.supabase.co/functions/v1/ciao-miniapp-api';
+  function diag(stage){
+    try{
+      const i=new Image();
+      i.style.display='none';
+      i.src=DIAG+'?stage='+encodeURIComponent(stage)+'&v=7&t='+Date.now();
+      document.body.appendChild(i);
+    }catch(e){}
+  }
+  diag('dom-detached');
+
+  // Важно: ready вызываем ещё раз ПОСЛЕ переноса root в body.
+  try { window.__ciaoNativePost?.('web_app_ready'); window.__ciaoNativePost?.('web_app_expand'); } catch(e) {}
+  try { tg?.ready?.(); tg?.expand?.(); tg?.disableVerticalSwipes?.(); } catch(e) {}
+  applyViewport();
+  try { tg?.onEvent?.('viewportChanged', applyViewport); } catch(e) {}
+  window.addEventListener('resize',applyViewport,{passive:true});
+  window.addEventListener('orientationchange',()=>setTimeout(applyViewport,120),{passive:true});
+  document.documentElement.style.overflow='hidden'; document.body.style.overflow='hidden';
+  try { tg?.setHeaderColor?.('secondary_bg_color'); tg?.setBackgroundColor?.('bg_color'); } catch(e) {}
+  function initDataFromUrl(){
+    try {
+      const variants=[location.search.replace(/^\?/,''),location.hash.replace(/^#/, '')];
+      for(const raw of variants){
+        const p=new URLSearchParams(raw);
+        const x=p.get('tgWebAppData');
+        if(x) return x;
+      }
+    } catch(e) {}
+    return '';
+  }
+  async function waitInitData(){
+    for(let i=0;i<30;i++){
+      const x=window.Telegram?.WebApp?.initData || initDataFromUrl();
+      if(x) return x;
+      await new Promise(r=>setTimeout(r,100));
+    }
+    return '';
+  }
+  let initData = '';
+  const toastEl = root.querySelector('#ciao-toast');
+  let S = null, tab = 'predict', selectedRound = null, draft = new Map();
+  const esc = s => String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const fmt = iso => iso ? new Intl.DateTimeFormat('ru-RU',{timeZone:'Europe/Rome',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}).format(new Date(iso)).replace(',',' ·') : 'время уточняется';
+  const API_BASE = 'https://dkefzepiiudehhzbbrjn.supabase.co/functions/v1/ciao-miniapp-api'; // backend для page210244509
+  const api = async (body) => { const r=await fetch(API_BASE,{method:'POST',headers:{'content-type':'application/json','x-telegram-init-data':initData},body:JSON.stringify(body)}); const j=await r.json(); if(!r.ok||!j.ok) throw new Error(j.error||'Ошибка'); return j; };
+  const logo = t => t?.custom_emoji_id ? `<img class="logo" loading="lazy" decoding="async" fetchpriority="low" src="${API_BASE}?asset=emoji&id=${encodeURIComponent(t.custom_emoji_id)}" alt="">` : '<span class="logo">⚽</span>';
+  function toast(s){toastEl.textContent=s;toastEl.classList.add('show');setTimeout(()=>toastEl.classList.remove('show'),1800);try{tg.HapticFeedback.notificationOccurred('success')}catch(e){}}
+  function roundBar(){return `<div class="rounds">${S.rounds.map(r=>`<button class="round-chip ${r.number===S.selected_round?'active':''} ${r.unlocked?'':'locked'}" data-round="${r.number}" ${r.unlocked?'':'disabled'}>${r.unlocked?r.number:'🔒 '+r.number}</button>`).join('')}</div>`}
+  function hero(){return `<div class="hero"><div class="hero-top"><div><h2>${esc(S.user.display_name)}</h2><p>${S.user.username?'@'+esc(S.user.username):'Игрок Ciao, Pronostici!'}</p></div><div><div class="rank">#${S.stats.rank}</div><p>место</p></div></div></div>`}
+  function scoreOf(m){const d=draft.get(m.id); if(d) return d; const p=m.prediction; return {h:p?.home_score??0,a:p?.away_score??0};}
+  function predict(){
+    const m=S.round.matches;
+    return hero()+roundBar()+`<div class="section-title"><h3>${S.selected_round}-й тур</h3><span>дедлайн −1 час</span></div><div class="matches">`+m.map(x=>{const v=scoreOf(x);return `<div class="match ${x.open?'':'closed'}" data-mid="${x.id}"><div class="match-head"><div class="teams"><div class="team">${logo(x.home)}<span class="team-name">${esc(x.home.name)}</span></div><span class="dash">—</span><div class="team away"><span class="team-name">${esc(x.away.name)}</span>${logo(x.away)}</div></div></div>${x.open?`<div class="score"><div class="score-side"><button data-delta="h:-1">−</button><div class="score-value">${v.h}</div><button data-delta="h:1">+</button></div><span class="colon">:</span><div class="score-side"><button data-delta="a:-1">−</button><div class="score-value">${v.a}</div><button data-delta="a:1">+</button></div></div>`:''}<div class="meta"><span>Начало матча: ${fmt(x.kickoff_at)}</span><span>${x.is_finished?`Итог ${x.home_score}:${x.away_score}`:x.open?(x.prediction?'<span class="saved">сохранён</span>':'не сохранён'):'🔒 закрыт'}</span></div></div>`}).join('')+`</div><div class="savebar"><button id="saveAll" class="save">Сохранить прогнозы на тур</button></div>`;
+  }
+  function mine(){return hero()+roundBar()+`<div class="section-title"><h3>Мои прогнозы · ${S.selected_round}-й тур</h3></div><div class="card">`+S.round.matches.map(x=>{const p=x.prediction;return `<div class="list-row"><div style="display:flex;align-items:center;gap:7px;min-width:0">${logo(x.home)}<div><div style="font-weight:800">${esc(x.home.name)} — ${esc(x.away.name)}</div><div style="font-size:12px;color:var(--muted)">${fmt(x.kickoff_at)}</div></div></div><div class="pts">${p?`${p.home_score}:${p.away_score}${p.points!=null?` · +${p.points}`:''}`:'—'}</div></div>`}).join('')+`</div>`}
+  function table(){return hero()+`<div class="section-title"><h3>Общая таблица</h3><span>${S.standings.length} игроков</span></div><div class="card">`+S.standings.map((x,i)=>`<div class="list-row ${x.id===S.user.id?'me':''}"><div class="pos">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div><div class="person">${esc(x.display_name)}</div><div class="pts">${x.points}</div></div>`).join('')+`</div>`}
+  function calendar(){return roundBar()+`<div class="section-title"><h3>Календарь · ${S.selected_round}-й тур</h3></div><div class="card">`+S.round.matches.map(x=>`<div class="calendar-row"><div class="cal-time">Начало матча: ${fmt(x.kickoff_at)}</div><div class="cal-match">${logo(x.home)} ${esc(x.home.name)} — ${esc(x.away.name)} ${logo(x.away)} ${x.is_finished?`<span class="result">${x.home_score}:${x.away_score}</span>`:''}</div></div>`).join('')+`</div>`}
+  function profile(){return hero()+`<div class="stats-grid"><div class="stat"><b>${S.stats.points}</b><span>Очки</span></div><div class="stat"><b>${S.stats.exact}</b><span>Точных счетов</span></div><div class="stat"><b>${S.stats.successful}</b><span>Удачных прогнозов</span></div><div class="stat"><b>${S.stats.calculated}</b><span>Рассчитано матчей</span></div></div><div class="card" style="margin-top:10px"><div class="settings-row"><div><b>Напоминания о дедлайнах</b><div style="font-size:12px;color:var(--muted);margin-top:3px">За 3 часа и за 30 минут</div></div><button id="remSwitch" class="switch ${S.user.reminders?'on':''}"><i></i></button></div></div>`}
+  let firstRenderDone=false;
+  function render(){
+    applyViewport();
+    root.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+    main.innerHTML=tab==='predict'?predict():tab==='mine'?mine():tab==='table'?table():tab==='calendar'?calendar():profile();
+    bind();
+    if(!firstRenderDone){
+      firstRenderDone=true;
+      requestAnimationFrame(()=>{
+        try{ window.__ciaoNativePost?.('web_app_ready'); }catch(e){}
+        diag('render-done');
+      });
+    }
+  }
+  function bind(){
+    root.querySelectorAll('[data-round]').forEach(b=>b.onclick=async()=>{const n=Number(b.dataset.round); if(n===S.selected_round)return; await load(n)});
+    root.querySelectorAll('[data-delta]').forEach(b=>b.onclick=()=>{const box=b.closest('.match'),id=Number(box.dataset.mid),m=S.round.matches.find(x=>x.id===id);if(!m?.open)return;const cur=scoreOf(m),[side,ds]=b.dataset.delta.split(':'),d=Number(ds),nv={h:cur.h,a:cur.a};nv[side]=Math.max(0,Math.min(20,nv[side]+d));draft.set(id,nv);render();});
+    const save=root.querySelector('#saveAll'); if(save) save.onclick=saveAll;
+    const sw=root.querySelector('#remSwitch'); if(sw) sw.onclick=toggleRem;
+  }
+  async function saveAll(){const items=S.round.matches.filter(x=>x.open).map(x=>{const v=scoreOf(x);return{match_id:x.id,home_score:v.h,away_score:v.a}}); if(!items.length)return toast('Нет открытых матчей'); try{const r=await api({action:'save_predictions',round:S.selected_round,predictions:items});toast(`Сохранено: ${r.saved}`);await load(S.selected_round,true);}catch(e){(tg.showAlert?tg.showAlert(e.message):alert(e.message))}}
+  async function toggleRem(){try{const enabled=!S.user.reminders;await api({action:'toggle_reminders',enabled});S.user.reminders=enabled;render();toast(enabled?'Напоминания включены':'Напоминания отключены')}catch(e){(tg.showAlert?tg.showAlert(e.message):alert(e.message))}}
+  async function load(round,quiet=false){
+    if(!quiet)main.innerHTML='<div class="loader"><div><div class="spinner"></div>Загрузка…</div></div>';
+    try{
+      S=await api({action:'state',round});
+      diag('api-done');
+      selectedRound=S.selected_round;
+      draft.clear();
+      render();
+    }catch(e){
+      diag('api-error');
+      main.innerHTML=`<div class="empty"><b>Не удалось открыть приложение</b><br><br>${esc(e.message)}<br><br>Закрой Mini App и открой заново из бота.</div>`;
+    }
+  }
+  root.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;render()});
+  (async()=>{
+    initData=await waitInitData();
+    if(!initData){
+      main.innerHTML='<div class="empty"><b>Telegram не передал данные авторизации.</b><br><br>Закрой Mini App и открой его заново из бота.</div>';
+      return;
+    }
+    await load();
+  })();
+})();
+</script>
+
+</body>
+</html>
