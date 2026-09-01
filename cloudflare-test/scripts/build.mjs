@@ -11,19 +11,6 @@ const cssPath = resolve(root, 'src/ui-v23.1.css');
 const jsPath = resolve(root, 'src/ui-v23.1.js');
 const outPath = resolve(root, 'dist/index.html');
 
-function printAround(text, needle, label, span = 1800) {
-  const at = text.indexOf(needle);
-  console.log(`DIAG ${label}:`, at >= 0 ? text.slice(at, at + span) : 'NOT FOUND');
-}
-
-function diagnoseBase(source) {
-  const text = String(source);
-  printAround(text, 'function __cw231RawScheduleMatches', 'raw schedule function', 1800);
-  printAround(text, 'function __cw211FavoriteDashboard', 'favorite dashboard', 5200);
-  printAround(text, 'const m=', 'first const m', 2200);
-  printAround(text, '__kind', 'favorite match kind', 2600);
-}
-
 export function applyScheduleSourcePatch(input) {
   const source = String(input);
   if (source.includes('cw231-empty__schedule-source')) return source;
@@ -42,7 +29,7 @@ export function applyScheduleSourcePatch(input) {
   const indentMatch = source.slice(Math.max(0, start - 8), start).match(/(^|\n)([ \t]*)$/);
   const i = indentMatch?.[2] || '  ';
 
-  const replacement = `${i}const nearest = visible.length ? null : __cw231NearestMatch(rawSchedule);\n${i}const body = visible.length\n${i}  ? \`<div class="cw231-today-list">\${visible.map(__cw231TodayCard).join('')}</div>\`\n${i}  : \`<div class="cw231-empty cw231-empty__schedule-source">\n${i}      <div class="cw231-empty__title">Сегодня матчей нет</div>\n${i}      \${nearest ? \`<div class="cw231-empty__next-card">\n${i}        <div class="cw231-empty__next-label">Ближайший матч</div>\n${i}        <div class="cw231-empty__match">\${esc(nearest.homeTeam?.name || '—')} — \${esc(nearest.awayTeam?.name || '—')}</div>\n${i}        <div class="cw231-empty__time">\${__cw231Status(nearest)}</div>\n${i}      </div>\` : ''}\n${i}    </div>\`;\n\n`;
+  const replacement = `${i}const favoriteTeam = S?.user?.favorite_team || null;\n${i}const favoriteData = favoriteTeam && typeof __cw18ClubQuick !== 'undefined'\n${i}  ? __cw18ClubQuick.get(Number(favoriteTeam.id))\n${i}  : null;\n${i}const favoriteRaw = favoriteTeam && favoriteData && typeof __cw211FavoriteMatch === 'function'\n${i}  ? __cw211FavoriteMatch(favoriteTeam, favoriteData)\n${i}  : null;\n${i}const nearest = visible.length\n${i}  ? null\n${i}  : (__cw231NearestMatch(rawSchedule) || __cw231NearestMatch(favoriteRaw ? [favoriteRaw] : []));\n${i}const body = visible.length\n${i}  ? \`<div class="cw231-today-list">\${visible.map(__cw231TodayCard).join('')}</div>\`\n${i}  : \`<div class="cw231-empty cw231-empty__schedule-source">\n${i}      <div class="cw231-empty__title">Сегодня матчей нет</div>\n${i}      \${nearest ? \`<div class="cw231-empty__next-card">\n${i}        <div class="cw231-empty__next-label">Ближайший матч</div>\n${i}        <div class="cw231-empty__match">\${esc(nearest.homeTeam?.name || '—')} — \${esc(nearest.awayTeam?.name || '—')}</div>\n${i}        <div class="cw231-empty__time">\${__cw231Status(nearest)}</div>\n${i}      </div>\` : ''}\n${i}    </div>\`;\n\n`;
 
   return source.slice(0, start) + replacement + source.slice(end);
 }
@@ -82,7 +69,6 @@ export async function build() {
     readFile(cssPath, 'utf8'),
     readFile(jsPath, 'utf8'),
   ]);
-  diagnoseBase(base);
   const schedulePatched = applyScheduleSourcePatch(base);
   if (!schedulePatched.includes('cw231-empty__schedule-source')) {
     throw new Error('v23.1 rawSchedule source patch did not apply');
