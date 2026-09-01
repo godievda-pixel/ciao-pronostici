@@ -62,6 +62,7 @@ const SOURCE_HINT_MARKERS = Object.freeze([
   '/api/ciao-club-calendar-fast-v1',
   '__cw9Post(__CW208_CLUB_CALENDAR',
   '__cw16MatchesHtml=function',
+  'const rows=all.filter',
   '__cw9Post',
   'boardStatus',
   'boardScore',
