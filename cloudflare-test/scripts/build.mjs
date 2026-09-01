@@ -89,16 +89,15 @@ export function applyFavoriteHtmlSourcePatch(input) {
     card.setAttribute('role', 'button');
     card.setAttribute('aria-label', 'Открыть ближайший матч любимого клуба');
     card.tabIndex = 0;
-    card.innerHTML = `
-      <small>${live ? 'Матч идёт' : 'Ближайший матч'}</small>
-      <div class="cw231-favorite-match-teams">
-        <span class="cw231-favorite-team home">${__cw231Logo(match.homeTeam)}<b>${esc(match.homeTeam?.name || '—')}</b></span>
-        <span class="cw231-favorite-match-score">${live ? esc(score) : '—'}</span>
-        <span class="cw231-favorite-team away"><b>${esc(match.awayTeam?.name || '—')}</b>${__cw231Logo(match.awayTeam)}</span>
-      </div>
-      <div class="cw231-favorite-match-status">${esc(status)}</div>
-      ${prediction}
-    `;
+    card.innerHTML =
+      '<small>' + (live ? 'Матч идёт' : 'Ближайший матч') + '</small>' +
+      '<div class="cw231-favorite-match-teams">' +
+        '<span class="cw231-favorite-team home">' + __cw231Logo(match.homeTeam) + '<b>' + esc(match.homeTeam?.name || '—') + '</b></span>' +
+        '<span class="cw231-favorite-match-score">' + (live ? esc(score) : '—') + '</span>' +
+        '<span class="cw231-favorite-team away"><b>' + esc(match.awayTeam?.name || '—') + '</b>' + __cw231Logo(match.awayTeam) + '</span>' +
+      '</div>' +
+      '<div class="cw231-favorite-match-status">' + esc(status) + '</div>' +
+      prediction;
   }
 
   return favorite.outerHTML;
