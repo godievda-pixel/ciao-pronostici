@@ -16,14 +16,18 @@ const MODULES = [
 const NAV_MARKERS = [
   "root.addEventListener('click'",
   'root.addEventListener("click"',
-  "closest('[data-tab]')",
-  'closest("[data-tab]")',
-  "closest?.('[data-tab]')",
+  "querySelectorAll('.nav",
+  'querySelectorAll(".nav',
+  '.nav button',
+  'dataset.tab',
   'data-tab="calendar"',
   'stopPropagation()',
   '#ciao-miniapp-root{',
   '#ciao-miniapp-root {',
-  'z-index:',
+  '.scoreboard-card',
+  '.board-team',
+  'class="logo"',
+  'loading="lazy"',
 ];
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -46,7 +50,7 @@ function snippets(text, markers) {
       marker,
       found: true,
       index,
-      snippet: text.slice(Math.max(0, index - 900), Math.min(text.length, index + 1800))
+      snippet: text.slice(Math.max(0, index - 1200), Math.min(text.length, index + 2600))
         .replace(/\s+/g, ' ')
         .trim(),
     };
