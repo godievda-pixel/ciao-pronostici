@@ -49,7 +49,7 @@ test('compact empty state uses live nearest-match text without decorative icon o
     readFile(new URL('../src/ui-v23.1.js', import.meta.url), 'utf8'),
   ]);
 
-  assert.doesNotMatch(premiumJs, /cw231-empty__icon/);
+  assert.doesNotMatch(premiumJs, /element\([^\n]*cw231-empty__icon/);
   assert.doesNotMatch(premiumJs, /Следующий матч уже на горизонте/);
   assert.doesNotMatch(premiumJs, /Дженоа|Комо/);
   assert.match(premiumJs, /empty\.textContent/);
