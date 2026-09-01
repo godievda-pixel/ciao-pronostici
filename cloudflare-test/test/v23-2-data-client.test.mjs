@@ -42,6 +42,32 @@ test('loads one competition through the TEST-only v23.2 route with Telegram auth
   assert.equal(data.matches[0].matchId, 'serie_a:777');
 });
 
+test('passes a bounded date range to external competition routes', async () => {
+  const requests = [];
+  const fetchImpl = async (url, options) => {
+    requests.push({ url: String(url), options });
+    return Response.json({
+      ok: true,
+      data: {
+        competition: 'ucl',
+        matches: [],
+      },
+    });
+  };
+
+  await loadCompetitionMatches('ucl', {
+    from: '2026-09-01',
+    to: '2026-12-31',
+    initData: 'tg-init-data',
+    fetchImpl,
+  });
+
+  assert.equal(
+    requests[0].url,
+    '/api/v23.2/matches?competition=ucl&from=2026-09-01&to=2026-12-31',
+  );
+});
+
 test('client fails locally when Telegram auth is unavailable', async () => {
   let calls = 0;
   await assert.rejects(
