@@ -47,7 +47,7 @@ export function applyFavoriteHtmlSourcePatch(input) {
   let source = String(input);
   if (source.includes('cw231-favorite-normalized-link')) return source;
 
-  const pattern = /function\s+__cw231FavoriteHtml\s*\(\)\s*\{\s*const\s+host\s*=\s*document\.createElement\('div'\);\s*host\.innerHTML\s*=\s*__cw231LegacyHomeAndPredict\(\);\s*return\s+host\.querySelector\('\.cw18-favorite-home,\.cw2017-favorite-reminder'\)\?\.outerHTML\s*\|\|\s*'';\s*\}/;
+  const pattern = /function __cw231FavoriteHtml\(\)\s*\{\s*const host = document\.createElement\('div'\);\s*host\.innerHTML = __cw231LegacyHomeAndPredict\(\);\s*return host\.querySelector\('\.cw18-favorite-home,\.cw2017-favorite-reminder'\)\?\.outerHTML \|\| '';\s*\}/;
   if (!pattern.test(source)) return source;
 
   const replacement = `function __cw231FavoriteHtml() {
@@ -77,6 +77,11 @@ export function applyFavoriteHtmlSourcePatch(input) {
 
   const card = favorite.querySelector('.cw211-favorite-body .cw211-info-card:nth-child(2)');
   if (card && match?.matchId) {
+    const live = match.status === 'live';
+    const score = __cw231Score(match);
+    const status = __cw231Status(match);
+    const prediction = card.querySelector('.cw211-prediction')?.outerHTML || '';
+
     card.classList.add('cw231-favorite-source-link');
     card.dataset.cw231Action = 'match';
     card.dataset.cw231Match = String(match.matchId);
@@ -84,6 +89,16 @@ export function applyFavoriteHtmlSourcePatch(input) {
     card.setAttribute('role', 'button');
     card.setAttribute('aria-label', 'Открыть ближайший матч любимого клуба');
     card.tabIndex = 0;
+    card.innerHTML = `
+      <small>${live ? 'Матч идёт' : 'Ближайший матч'}</small>
+      <div class="cw231-favorite-match-teams">
+        <span class="cw231-favorite-team home">${__cw231Logo(match.homeTeam)}<b>${esc(match.homeTeam?.name || '—')}</b></span>
+        <span class="cw231-favorite-match-score">${live ? esc(score) : '—'}</span>
+        <span class="cw231-favorite-team away"><b>${esc(match.awayTeam?.name || '—')}</b>${__cw231Logo(match.awayTeam)}</span>
+      </div>
+      <div class="cw231-favorite-match-status">${esc(status)}</div>
+      ${prediction}
+    `;
   }
 
   return favorite.outerHTML;
