@@ -6,6 +6,7 @@ import {
   renderCompetitionScreen,
   loadCompetitionScreen,
   createMatchesUiController,
+  installMatchesUi,
 } from '../src/v23.2/matches-ui.mjs';
 
 test('season date range spans the current European football season', () => {
@@ -119,4 +120,55 @@ test('matches controller opens the hub, loads external competitions and preserve
   await controller.openCompetition('serie_a');
   assert.equal(hidden, 1);
   assert.deepEqual(loaded, ['ucl']);
+});
+
+test('DOM installer binds the v23.2 hub to the existing calendar tab and closes on other tabs', () => {
+  const listeners = {};
+  const nodes = new Map();
+  const append = node => { if (node.id) nodes.set(node.id, node); };
+  const documentRef = {
+    head: { appendChild: append },
+    body: { appendChild: append },
+    createElement(tagName) {
+      return {
+        tagName,
+        id: '',
+        className: '',
+        hidden: false,
+        innerHTML: '',
+        textContent: '',
+        setAttribute() {},
+      };
+    },
+    getElementById(id) { return nodes.get(id) || null; },
+    addEventListener(type, handler) { listeners[type] = handler; },
+  };
+
+  installMatchesUi(documentRef, { defer: fn => fn() });
+  const overlay = nodes.get('ciao-v232-matches-overlay');
+  assert.ok(overlay);
+  assert.equal(overlay.hidden, true);
+
+  listeners.click({
+    target: {
+      closest(selector) {
+        if (selector === 'button[data-tab]') return { dataset: { tab: 'calendar' } };
+        return null;
+      },
+    },
+    preventDefault() {},
+  });
+  assert.equal(overlay.hidden, false);
+  assert.match(overlay.innerHTML, /data-cw232-view="hub"/);
+
+  listeners.click({
+    target: {
+      closest(selector) {
+        if (selector === 'button[data-tab]') return { dataset: { tab: 'profile' } };
+        return null;
+      },
+    },
+    preventDefault() {},
+  });
+  assert.equal(overlay.hidden, true);
 });
