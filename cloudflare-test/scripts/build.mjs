@@ -129,6 +129,16 @@ export function applyFavoriteHtmlSourcePatch(input) {
   return source.replace(pattern, replacement);
 }
 
+export function applyLogoSourcePatch(input) {
+  const source = String(input);
+  if (source.includes('data-cw231-stable-logo-load="1"')) return source;
+
+  return source.replace(
+    /<img class="logo" loading="lazy" decoding="async" fetchpriority="low"/g,
+    '<img class="logo" width="48" height="48" loading="eager" decoding="sync" fetchpriority="auto" data-cw231-stable-logo-load="1"',
+  );
+}
+
 export function applyPatch(baseHtml, css, js) {
   let html = String(baseHtml);
   if (!html.includes(BASE_BUILD)) throw new Error(`base build marker missing: ${BASE_BUILD}`);
@@ -201,8 +211,13 @@ export async function build() {
     throw new Error('v23.1 favorite normalized link patch did not apply');
   }
 
+  const logoPatched = applyLogoSourcePatch(favoritePatched);
+  if (!logoPatched.includes('data-cw231-stable-logo-load="1"')) {
+    throw new Error('v23.1 stable logo source patch did not apply');
+  }
+
   await copyV232Modules();
-  const html = injectV232Entry(applyPatch(favoritePatched, css, js));
+  const html = injectV232Entry(applyPatch(logoPatched, css, js));
   await mkdir(dirname(outPath), { recursive: true });
   await writeFile(outPath, html, 'utf8');
   return { output: outPath, bytes: Buffer.byteLength(html), build: TEST_BUILD };
