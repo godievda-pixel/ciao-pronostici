@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { applyPatch, BASE_BUILD, TEST_BUILD } from '../scripts/build.mjs';
+import { applyPatch, applyScheduleSourcePatch, BASE_BUILD, TEST_BUILD } from '../scripts/build.mjs';
 
 const base = `<!doctype html><html><head><meta name="build" content="${BASE_BUILD}"></head><body><div id="ciao-miniapp-root"><div class="cw231-today-head"><h2>Сегодня в мире кальчо</h2></div><div class="cw231-prediction-tabs"><button>Сделать прогноз</button><button>Мои прогнозы</button></div><div class="cw231-filters"><button>Все</button><button>Серия A</button></div><div class="cw231-empty"><b>Сегодня матчей нет</b><div>Ближайший матч · Дженоа — Комо · 04.09 · 21:45</div></div></div></body></html>`;
 const css = '.cw231-prediction-tabs{gap:8px}';
@@ -39,21 +39,33 @@ test('premium home sources define the approved today card and spacing', async ()
 
   assert.match(premiumJs, /Матчи и события дня/);
   assert.match(premiumJs, /cw231-today-premium/);
-  assert.match(premiumJs, /cw231-empty__next-card/);
-  assert.match(premiumJs, /Ближайший матч/);
 });
 
-test('compact empty state uses live nearest-match text without decorative icon or filler copy', async () => {
+test('schedule source patch renders nearest match directly from rawSchedule result', () => {
+  const source = `
+    const nearest = visible.length ? null : __cw231NearestMatch(rawSchedule);
+    const body = visible.length
+      ? \`<div class="cw231-today-list">\${visible.map(__cw231TodayCard).join('')}</div>\`
+      : \`<div class="cw231-empty"><b>Сегодня матчей нет</b>\${nearest ? \`<div>Ближайший матч · \${esc(nearest.homeTeam?.name || '—')} — \${esc(nearest.awayTeam?.name || '—')} · \${__cw231Status(nearest)}</div>\` : ''}</div>\`;
+  `;
+
+  const patched = applyScheduleSourcePatch(source);
+
+  assert.match(patched, /cw231-empty__next-card/);
+  assert.match(patched, /nearest\.homeTeam/);
+  assert.match(patched, /nearest\.awayTeam/);
+  assert.match(patched, /__cw231Status\(nearest\)/);
+  assert.match(patched, /Ближайший матч/);
+  assert.doesNotMatch(patched, /Ближайший матч ·/);
+});
+
+test('compact empty state has no forced minimum height or decorative filler', async () => {
   const [premiumCss, premiumJs] = await Promise.all([
     readFile(new URL('../src/ui-v23.1.css', import.meta.url), 'utf8'),
     readFile(new URL('../src/ui-v23.1.js', import.meta.url), 'utf8'),
   ]);
 
-  assert.doesNotMatch(premiumJs, /element\([^\n]*cw231-empty__icon/);
+  assert.doesNotMatch(premiumCss, /\.cw231-empty\{[^}]*min-height/s);
   assert.doesNotMatch(premiumJs, /Следующий матч уже на горизонте/);
   assert.doesNotMatch(premiumJs, /Дженоа|Комо/);
-  assert.match(premiumJs, /empty\.textContent/);
-  assert.match(premiumJs, /cw231-empty__next-card/);
-  assert.match(premiumCss, /min-height:\s*128px!important/);
-  assert.match(premiumCss, /margin-top:\s*12px!important/);
 });
