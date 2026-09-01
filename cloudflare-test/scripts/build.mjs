@@ -11,25 +11,18 @@ const cssPath = resolve(root, 'src/ui-v23.1.css');
 const jsPath = resolve(root, 'src/ui-v23.1.js');
 const outPath = resolve(root, 'dist/index.html');
 
-function diagnoseCalendarLoader(input) {
-  const source = String(input);
-  for (const needle of ['__cw209Schedule=', '/api/schedule', 'schedule-fast', 'function __cw209']) {
-    let from = 0;
-    let count = 0;
-    while (count < 8) {
-      const at = source.indexOf(needle, from);
-      if (at < 0) break;
-      console.log(`DIAG ${needle} ${count + 1}:`, source.slice(Math.max(0, at - 700), at + 1800));
-      from = at + needle.length;
-      count += 1;
-    }
-    if (!count) console.log(`DIAG ${needle}: NOT FOUND`);
-  }
-}
-
 export function applyScheduleSourcePatch(input) {
-  const source = String(input);
+  let source = String(input);
   if (source.includes('cw231-empty__schedule-source')) return source;
+
+  const homeNeedle = 'const rawSchedule = __cw231RawScheduleMatches();';
+  const homeAt = source.indexOf(homeNeedle);
+  if (homeAt >= 0) {
+    const indentMatch = source.slice(Math.max(0, homeAt - 8), homeAt).match(/(^|\n)([ \t]*)$/);
+    const i = indentMatch?.[2] || '  ';
+    const prefetch = `${i}if (!__cw209Schedule && !__cw209ScheduleLoading && !__cw209ScheduleError && typeof __cw209LoadSchedule === 'function') {\n${i}  setTimeout(() => {\n${i}    __cw209LoadSchedule().then(() => {\n${i}      if (!matchViewId && !clubViewId && main?.querySelector?.('.cw231-today-head')) render();\n${i}    }).catch(() => {});\n${i}  }, 0);\n${i}}\n${i}${homeNeedle}`;
+    source = source.slice(0, homeAt) + prefetch + source.slice(homeAt + homeNeedle.length);
+  }
 
   const startNeedle = 'const nearest = visible.length ? null : __cw231NearestMatch(rawSchedule);';
   const start = source.indexOf(startNeedle);
@@ -45,7 +38,7 @@ export function applyScheduleSourcePatch(input) {
   const indentMatch = source.slice(Math.max(0, start - 8), start).match(/(^|\n)([ \t]*)$/);
   const i = indentMatch?.[2] || '  ';
 
-  const replacement = `${i}const favoriteTeam = S?.user?.favorite_team || null;\n${i}const favoriteData = favoriteTeam && typeof __cw18ClubQuick !== 'undefined'\n${i}  ? __cw18ClubQuick.get(Number(favoriteTeam.id))\n${i}  : null;\n${i}const favoriteRaw = favoriteTeam && favoriteData && typeof __cw211FavoriteMatch === 'function'\n${i}  ? __cw211FavoriteMatch(favoriteTeam, favoriteData)\n${i}  : null;\n${i}const nearest = visible.length\n${i}  ? null\n${i}  : (__cw231NearestMatch(rawSchedule) || __cw231NearestMatch(favoriteRaw ? [favoriteRaw] : []));\n${i}const body = visible.length\n${i}  ? \`<div class="cw231-today-list">\${visible.map(__cw231TodayCard).join('')}</div>\`\n${i}  : \`<div class="cw231-empty cw231-empty__schedule-source">\n${i}      <div class="cw231-empty__title">Сегодня матчей нет</div>\n${i}      \${nearest ? \`<div class="cw231-empty__next-card">\n${i}        <div class="cw231-empty__next-label">Ближайший матч</div>\n${i}        <div class="cw231-empty__match">\${esc(nearest.homeTeam?.name || '—')} — \${esc(nearest.awayTeam?.name || '—')}</div>\n${i}        <div class="cw231-empty__time">\${__cw231Status(nearest)}</div>\n${i}      </div>\` : ''}\n${i}    </div>\`;\n\n`;
+  const replacement = `${i}const nearest = visible.length ? null : __cw231NearestMatch(rawSchedule);\n${i}const body = visible.length\n${i}  ? \`<div class="cw231-today-list">\${visible.map(__cw231TodayCard).join('')}</div>\`\n${i}  : \`<div class="cw231-empty cw231-empty__schedule-source">\n${i}      <div class="cw231-empty__title">Сегодня матчей нет</div>\n${i}      \${nearest ? \`<div class="cw231-empty__next-card">\n${i}        <div class="cw231-empty__next-label">Ближайший матч</div>\n${i}        <div class="cw231-empty__match">\${esc(nearest.homeTeam?.name || '—')} — \${esc(nearest.awayTeam?.name || '—')}</div>\n${i}        <div class="cw231-empty__time">\${__cw231Status(nearest)}</div>\n${i}      </div>\` : ''}\n${i}    </div>\`;\n\n`;
 
   return source.slice(0, start) + replacement + source.slice(end);
 }
@@ -85,7 +78,6 @@ export async function build() {
     readFile(cssPath, 'utf8'),
     readFile(jsPath, 'utf8'),
   ]);
-  diagnoseCalendarLoader(base);
   const schedulePatched = applyScheduleSourcePatch(base);
   if (!schedulePatched.includes('cw231-empty__schedule-source')) {
     throw new Error('v23.1 rawSchedule source patch did not apply');
