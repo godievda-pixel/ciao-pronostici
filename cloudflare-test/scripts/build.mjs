@@ -43,6 +43,17 @@ export function applyScheduleSourcePatch(input) {
   return source.slice(0, start) + replacement + source.slice(end);
 }
 
+export function applyFavoriteMatchSourcePatch(input) {
+  let source = String(input);
+  if (source.includes('cw231-favorite-source-link')) return source;
+
+  const needle = `<div class="cw211-info-card"><small>\${m?.__kind==='live'?'Матч идёт':'Ближайший матч'}</small>`;
+  if (!source.includes(needle)) return source;
+
+  const replacement = `<div class="cw211-info-card cw231-favorite-source-link" data-cw211-match="\${mid}" role="button" tabindex="0"><small>\${m?.__kind==='live'?'Матч идёт':'Ближайший матч'}</small>`;
+  return source.replace(needle, replacement);
+}
+
 export function applyPatch(baseHtml, css, js) {
   let html = String(baseHtml);
   if (!html.includes(BASE_BUILD)) {
@@ -82,7 +93,11 @@ export async function build() {
   if (!schedulePatched.includes('cw231-empty__schedule-source')) {
     throw new Error('v23.1 rawSchedule source patch did not apply');
   }
-  const html = applyPatch(schedulePatched, css, js);
+  const favoritePatched = applyFavoriteMatchSourcePatch(schedulePatched);
+  if (!favoritePatched.includes('cw231-favorite-source-link')) {
+    throw new Error('v23.1 favorite match source patch did not apply');
+  }
+  const html = applyPatch(favoritePatched, css, js);
   await mkdir(dirname(outPath), { recursive: true });
   await writeFile(outPath, html, 'utf8');
   return { output: outPath, bytes: Buffer.byteLength(html), build: TEST_BUILD };
