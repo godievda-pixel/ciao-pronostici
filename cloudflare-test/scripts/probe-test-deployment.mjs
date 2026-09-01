@@ -21,6 +21,9 @@ const NAV_MARKERS = [
   "closest?.('[data-tab]')",
   'data-tab="calendar"',
   'stopPropagation()',
+  '#ciao-miniapp-root{',
+  '#ciao-miniapp-root {',
+  'z-index:',
 ];
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
