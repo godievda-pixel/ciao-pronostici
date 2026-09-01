@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { normalizeMatch } from '../src/v23.2/match-normalizer.mjs';
 import {
   sortChronologically,
@@ -64,4 +65,15 @@ test('favorite team next match scans every competition', () => {
     nextMatchForTeam(matches, '10', Date.parse('2026-09-01T00:00:00Z')).matchId,
     'serie_a:1',
   );
+});
+
+test('browser entry exposes core only and has no rendering side effects', async () => {
+  const source = await readFile(new URL('../src/v23.2/index.mjs', import.meta.url), 'utf8');
+  assert.match(source, /globalThis\.CiaoV232Core/);
+  assert.doesNotMatch(source, /document\.|MutationObserver|setInterval|setTimeout|fetch\(/);
+
+  delete globalThis.CiaoV232Core;
+  await import(`../src/v23.2/index.mjs?test=${Date.now()}`);
+  assert.equal(globalThis.CiaoV232Core.version, '23.2-core');
+  assert.equal(globalThis.CiaoV232Core.competitions.length, 5);
 });
