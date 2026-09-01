@@ -1,0 +1,106 @@
+function normalizeSnippet(value) {
+  return String(value).replace(/\s+/g, ' ').trim().slice(0, 240);
+}
+
+function inferMethod(callText) {
+  const match = String(callText).match(/method\s*:\s*['\"]([A-Za-z]+)['\"]/i);
+  return String(match?.[1] || 'GET').toUpperCase();
+}
+
+export function discoverApiCalls(source) {
+  const text = String(source);
+  const calls = [];
+  const pattern = /fetch\s*\(\s*([`'\"])(\/api\/[\s\S]*?)\1([\s\S]{0,220}?)\)/g;
+  let match;
+
+  while ((match = pattern.exec(text))) {
+    const route = String(match[2]).trim();
+    const callText = match[0];
+    calls.push({
+      route,
+      method: inferMethod(callText),
+      concrete: !/[${}]/.test(route),
+      snippet: normalizeSnippet(callText),
+    });
+  }
+
+  const unique = new Map();
+  for (const call of calls) {
+    const key = `${call.method} ${call.route}`;
+    if (!unique.has(key)) unique.set(key, call);
+  }
+
+  return [...unique.values()].sort((a, b) =>
+    a.route.localeCompare(b.route) || a.method.localeCompare(b.method)
+  );
+}
+
+function primitiveKind(value) {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'array';
+  return typeof value;
+}
+
+function nestedKeys(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  return Object.keys(value).sort();
+}
+
+export function summarizeJsonShape(value) {
+  const kind = primitiveKind(value);
+
+  if (kind === 'array') {
+    const first = value.find(item => item && typeof item === 'object' && !Array.isArray(item));
+    if (!first) return { kind: 'array', itemKeys: [] };
+
+    const itemKeys = Object.keys(first).sort();
+    const nested = {};
+    for (const key of itemKeys) {
+      const keys = nestedKeys(first[key]);
+      if (keys) nested[key] = keys;
+    }
+
+    return {
+      kind: 'array',
+      itemKeys,
+      ...(Object.keys(nested).length ? { nestedKeys: nested } : {}),
+    };
+  }
+
+  if (kind === 'object') {
+    const keys = Object.keys(value).sort();
+    const objectKeys = {};
+
+    for (const key of keys) {
+      const child = value[key];
+      const childKind = primitiveKind(child);
+
+      if (childKind === 'array') {
+        const first = child.find(item => item && typeof item === 'object' && !Array.isArray(item));
+        const itemKeys = first ? Object.keys(first).sort() : [];
+        const nested = {};
+
+        if (first) {
+          for (const itemKey of itemKeys) {
+            const keys2 = nestedKeys(first[itemKey]);
+            if (keys2) nested[itemKey] = keys2;
+          }
+        }
+
+        objectKeys[key] = {
+          kind: 'array',
+          itemKeys,
+          ...(Object.keys(nested).length ? { nestedKeys: nested } : {}),
+        };
+      } else if (childKind === 'object') {
+        objectKeys[key] = { kind: 'object', keys: Object.keys(child).sort() };
+      } else {
+        objectKeys[key] = { kind: childKind };
+      }
+    }
+
+    return { kind: 'object', keys, objectKeys };
+  }
+
+  return { kind };
+}
