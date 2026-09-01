@@ -68,6 +68,16 @@ test('favorite home match card renders both clubs with logos and calendar status
   assert.match(patched, /cw231-favorite-match-status/);
 });
 
+test('favorite home match premium styles keep the whole card interactive', async () => {
+  const css = await readFile(new URL('../src/ui-v23.1.css', import.meta.url), 'utf8');
+
+  assert.match(css, /\.cw231-favorite-source-link/);
+  assert.match(css, /\.cw231-favorite-match-teams/);
+  assert.match(css, /\.cw231-favorite-team img/);
+  assert.match(css, /\.cw231-favorite-match-score/);
+  assert.match(css, /\.cw231-favorite-match-status/);
+});
+
 test('runtime no longer depends on clicking a hidden match-center button', async () => {
   const js = await readFile(new URL('../src/ui-v23.1.js', import.meta.url), 'utf8');
 
