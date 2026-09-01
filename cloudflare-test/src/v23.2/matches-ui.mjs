@@ -308,26 +308,23 @@ export function installMatchesUi(
   documentRef.addEventListener('click', event => {
     const target = event?.target;
     if (!target?.closest) return;
-    const nav = target.closest('button[data-tab]');
-    if (!nav || nav.dataset?.cw232NavBound === '1') return;
-    handleNav(nav);
-  }, true);
-
-  documentRef.addEventListener('click', event => {
-    const target = event?.target;
-    if (!target?.closest) return;
 
     const nav = target.closest('button[data-tab]');
-    if (nav) return;
+    if (nav) {
+      if (nav.dataset?.cw232NavBound !== '1') handleNav(nav);
+      return;
+    }
 
     const action = target.closest('[data-cw232-action]');
     if (action?.dataset?.cw232Action === 'hub') {
       event.preventDefault?.();
+      event.stopPropagation?.();
       controller.openHub();
       return;
     }
     if (action?.dataset?.cw232Action === 'retry') {
       event.preventDefault?.();
+      event.stopPropagation?.();
       const competition = action.dataset?.cw232Competition;
       if (competition) void controller.openCompetition(competition);
       return;
@@ -336,9 +333,10 @@ export function installMatchesUi(
     const card = target.closest('.cw232-tournament-card[data-cw232-competition]');
     if (card?.dataset?.cw232Competition) {
       event.preventDefault?.();
+      event.stopPropagation?.();
       void controller.openCompetition(card.dataset.cw232Competition);
     }
-  });
+  }, true);
 
   return controller;
 }
