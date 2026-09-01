@@ -18,13 +18,10 @@ function printAround(text, needle, label, span = 1800) {
 
 function diagnoseBase(source) {
   const text = String(source);
-  printAround(text, 'function __cw231NearestMatch', 'nearest function', 1400);
-  printAround(text, 'function __cw231RawScheduleMatches', 'raw schedule function', 2200);
-
-  for (const needle of ['nextMatch', 'next_match', 'БЛИЖАЙШИЙ МАТЧ', 'Ближайший матч']) {
-    const at = text.indexOf(needle);
-    console.log(`DIAG ${needle}:`, at >= 0 ? text.slice(Math.max(0, at - 700), at + 1800) : 'NOT FOUND');
-  }
+  printAround(text, 'function __cw231RawScheduleMatches', 'raw schedule function', 1800);
+  printAround(text, 'function __cw211FavoriteDashboard', 'favorite dashboard', 5200);
+  printAround(text, 'const m=', 'first const m', 2200);
+  printAround(text, '__kind', 'favorite match kind', 2600);
 }
 
 export function applyScheduleSourcePatch(input) {
