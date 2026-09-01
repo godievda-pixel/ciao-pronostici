@@ -56,22 +56,11 @@ export function applyFavoriteMatchSourcePatch(input) {
 
 export function applyPatch(baseHtml, css, js) {
   let html = String(baseHtml);
-  if (!html.includes(BASE_BUILD)) {
-    throw new Error(`base build marker missing: ${BASE_BUILD}`);
-  }
-  if (!/<\/head>/i.test(html) || !/<\/body>/i.test(html)) {
-    throw new Error('base HTML is missing head/body anchors');
-  }
+  if (!html.includes(BASE_BUILD)) throw new Error(`base build marker missing: ${BASE_BUILD}`);
+  if (!/<\/head>/i.test(html) || !/<\/body>/i.test(html)) throw new Error('base HTML is missing head/body anchors');
   if (/ciao-web-github-test-patch/.test(html)) return html;
-
-  html = html.replace(
-    /<\/head>/i,
-    `<meta name="ciao-test-build" content="${TEST_BUILD}">\n<style id="ciao-web-github-test-patch">\n${css}\n</style>\n</head>`,
-  );
-  html = html.replace(
-    /<\/body>/i,
-    `<script id="ciao-web-github-test-runtime">\n${js}\n</script>\n</body>`,
-  );
+  html = html.replace(/<\/head>/i, `<meta name="ciao-test-build" content="${TEST_BUILD}">\n<style id="ciao-web-github-test-patch">\n${css}\n</style>\n</head>`);
+  html = html.replace(/<\/body>/i, `<script id="ciao-web-github-test-runtime">\n${js}\n</script>\n</body>`);
   return html;
 }
 
@@ -83,20 +72,21 @@ async function loadBase() {
   return response.text();
 }
 
+function diag(source, needle, label) {
+  const at = source.indexOf(needle);
+  if (at < 0) return console.log(`DIAG ${label}: missing`);
+  console.log(`DIAG ${label}:`, source.slice(Math.max(0, at - 700), at + 1600));
+}
+
 export async function build() {
-  const [base, css, js] = await Promise.all([
-    loadBase(),
-    readFile(cssPath, 'utf8'),
-    readFile(jsPath, 'utf8'),
-  ]);
+  const [base, css, js] = await Promise.all([loadBase(), readFile(cssPath, 'utf8'), readFile(jsPath, 'utf8')]);
+  diag(base, 'function __cw211FavoriteMatch', '__cw211FavoriteMatch');
+  diag(base, 'overview.next_match', 'overview.next_match');
+  diag(base, 'm=__cw211FavoriteMatch', 'favorite dashboard mid');
   const schedulePatched = applyScheduleSourcePatch(base);
-  if (!schedulePatched.includes('cw231-empty__schedule-source')) {
-    throw new Error('v23.1 rawSchedule source patch did not apply');
-  }
+  if (!schedulePatched.includes('cw231-empty__schedule-source')) throw new Error('v23.1 rawSchedule source patch did not apply');
   const favoritePatched = applyFavoriteMatchSourcePatch(schedulePatched);
-  if (!favoritePatched.includes('cw231-favorite-source-link')) {
-    throw new Error('v23.1 favorite match source patch did not apply');
-  }
+  if (!favoritePatched.includes('cw231-favorite-source-link')) throw new Error('v23.1 favorite match source patch did not apply');
   const html = applyPatch(favoritePatched, css, js);
   await mkdir(dirname(outPath), { recursive: true });
   await writeFile(outPath, html, 'utf8');
@@ -104,8 +94,5 @@ export async function build() {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  build().then((result) => console.log(JSON.stringify({ ok: true, ...result }))).catch((error) => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  });
+  build().then((result) => console.log(JSON.stringify({ ok: true, ...result }))).catch((error) => { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1; });
 }
