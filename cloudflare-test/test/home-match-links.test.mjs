@@ -69,6 +69,28 @@ test('favorite home match card renders both clubs with logos and calendar status
   assert.match(patched, /card\.querySelector\('\.cw211-prediction'\)/);
 });
 
+test('favorite match reserves its final geometry before calendar hydration', async () => {
+  const source = `
+  function __cw231FavoriteHtml() {
+    const host = document.createElement('div');
+    host.innerHTML = __cw231LegacyHomeAndPredict();
+    return host.querySelector('.cw18-favorite-home,.cw2017-favorite-reminder')?.outerHTML || '';
+  }
+  `;
+
+  const [patched, css] = await Promise.all([
+    Promise.resolve(applyFavoriteHtmlSourcePatch(source)),
+    readFile(new URL('../src/ui-v23.1.css', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(patched, /card\.classList\.add\('cw231-favorite-shell'\)/);
+  assert.match(patched, /cw231-favorite-match-placeholder/);
+  assert.match(patched, /if \(card\) \{/);
+  assert.match(css, /\.cw211-favorite-body \.cw211-info-card:nth-child\(2\)[^{]*\{[^}]*min-height:/s);
+  assert.match(css, /\.cw231-favorite-match-teams\{[^}]*min-height:/s);
+  assert.match(css, /\.cw231-favorite-match-status\{[^}]*min-height:/s);
+});
+
 test('favorite home match premium styles keep the whole card interactive', async () => {
   const css = await readFile(new URL('../src/ui-v23.1.css', import.meta.url), 'utf8');
 
