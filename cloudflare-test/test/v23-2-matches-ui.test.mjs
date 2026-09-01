@@ -123,7 +123,7 @@ test('matches controller opens the hub, loads external competitions and preserve
 });
 
 test('DOM installer binds the v23.2 hub to the existing calendar tab and closes on other tabs', () => {
-  const listeners = {};
+  const listeners = [];
   const nodes = new Map();
   const append = node => { if (node.id) nodes.set(node.id, node); };
   const documentRef = {
@@ -137,11 +137,13 @@ test('DOM installer binds the v23.2 hub to the existing calendar tab and closes 
         hidden: false,
         innerHTML: '',
         textContent: '',
+        dataset: {},
         setAttribute() {},
       };
     },
     getElementById(id) { return nodes.get(id) || null; },
-    addEventListener(type, handler) { listeners[type] = handler; },
+    querySelectorAll() { return []; },
+    addEventListener(type, handler, options) { listeners.push({ type, handler, options }); },
   };
 
   installMatchesUi(documentRef, { defer: fn => fn() });
@@ -149,7 +151,10 @@ test('DOM installer binds the v23.2 hub to the existing calendar tab and closes 
   assert.ok(overlay);
   assert.equal(overlay.hidden, true);
 
-  listeners.click({
+  const captureClick = listeners.find(item => item.type === 'click' && item.options === true)?.handler;
+  assert.equal(typeof captureClick, 'function');
+
+  captureClick({
     target: {
       closest(selector) {
         if (selector === 'button[data-tab]') return { dataset: { tab: 'calendar' } };
@@ -161,7 +166,7 @@ test('DOM installer binds the v23.2 hub to the existing calendar tab and closes 
   assert.equal(overlay.hidden, false);
   assert.match(overlay.innerHTML, /data-cw232-view="hub"/);
 
-  listeners.click({
+  captureClick({
     target: {
       closest(selector) {
         if (selector === 'button[data-tab]') return { dataset: { tab: 'profile' } };
