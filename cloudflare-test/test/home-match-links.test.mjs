@@ -66,6 +66,7 @@ test('favorite home match card renders both clubs with logos and calendar status
   assert.match(patched, /match\.status === 'live'/);
   assert.match(patched, /cw231-favorite-match-teams/);
   assert.match(patched, /cw231-favorite-match-status/);
+  assert.match(patched, /card\.querySelector\('\.cw211-prediction'\)/);
 });
 
 test('favorite home match premium styles keep the whole card interactive', async () => {
