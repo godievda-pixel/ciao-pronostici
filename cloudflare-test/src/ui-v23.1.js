@@ -40,32 +40,16 @@
   }
 
   function enhanceFavoriteMatchCard() {
-    document.querySelectorAll('.cw211-favorite-body .cw211-info-card').forEach((card) => {
-      const trigger = card.querySelector('.cw211-match-btn[data-cw211-match]');
-      const matchId = trigger?.dataset?.cw211Match;
-      if (!matchId) return;
-
+    document.querySelectorAll('.cw231-favorite-source-link[data-cw211-match]').forEach((card) => {
       card.classList.add('cw231-favorite-match-card');
-      card.dataset.cw211Match = matchId;
-      card.setAttribute('role', 'button');
       card.setAttribute('aria-label', 'Открыть ближайший матч любимого клуба');
-      card.tabIndex = 0;
-
-      if (card.dataset.cw231ClickBound !== '1') {
-        card.dataset.cw231ClickBound = '1';
-        card.addEventListener('click', (event) => {
-          if (event.target?.closest?.('.cw211-match-btn[data-cw211-match]')) return;
-          event.preventDefault();
-          trigger.click();
-        });
-      }
 
       if (card.dataset.cw231KeyBound === '1') return;
       card.dataset.cw231KeyBound = '1';
       card.addEventListener('keydown', (event) => {
         if (event.key !== 'Enter' && event.key !== ' ') return;
         event.preventDefault();
-        trigger.click();
+        card.click();
       });
     });
   }
