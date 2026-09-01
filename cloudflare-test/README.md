@@ -18,3 +18,7 @@ After the first successful deploy, Telegram TEST should permanently point to:
 Production `ciao-web-app` is intentionally not managed by this directory yet.
 
 Build trigger: 2026-09-01T14:37+03:00
+
+## v23.2 migration checkpoint
+
+The v23.2 competition model and Tournament Engine are loaded in TEST as inert ES modules under `/v23.2/`. v23.1 remains the visible UI until the next migration milestone explicitly switches a screen.
