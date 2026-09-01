@@ -39,78 +39,8 @@
     }
   }
 
-  function parseNearest(text) {
-    const normalized = String(text || '')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    const dotMatch = normalized.match(
-      /Ближайший матч\s*[·:]?\s*([^·]+?)\s*·\s*(.+)$/i,
-    );
-
-    if (dotMatch) {
-      return {
-        label: 'Ближайший матч',
-        match: dotMatch[1].trim(),
-        time: dotMatch[2].trim(),
-      };
-    }
-
-    return null;
-  }
-
-  function extractNearest(empty) {
-    const children = [...empty.children].filter((node) => {
-      if (!(node instanceof HTMLElement)) return false;
-      return !node.matches(
-        '.cw231-empty__title,.cw231-empty__next-card',
-      );
-    });
-
-    for (const node of children) {
-      const nearest = parseNearest(node.textContent);
-      if (nearest) return { nearest, source: node };
-    }
-
-    const nearest = parseNearest(empty.textContent);
-    return nearest ? { nearest, source: null } : null;
-  }
-
-  function enhanceEmpty(empty) {
-    if (!empty) return;
-
-    empty.querySelectorAll('.cw231-empty__icon,.cw231-empty__hint').forEach((node) => {
-      node.remove();
-    });
-
-    let title = empty.querySelector('.cw231-empty__title');
-    if (!title) {
-      const oldTitle = empty.querySelector('b');
-      if (oldTitle) {
-        oldTitle.classList.add('cw231-empty__title');
-        title = oldTitle;
-      }
-    }
-
-    if (!title || empty.querySelector('.cw231-empty__next-card')) return;
-
-    const found = extractNearest(empty);
-    if (!found) return;
-
-    const card = element('div', 'cw231-empty__next-card');
-    card.appendChild(element('div', 'cw231-empty__next-label', found.nearest.label));
-    card.appendChild(element('div', 'cw231-empty__match', found.nearest.match));
-    if (found.nearest.time) {
-      card.appendChild(element('div', 'cw231-empty__time', found.nearest.time));
-    }
-
-    if (found.source) found.source.replaceWith(card);
-    else empty.appendChild(card);
-  }
-
   function polish() {
     document.querySelectorAll('.cw231-today-head').forEach(enhanceHeader);
-    document.querySelectorAll('.cw231-empty').forEach(enhanceEmpty);
   }
 
   if (document.readyState === 'loading') {
