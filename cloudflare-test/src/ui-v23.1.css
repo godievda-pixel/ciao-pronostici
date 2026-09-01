@@ -239,16 +239,18 @@
   box-shadow:inset 0 1px 0 rgba(255,255,255,.035)!important;
 }
 
-#ciao-miniapp-root .cw231-favorite-match-card{
+#ciao-miniapp-root .cw231-favorite-source-link{
   cursor:pointer!important;
+  pointer-events:auto!important;
+  touch-action:manipulation!important;
   transition:transform .16s ease,border-color .16s ease,background .16s ease!important;
 }
 
-#ciao-miniapp-root .cw231-favorite-match-card:active{
+#ciao-miniapp-root .cw231-favorite-source-link:active{
   transform:scale(.985)!important;
 }
 
-#ciao-miniapp-root .cw231-favorite-match-card:focus-visible,
+#ciao-miniapp-root .cw231-favorite-source-link:focus-visible,
 #ciao-miniapp-root .cw231-empty__next-card:focus-visible{
   outline:2px solid rgba(90,122,255,.72)!important;
   outline-offset:2px!important;
