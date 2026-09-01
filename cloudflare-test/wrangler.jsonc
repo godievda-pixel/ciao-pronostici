@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ciao-web-app-test",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/healthz", "/api/*"]
+  },
+  "services": [
+    {
+      "binding": "CIAO_WEB_API",
+      "service": "ciao-web-api"
+    }
+  ]
+}
