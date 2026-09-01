@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   discoverApiCalls,
+  discoverApiRouteLiterals,
   extractSourceHints,
   summarizeJsonShape,
 } from '../src/v23.2/api-contract-observer.mjs';
@@ -47,11 +48,31 @@ test('discovers unique literal API calls and marks dynamic routes as non-concret
   ]);
 });
 
+test('discovers static API route literals even when fetch uses constants', () => {
+  const source = `
+    const API_BASE = '/api/ciao-core-api-fast-v4';
+    const MATCH_API = '/api/ciao-match-center-fast-v3';
+    const SCHEDULE = '/api/ciao-schedule-fast-v1';
+    fetch(API_BASE, { method: 'POST' });
+    post(SCHEDULE, {});
+    const duplicate = '/api/ciao-schedule-fast-v1';
+  `;
+
+  assert.deepEqual(discoverApiRouteLiterals(source), [
+    '/api/ciao-core-api-fast-v4',
+    '/api/ciao-match-center-fast-v3',
+    '/api/ciao-schedule-fast-v1',
+  ]);
+});
+
 test('extracts bounded source hints around known schedule and network markers', () => {
   const source = `
     const before = 'x';
     async function __cw209LoadSchedule() {
       return apiJson('/schedule');
+    }
+    function __cw231RawScheduleMatches() {
+      return selectedRound.matches || [];
     }
     const API_BASE = '/api';
     async function apiJson(path) {
@@ -61,6 +82,7 @@ test('extracts bounded source hints around known schedule and network markers', 
 
   const hints = extractSourceHints(source);
   assert.equal(hints.some(hint => hint.marker === '__cw209LoadSchedule'), true);
+  assert.equal(hints.some(hint => hint.marker === '__cw231RawScheduleMatches'), true);
   assert.equal(hints.some(hint => hint.marker === 'fetch('), true);
   assert.equal(hints.some(hint => hint.marker === 'API_BASE'), true);
   assert.equal(hints.every(hint => hint.snippet.length <= 900), true);
@@ -113,13 +135,13 @@ test('safeCalls allows only concrete anonymous GET API calls', () => {
   assert.deepEqual(safeCalls(calls).map(call => call.route), ['/api/schedule']);
 });
 
-test('observeContract stores schema only for successful JSON GET responses and source hints', async () => {
+test('observeContract stores schema only for successful JSON GET responses and static source facts', async () => {
   const requests = [];
   const fetchImpl = async url => {
     requests.push(String(url));
     if (String(url).includes('/releases/v23.1/')) {
       return new Response(
-        "<script>async function __cw209LoadSchedule(){return fetch('/api/schedule')}</script>",
+        "<script>const SCHEDULE='/api/schedule'; async function __cw209LoadSchedule(){return fetch('/api/schedule')}</script>",
         {
           status: 200,
           headers: { 'content-type': 'text/html' },
@@ -141,6 +163,7 @@ test('observeContract stores schema only for successful JSON GET responses and s
   assert.equal(requests.at(-1), 'https://test.example/api/schedule');
   assert.equal(result.probes[0].status, 200);
   assert.deepEqual(result.probes[0].shape.keys, ['matches']);
+  assert.deepEqual(result.routeLiterals, ['/api/schedule']);
   assert.equal(result.sourceHints.some(hint => hint.marker === '__cw209LoadSchedule'), true);
   assert.equal(JSON.stringify(result).includes('Inter'), false);
 });
