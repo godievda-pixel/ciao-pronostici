@@ -4,38 +4,38 @@
 
 **Goal:** Build the TEST-only v23.2 multi-competition core—competition metadata, canonical match normalization, inclusion rules, Tournament Engine selectors, and a browser-safe module entry—without replacing any working v23.1 screen.
 
-**Architecture:** Keep the existing v23.1 HTML patch as the visible TEST UI while introducing a modular v23.2 core under `cloudflare-test/src/v23.2/`. The same ES modules are imported directly by Node tests and copied unchanged to `dist/v23.2/` for browser `type="module"` loading, avoiding duplicated business logic and avoiding a new bundler dependency. This milestone does not connect a new upstream provider yet; it establishes the exact normalized contract that the subsequent API/source plan must feed.
+**Architecture:** Keep the existing v23.1 HTML patch as the visible TEST UI while introducing modular v23.2 ES modules under `cloudflare-test/src/v23.2/`. Node tests import those modules directly; the custom build copies the same modules unchanged to `dist/v23.2/` and loads only the inert `index.mjs` entry with `type="module"`. This milestone establishes the contract for the later real-data API plan and deliberately does not guess provider routes.
 
-**Tech Stack:** JavaScript ES modules, Node.js 22 built-in test runner, Cloudflare Workers Static Assets, existing custom `scripts/build.mjs`, GitHub Actions `Ciao TEST check`.
+**Tech Stack:** JavaScript ES modules, Node.js 22 built-in test runner, Cloudflare Workers Static Assets, existing `cloudflare-test/scripts/build.mjs`, GitHub Actions `Ciao TEST check`.
 
 **Spec:** `docs/superpowers/specs/2026-09-01-ciao-web-v23-2-multitournament-design.md`
 
 ## Global Constraints
 
-- Work only on branch `develop` and TEST worker `ciao-web-app-test`.
+- Work only on `develop` and `ciao-web-app-test`.
 - Production `ciao-web-app` remains unchanged until explicit acceptance.
-- Existing v23.1 favorite-club card and `Кальчо сегодня` behavior must not regress.
+- Existing v23.1 favorite-club card and `Кальчо сегодня` behavior must remain green.
 - Competition keys are exactly `serie_a`, `coppa_italia`, `ucl`, `uel`, `uecl`.
 - Serie A and Coppa Italia include every match; UCL, UEL and UECL include only matches with at least one Italian club.
 - Match status is exactly one of `scheduled`, `live`, `finished`, `postponed`, `cancelled`.
 - `predictionDeadline` is authoritative for prediction locking; LIVE polling never decides whether a prediction is open.
-- Async hydration must not remount existing v23.1 UI, reset scroll, or change card geometry.
-- This milestone exposes core logic only; it does not switch Matches, Predictions, Rankings, Home or Match Center to v23.2 data.
+- Async hydration must not remount the v23.1 UI, reset scroll, or change card geometry.
+- This milestone exposes core logic only. It does not switch Matches, Predictions, Rankings, Home or Match Center to v23.2 data.
 
 ---
 
 ## File Structure Locked by This Plan
 
-- `cloudflare-test/src/v23.2/competition-config.mjs` — immutable competition metadata and theme/navigation configuration.
-- `cloudflare-test/src/v23.2/match-normalizer.mjs` — canonical team/match normalization, status mapping and inclusion rule.
-- `cloudflare-test/src/v23.2/tournament-engine.mjs` — pure selectors over already-normalized matches.
-- `cloudflare-test/src/v23.2/index.mjs` — browser entry that exposes the tested core as `globalThis.CiaoV232Core` and performs no rendering.
-- `cloudflare-test/test/v23-2-competition-config.test.mjs` — competition config contract.
+- `cloudflare-test/src/v23.2/competition-config.mjs` — immutable competition/theme/navigation metadata.
+- `cloudflare-test/src/v23.2/match-normalizer.mjs` — canonical team/match normalization and inclusion rule.
+- `cloudflare-test/src/v23.2/tournament-engine.mjs` — pure selectors over normalized matches.
+- `cloudflare-test/src/v23.2/index.mjs` — inert browser entry exposing `globalThis.CiaoV232Core`.
+- `cloudflare-test/test/v23-2-competition-config.test.mjs` — config contract.
 - `cloudflare-test/test/v23-2-normalizer.test.mjs` — canonical model, stable IDs and Italian-club filtering.
-- `cloudflare-test/test/v23-2-engine.test.mjs` — chronological/stage/round/favorite/prediction selectors.
-- `cloudflare-test/test/v23-2-build.test.mjs` — build copies browser modules and injects one module entry without altering v23.1 runtime.
-- `cloudflare-test/scripts/build.mjs` — copy v23.2 modules to Static Assets and inject the inert module entry.
-- `.github/workflows/ciao-test-check.yml` — include v23.2 source paths in the existing TEST verification trigger only if path filtering requires it; because all files are under `cloudflare-test/**`, no workflow behavior change is expected.
+- `cloudflare-test/test/v23-2-engine.test.mjs` — chronological/group/favorite/prediction selectors.
+- `cloudflare-test/test/v23-2-build.test.mjs` — module copy/injection and v23.1 coexistence.
+- `cloudflare-test/scripts/build.mjs` — copy v23.2 modules and inject the inert module entry after the existing v23.1 patch.
+- `cloudflare-test/README.md` — checkpoint note after the milestone is green.
 
 ---
 
@@ -46,7 +46,7 @@
 - Create: `cloudflare-test/test/v23-2-competition-config.test.mjs`
 
 **Interfaces:**
-- Consumes: no earlier task.
+- Consumes: nothing.
 - Produces: `COMPETITION_KEYS`, `COMPETITIONS`, `getCompetitionConfig(key)`.
 
 - [ ] **Step 1: Write the failing configuration test**
@@ -54,20 +54,10 @@
 ```js
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  COMPETITION_KEYS,
-  COMPETITIONS,
-  getCompetitionConfig,
-} from '../src/v23.2/competition-config.mjs';
+import { COMPETITION_KEYS, COMPETITIONS, getCompetitionConfig } from '../src/v23.2/competition-config.mjs';
 
 test('v23.2 defines exactly five competition configs', () => {
-  assert.deepEqual(COMPETITION_KEYS, [
-    'serie_a',
-    'coppa_italia',
-    'ucl',
-    'uel',
-    'uecl',
-  ]);
+  assert.deepEqual(COMPETITION_KEYS, ['serie_a','coppa_italia','ucl','uel','uecl']);
   assert.equal(Object.keys(COMPETITIONS).length, 5);
 });
 
@@ -83,26 +73,19 @@ test('competition themes and navigation models are stable', () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
-
-Run from `cloudflare-test`:
+- [ ] **Step 2: Run test to verify RED**
 
 ```bash
+cd cloudflare-test
 node --test test/v23-2-competition-config.test.mjs
 ```
 
-Expected: FAIL with `ERR_MODULE_NOT_FOUND` for `src/v23.2/competition-config.mjs`.
+Expected: FAIL with `ERR_MODULE_NOT_FOUND`.
 
 - [ ] **Step 3: Implement the immutable competition config**
 
 ```js
-export const COMPETITION_KEYS = Object.freeze([
-  'serie_a',
-  'coppa_italia',
-  'ucl',
-  'uel',
-  'uecl',
-]);
+export const COMPETITION_KEYS = Object.freeze(['serie_a','coppa_italia','ucl','uel','uecl']);
 
 export const COMPETITIONS = Object.freeze({
   serie_a: Object.freeze({ key: 'serie_a', title: 'Serie A', shortTitle: 'Serie A', theme: 'serie-a', navigation: 'rounds', european: false }),
@@ -119,13 +102,13 @@ export function getCompetitionConfig(key) {
 }
 ```
 
-- [ ] **Step 4: Run the focused test and verify GREEN**
+- [ ] **Step 4: Run test to verify GREEN**
 
 ```bash
 node --test test/v23-2-competition-config.test.mjs
 ```
 
-Expected: 2 tests PASS.
+Expected: 2 PASS.
 
 - [ ] **Step 5: Commit**
 
@@ -143,19 +126,16 @@ git commit -m "feat: add v23.2 competition config"
 - Create: `cloudflare-test/test/v23-2-normalizer.test.mjs`
 
 **Interfaces:**
-- Consumes: `getCompetitionConfig(key)` from Task 1.
+- Consumes: `getCompetitionConfig(key)`.
 - Produces: `MATCH_STATUSES`, `normalizeTeam(raw)`, `normalizeMatch(raw, competition)`, `shouldIncludeMatch(match)`.
-- Canonical `matchId` type: string `${competition}:${sourceId}` so IDs cannot collide between competitions.
+- Canonical `matchId`: string `${competition}:${sourceId}`.
 
 - [ ] **Step 1: Write failing normalizer tests**
 
 ```js
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  normalizeMatch,
-  shouldIncludeMatch,
-} from '../src/v23.2/match-normalizer.mjs';
+import { normalizeMatch, shouldIncludeMatch } from '../src/v23.2/match-normalizer.mjs';
 
 const raw = {
   id: 101,
@@ -179,6 +159,8 @@ test('normalizes a match to the canonical v23.2 shape', () => {
   assert.equal(match.status, 'scheduled');
   assert.equal(match.homeTeam.countryCode, 'ITA');
   assert.equal(match.awayTeam.countryCode, 'ENG');
+  assert.equal(match.homeScore, null);
+  assert.equal(match.awayScore, null);
   assert.equal(match.predictionDeadline, '2026-09-15T18:59:59Z');
   assert.deepEqual(Object.keys(match), [
     'matchId','competition','season','stage','round','kickoffAt','status','minute',
@@ -187,11 +169,10 @@ test('normalizes a match to the canonical v23.2 shape', () => {
   ]);
 });
 
-test('includes every domestic match and only Italian-club European matches', () => {
+test('includes all domestic matches and only Italian-club European matches', () => {
   assert.equal(shouldIncludeMatch(normalizeMatch(raw, 'serie_a')), true);
   assert.equal(shouldIncludeMatch(normalizeMatch(raw, 'coppa_italia')), true);
   assert.equal(shouldIncludeMatch(normalizeMatch(raw, 'ucl')), true);
-
   const foreign = normalizeMatch({
     ...raw,
     id: 102,
@@ -209,24 +190,20 @@ test('maps provider statuses into the exact finite status set', () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [ ] **Step 2: Run test to verify RED**
 
 ```bash
 node --test test/v23-2-normalizer.test.mjs
 ```
 
-Expected: FAIL because `match-normalizer.mjs` does not exist.
+Expected: FAIL with `ERR_MODULE_NOT_FOUND`.
 
 - [ ] **Step 3: Implement team/country/status normalization**
-
-Use these exact mappings in `match-normalizer.mjs`:
 
 ```js
 import { getCompetitionConfig } from './competition-config.mjs';
 
-export const MATCH_STATUSES = Object.freeze([
-  'scheduled', 'live', 'finished', 'postponed', 'cancelled',
-]);
+export const MATCH_STATUSES = Object.freeze(['scheduled','live','finished','postponed','cancelled']);
 
 const STATUS_MAP = Object.freeze({
   NS: 'scheduled', SCHEDULED: 'scheduled', TIMED: 'scheduled',
@@ -237,17 +214,20 @@ const STATUS_MAP = Object.freeze({
 });
 
 const COUNTRY_CODES = Object.freeze({
-  italy: 'ITA', italia: 'ITA',
-  england: 'ENG', spain: 'ESP', germany: 'GER', france: 'FRA', portugal: 'POR',
+  italy: 'ITA', italia: 'ITA', england: 'ENG', spain: 'ESP', germany: 'GER', france: 'FRA', portugal: 'POR',
 });
 
 function text(value) { return String(value ?? '').trim(); }
-function numberOrNull(value) { return Number.isFinite(Number(value)) ? Number(value) : null; }
+function numberOrNull(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
 
 export function normalizeTeam(raw = {}) {
   const country = text(raw.country || raw.country_name);
   return Object.freeze({
-    id: text(raw.id || raw.team_id),
+    id: text(raw.id ?? raw.team_id),
     name: text(raw.name || raw.team_name) || '—',
     countryCode: text(raw.country_code).toUpperCase() || COUNTRY_CODES[country.toLowerCase()] || '',
     crestUrl: text(raw.logo || raw.crest || raw.crest_url),
@@ -262,7 +242,6 @@ export function normalizeMatch(raw, competition) {
   const predictionDeadline = text(raw.predictionDeadline || raw.prediction_deadline || kickoffAt);
   const providerStatus = text(raw.status).toUpperCase();
   const status = STATUS_MAP[providerStatus] || 'scheduled';
-
   return Object.freeze({
     matchId: `${competition}:${sourceId}`,
     competition,
@@ -291,7 +270,7 @@ export function shouldIncludeMatch(match) {
 }
 ```
 
-- [ ] **Step 4: Run focused tests and all core tests**
+- [ ] **Step 4: Run focused tests to verify GREEN**
 
 ```bash
 node --test test/v23-2-normalizer.test.mjs test/v23-2-competition-config.test.mjs
@@ -315,8 +294,8 @@ git commit -m "feat: normalize v23.2 competition matches"
 - Create: `cloudflare-test/test/v23-2-engine.test.mjs`
 
 **Interfaces:**
-- Consumes canonical normalized match objects from Task 2.
-- Produces `sortChronologically(matches)`, `matchesForCompetition(matches,key)`, `groupForCompetition(matches,key)`, `availablePredictions(matches,now)`, `nextMatchForTeam(matches,teamId,now)`.
+- Consumes: canonical normalized match objects.
+- Produces: `sortChronologically(matches)`, `matchesForCompetition(matches,key)`, `groupForCompetition(matches,key)`, `availablePredictions(matches,now)`, `nextMatchForTeam(matches,teamId,now)`.
 
 - [ ] **Step 1: Write failing engine tests with a fixed clock**
 
@@ -324,13 +303,7 @@ git commit -m "feat: normalize v23.2 competition matches"
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeMatch } from '../src/v23.2/match-normalizer.mjs';
-import {
-  sortChronologically,
-  matchesForCompetition,
-  groupForCompetition,
-  availablePredictions,
-  nextMatchForTeam,
-} from '../src/v23.2/tournament-engine.mjs';
+import { sortChronologically, matchesForCompetition, groupForCompetition, availablePredictions, nextMatchForTeam } from '../src/v23.2/tournament-engine.mjs';
 
 const m = (id, competition, kickoff, extra = {}) => normalizeMatch({
   id, season: '2026/27', kickoff_at: kickoff, status: 'NS',
@@ -347,9 +320,7 @@ const matches = [
 ];
 
 test('selectors preserve one chronological source of truth', () => {
-  assert.deepEqual(sortChronologically(matches).map(x => x.matchId), [
-    'serie_a:1', 'coppa_italia:2', 'ucl:3',
-  ]);
+  assert.deepEqual(sortChronologically(matches).map(x => x.matchId), ['serie_a:1','coppa_italia:2','ucl:3']);
   assert.deepEqual(matchesForCompetition(matches, 'ucl').map(x => x.matchId), ['ucl:3']);
 });
 
@@ -360,26 +331,23 @@ test('league groups by round while cups group by stage', () => {
 
 test('prediction availability uses predictionDeadline rather than match status', () => {
   const now = Date.parse('2026-09-05T18:00:00Z');
-  assert.deepEqual(availablePredictions(matches, now).map(x => x.matchId), [
-    'serie_a:1', 'coppa_italia:2', 'ucl:3',
-  ]);
+  assert.deepEqual(availablePredictions(matches, now).map(x => x.matchId), ['serie_a:1','coppa_italia:2','ucl:3']);
 });
 
-test('favorite team next match scans every included competition', () => {
-  const now = Date.parse('2026-09-01T00:00:00Z');
-  assert.equal(nextMatchForTeam(matches, '10', now).matchId, 'serie_a:1');
+test('favorite team next match scans every competition', () => {
+  assert.equal(nextMatchForTeam(matches, '10', Date.parse('2026-09-01T00:00:00Z')).matchId, 'serie_a:1');
 });
 ```
 
-- [ ] **Step 2: Run and verify RED**
+- [ ] **Step 2: Run test to verify RED**
 
 ```bash
 node --test test/v23-2-engine.test.mjs
 ```
 
-Expected: FAIL because `tournament-engine.mjs` does not exist.
+Expected: FAIL with `ERR_MODULE_NOT_FOUND`.
 
-- [ ] **Step 3: Implement selectors without DOM or network access**
+- [ ] **Step 3: Implement selectors without DOM/network access**
 
 ```js
 import { getCompetitionConfig } from './competition-config.mjs';
@@ -395,18 +363,14 @@ export function matchesForCompetition(matches, key) {
 
 export function groupForCompetition(matches, key) {
   const config = getCompetitionConfig(key);
-  const selected = matchesForCompetition(matches, key);
   const groups = new Map();
-  for (const match of selected) {
+  for (const match of matchesForCompetition(matches, key)) {
     const rawKey = config.navigation === 'rounds' ? match.round : match.stage;
     const groupKey = String(rawKey ?? '');
     if (!groups.has(groupKey)) groups.set(groupKey, []);
     groups.get(groupKey).push(match);
   }
-  return [...groups.entries()].map(([groupKey, groupMatches]) => ({
-    key: groupKey,
-    matches: sortChronologically(groupMatches),
-  }));
+  return [...groups.entries()].map(([groupKey, groupMatches]) => ({ key: groupKey, matches: sortChronologically(groupMatches) }));
 }
 
 export function availablePredictions(matches, now = Date.now()) {
@@ -426,13 +390,13 @@ export function nextMatchForTeam(matches, teamId, now = Date.now()) {
 }
 ```
 
-- [ ] **Step 4: Run the engine suite and entire v23.2 unit suite**
+- [ ] **Step 4: Run the whole v23.2 unit suite**
 
 ```bash
 node --test test/v23-2-*.test.mjs
 ```
 
-Expected: all tests PASS.
+Expected: all PASS.
 
 - [ ] **Step 5: Commit**
 
@@ -447,23 +411,22 @@ git commit -m "feat: add v23.2 tournament selectors"
 
 **Files:**
 - Create: `cloudflare-test/src/v23.2/index.mjs`
-- Extend: `cloudflare-test/test/v23-2-engine.test.mjs`
+- Modify: `cloudflare-test/test/v23-2-engine.test.mjs`
 
 **Interfaces:**
-- Consumes all Task 1–3 exports.
-- Produces browser global `globalThis.CiaoV232Core`.
-- Must not call `render`, mutate DOM, fetch network data, start timers, or attach MutationObservers.
+- Consumes: all Task 1–3 exports.
+- Produces: `globalThis.CiaoV232Core`.
+- Side effects allowed: assigning that one global only.
 
-- [ ] **Step 1: Add a failing browser-entry contract test**
+- [ ] **Step 1: Add failing browser-entry test**
 
 ```js
 import { readFile } from 'node:fs/promises';
 
-test('v23.2 browser entry exposes core only and has no rendering side effects', async () => {
+test('browser entry exposes core only and has no rendering side effects', async () => {
   const source = await readFile(new URL('../src/v23.2/index.mjs', import.meta.url), 'utf8');
   assert.match(source, /globalThis\.CiaoV232Core/);
   assert.doesNotMatch(source, /document\.|MutationObserver|setInterval|setTimeout|fetch\(/);
-
   delete globalThis.CiaoV232Core;
   await import(`../src/v23.2/index.mjs?test=${Date.now()}`);
   assert.equal(globalThis.CiaoV232Core.version, '23.2-core');
@@ -471,26 +434,20 @@ test('v23.2 browser entry exposes core only and has no rendering side effects', 
 });
 ```
 
-- [ ] **Step 2: Run and verify RED**
+- [ ] **Step 2: Run test to verify RED**
 
 ```bash
 node --test test/v23-2-engine.test.mjs
 ```
 
-Expected: FAIL because `src/v23.2/index.mjs` does not exist.
+Expected: FAIL because `index.mjs` does not exist.
 
-- [ ] **Step 3: Implement the inert browser entry**
+- [ ] **Step 3: Implement the inert entry**
 
 ```js
 import { COMPETITION_KEYS, COMPETITIONS, getCompetitionConfig } from './competition-config.mjs';
 import { normalizeMatch, normalizeTeam, shouldIncludeMatch } from './match-normalizer.mjs';
-import {
-  sortChronologically,
-  matchesForCompetition,
-  groupForCompetition,
-  availablePredictions,
-  nextMatchForTeam,
-} from './tournament-engine.mjs';
+import { sortChronologically, matchesForCompetition, groupForCompetition, availablePredictions, nextMatchForTeam } from './tournament-engine.mjs';
 
 globalThis.CiaoV232Core = Object.freeze({
   version: '23.2-core',
@@ -508,7 +465,7 @@ globalThis.CiaoV232Core = Object.freeze({
 });
 ```
 
-- [ ] **Step 4: Run all v23.2 unit tests**
+- [ ] **Step 4: Run v23.2 tests to verify GREEN**
 
 ```bash
 node --test test/v23-2-*.test.mjs
@@ -525,20 +482,18 @@ git commit -m "feat: expose inert v23.2 browser core"
 
 ---
 
-### Task 5: Copy v23.2 Modules Into TEST Static Assets
+### Task 5: Ship the Core Beside v23.1
 
 **Files:**
 - Modify: `cloudflare-test/scripts/build.mjs`
 - Create: `cloudflare-test/test/v23-2-build.test.mjs`
 
 **Interfaces:**
-- Consumes `src/v23.2/*.mjs` from Tasks 1–4.
-- Produces `dist/v23.2/*.mjs` plus one `<script type="module" id="ciao-v232-core" src="/v23.2/index.mjs"></script>` in TEST HTML.
-- Existing `applyScheduleSourcePatch`, `applyFavoriteHtmlSourcePatch`, v23.1 CSS and v23.1 runtime remain authoritative and unchanged in behavior.
+- Consumes: `src/v23.2/*.mjs`.
+- Produces: `dist/v23.2/*.mjs` and exactly one `<script type="module" id="ciao-v232-core" src="/v23.2/index.mjs"></script>`.
+- Existing `applyScheduleSourcePatch`, `applyFavoriteHtmlSourcePatch`, v23.1 CSS and v23.1 JS remain authoritative.
 
-- [ ] **Step 1: Write failing build-helper tests**
-
-Add exported helpers `injectV232Entry(html)` and `copyV232Modules()` and test them:
+- [ ] **Step 1: Write failing build tests**
 
 ```js
 import test from 'node:test';
@@ -549,8 +504,7 @@ import { injectV232Entry, copyV232Modules } from '../scripts/build.mjs';
 test('injects one inert v23.2 module entry', () => {
   const html = '<html><body><div id="ciao-miniapp-root"></div></body></html>';
   const first = injectV232Entry(html);
-  const second = injectV232Entry(first);
-  assert.equal(first, second);
+  assert.equal(injectV232Entry(first), first);
   assert.match(first, /type="module" id="ciao-v232-core" src="\/v23\.2\/index\.mjs"/);
 });
 
@@ -563,76 +517,67 @@ test('copies v23.2 browser modules to dist', async () => {
 });
 ```
 
-- [ ] **Step 2: Run and verify RED**
+- [ ] **Step 2: Run test to verify RED**
 
 ```bash
 node --test test/v23-2-build.test.mjs
 ```
 
-Expected: FAIL because the two helpers are not exported.
+Expected: FAIL because `injectV232Entry` and `copyV232Modules` are not exported.
 
-- [ ] **Step 3: Extend `scripts/build.mjs` with module copy and injection**
+- [ ] **Step 3: Add copy/injection helpers to `scripts/build.mjs`**
 
-Change the fs import to:
+Change the fs import:
 
 ```js
 import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 ```
 
-Add paths:
+Add:
 
 ```js
 const v232SourceDir = resolve(root, 'src/v23.2');
 const v232OutDir = resolve(root, 'dist/v23.2');
-```
 
-Add helpers:
-
-```js
 export function injectV232Entry(input) {
   const html = String(input);
   if (html.includes('id="ciao-v232-core"')) return html;
   if (!/<\/body>/i.test(html)) throw new Error('v23.2 module entry requires body anchor');
-  return html.replace(
-    /<\/body>/i,
-    '<script type="module" id="ciao-v232-core" src="/v23.2/index.mjs"></script>\n</body>',
-  );
+  return html.replace(/<\/body>/i, '<script type="module" id="ciao-v232-core" src="/v23.2/index.mjs"></script>\n</body>');
 }
 
 export async function copyV232Modules() {
   await mkdir(v232OutDir, { recursive: true });
   const files = (await readdir(v232SourceDir)).filter(name => name.endsWith('.mjs'));
-  for (const name of files) {
-    await copyFile(resolve(v232SourceDir, name), resolve(v232OutDir, name));
-  }
+  for (const name of files) await copyFile(resolve(v232SourceDir, name), resolve(v232OutDir, name));
   return files.sort();
 }
 ```
 
-In `build()`, after writing/copy preparation and before the final `writeFile`, do:
+Inside `build()` keep the current v23.1 patch sequence, then use:
 
 ```js
 await copyV232Modules();
 const html = injectV232Entry(applyPatch(favoritePatched, css, js));
+await mkdir(dirname(outPath), { recursive: true });
+await writeFile(outPath, html, 'utf8');
 ```
 
-Keep the existing v23.1 source patches before this call.
-
-- [ ] **Step 4: Run focused build tests**
+- [ ] **Step 4: Run focused build/regression tests**
 
 ```bash
 node --test test/v23-2-build.test.mjs test/build.test.mjs test/home-match-links.test.mjs test/favorite-fallback.test.mjs
 ```
 
-Expected: all PASS; existing v23.1 regression tests remain green.
+Expected: all PASS.
 
-- [ ] **Step 5: Run the real TEST build**
+- [ ] **Step 5: Run real TEST build**
 
 ```bash
 npm run build
 ```
 
-Expected: command exits 0; `dist/index.html` contains both `ciao-web-github-test-runtime` and `ciao-v232-core`; `dist/v23.2/index.mjs` exists.
+Expected: exit 0; `dist/index.html` contains both `ciao-web-github-test-runtime` and `ciao-v232-core`; `dist/v23.2/index.mjs` exists.
 
 - [ ] **Step 6: Commit**
 
@@ -643,49 +588,44 @@ git commit -m "build: ship v23.2 core beside v23.1"
 
 ---
 
-### Task 6: Full Regression Gate and Milestone Marker
+### Task 6: Full Regression Gate and Checkpoint
 
 **Files:**
 - Modify: `cloudflare-test/README.md`
-- No application behavior files unless verification exposes a regression.
 
 **Interfaces:**
-- Consumes the complete Task 1–5 milestone.
-- Produces a documented green checkpoint for the next API/source implementation plan.
+- Consumes: Tasks 1–5.
+- Produces: a documented green checkpoint for the real-data API/source plan.
 
-- [ ] **Step 1: Run the complete test suite**
+- [ ] **Step 1: Run complete suite**
 
 ```bash
 npm test
 ```
 
-Expected: every existing v23.1 test and every `v23-2-*.test.mjs` test PASS.
+Expected: every existing v23.1 test and every v23.2 test PASS.
 
-- [ ] **Step 2: Build the complete TEST artifact**
+- [ ] **Step 2: Build complete artifact**
 
 ```bash
 npm run build
 ```
 
-Expected: exit 0 and JSON result with `ok: true` from `scripts/build.mjs`.
+Expected: exit 0 with the existing build JSON reporting `ok: true`.
 
-- [ ] **Step 3: Verify the produced HTML has no v23.2 screen switch**
-
-Run:
+- [ ] **Step 3: Prove v23.2 has not switched a screen**
 
 ```bash
 node -e "const fs=require('fs');const h=fs.readFileSync('dist/index.html','utf8');if(!h.includes('ciao-v232-core'))process.exit(1);if(h.includes('data-cw232-screen'))process.exit(2);console.log('v23.2 core loaded, v23.1 UI still authoritative')"
 ```
 
-Expected output:
+Expected:
 
 ```text
 v23.2 core loaded, v23.1 UI still authoritative
 ```
 
-- [ ] **Step 4: Update README milestone note**
-
-Append exactly:
+- [ ] **Step 4: Append the checkpoint to README**
 
 ```markdown
 ## v23.2 migration checkpoint
@@ -702,25 +642,25 @@ git commit -m "docs: mark v23.2 core checkpoint"
 
 - [ ] **Step 6: Verify GitHub Actions**
 
-Open the `Ciao TEST check` run for the final `develop` commit and confirm both steps are green:
+Confirm the final `Ciao TEST check` run on `develop` shows:
 
 ```text
 Test — success
 Build TEST artifact — success
 ```
 
-Do not claim the visual TEST app changed; this milestone is intentionally invisible to users.
+Do not claim a visible Telegram TEST change at this milestone; the core is intentionally inert.
 
 ---
 
-## Follow-on Plans After This Milestone
+## Follow-on Plans
 
-The following plans are separate because they each have their own data/storage or UI failure modes and must produce an independently reviewable TEST checkpoint:
+These remain separate implementation plans because they have independent data/storage/UI failure modes:
 
-1. `v23.2 API/source integration` — repo-manage the normalized TEST API contract, connect real Serie A/Coppa/UCL/UEL/UECL data, server cache and `dataVersion` without changing Production API.
-2. `v23.2 Matches` — five competition landing/detail screens, themes, stage/round navigation, route-state restoration and Match Center links.
-3. `v23.2 Predictions` — all-available feed, five competition screens, quick prediction states and competition-aware persistence while preserving the existing scoring formula.
-4. `v23.2 Rankings` — five competition tables, derived overall ranking, snapshots, movement and participant profile.
-5. `v23.2 Home + Match Center cutover` — favorite club across competitions, unified Today, ranking/prediction summary, one themed Match Center and final TEST acceptance suite.
+1. **API/source integration** — record the concrete current `ciao-web-api` contract, then connect real Serie A, Coppa Italia, UCL, UEL and UECL sources to the canonical model with server cache and `dataVersion`, without changing Production.
+2. **Matches** — five themed competition screens, round/stage navigation, route-state restoration and Match Center links.
+3. **Predictions** — all-available feed, five competition screens, quick prediction states and competition-aware persistence with the existing scoring formula.
+4. **Rankings** — five competition rankings, derived overall ranking, snapshots, movement and participant profile.
+5. **Home + Match Center cutover** — favorite club across competitions, unified Today, prediction/ranking summary, one themed Match Center and final TEST acceptance.
 
-The next plan must not be written against guessed provider routes. During execution of this core milestone, inspect the existing `ciao-web-api` contract through the TEST service binding and record the concrete upstream/API shapes before writing the API/source integration plan.
+Before writing the API/source integration plan, execution of this core plan must inspect the real existing `ciao-web-api` responses through the TEST service binding. The next plan will use those observed route/field names instead of invented provider contracts.
