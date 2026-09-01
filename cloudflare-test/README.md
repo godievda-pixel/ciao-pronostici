@@ -16,3 +16,5 @@ After the first successful deploy, Telegram TEST should permanently point to:
 `https://ciao-web-app-test.ciao-web.workers.dev/`
 
 Production `ciao-web-app` is intentionally not managed by this directory yet.
+
+Build trigger: 2026-09-01T14:37+03:00
