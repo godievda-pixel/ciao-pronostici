@@ -42,8 +42,8 @@ test('favorite home card resolves its clickable id through the same normalized S
   assert.match(patched, /__cw231RawScheduleMatches\(\)/);
   assert.match(patched, /CiaoV23Today\.normalizeMatch/);
   assert.match(patched, /match\?\.matchId/);
+  assert.match(patched, /card\.dataset\.cw231Action = 'match'/);
   assert.match(patched, /card\.dataset\.cw231Match = String\(match\.matchId\)/);
-  assert.match(patched, /data-cw231-action/);
 });
 
 test('favorite home match card renders both clubs with logos and calendar status', () => {
