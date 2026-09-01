@@ -89,8 +89,17 @@ async function loadBase() {
   return response.text();
 }
 
+function diagNeedle(source, needle) {
+  const at = source.indexOf(needle);
+  console.log(`DIAG ${needle}:`, at < 0 ? 'missing' : source.slice(Math.max(0, at - 900), Math.min(source.length, at + 1800)));
+}
+
 export async function build() {
   const [base, css, js] = await Promise.all([loadBase(), readFile(cssPath, 'utf8'), readFile(jsPath, 'utf8')]);
+  diagNeedle(base, "closest('[data-cw231-action]");
+  diagNeedle(base, 'dataset.cw231Action');
+  diagNeedle(base, 'data-cw231-action');
+  diagNeedle(base, 'openMatchCenter');
   const schedulePatched = applyScheduleSourcePatch(base);
   if (!schedulePatched.includes('cw231-empty__schedule-source')) throw new Error('v23.1 rawSchedule source patch did not apply');
   const resolverPatched = applyFavoriteMatchResolverPatch(schedulePatched);
