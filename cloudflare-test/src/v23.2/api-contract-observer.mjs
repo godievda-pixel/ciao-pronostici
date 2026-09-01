@@ -44,8 +44,28 @@ export function discoverApiCalls(source) {
   );
 }
 
+export function discoverApiRouteLiterals(source) {
+  const text = String(source);
+  const routes = new Set();
+  const pattern = /([`'\"])(\/api\/[A-Za-z0-9._~!$&()*+,;=:@%/?#\[\]-]+)\1/g;
+  let match;
+
+  while ((match = pattern.exec(text))) {
+    routes.add(String(match[2]).trim());
+  }
+
+  return [...routes].sort();
+}
+
 const SOURCE_HINT_MARKERS = Object.freeze([
   '__cw209LoadSchedule',
+  '__cw209CalendarHtml',
+  '__cw231RawScheduleMatches',
+  'normalizeMatch',
+  '__CW209_SCHEDULE',
+  '__CW9_FAST_API',
+  '__CW9_MATCH_API',
+  '__CW9_SUMMARY_API',
   '/api/',
   'fetch(',
   'API_BASE',
@@ -61,7 +81,7 @@ export function extractSourceHints(source) {
     let from = 0;
     let foundForMarker = 0;
 
-    while (hints.length < 12 && foundForMarker < 3) {
+    while (hints.length < 20 && foundForMarker < 3) {
       const index = text.indexOf(marker, from);
       if (index < 0) break;
 
