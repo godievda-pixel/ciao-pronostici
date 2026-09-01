@@ -76,28 +76,49 @@ export function applyFavoriteHtmlSourcePatch(input) {
     .sort((a, b) => Date.parse(a.kickoffAt) - Date.parse(b.kickoffAt))[0] || null;
 
   const card = favorite.querySelector('.cw211-favorite-body .cw211-info-card:nth-child(2)');
-  if (card && match?.matchId) {
-    const live = match.status === 'live';
-    const score = __cw231Score(match);
-    const status = __cw231Status(match);
+  if (card) {
     const prediction = card.querySelector('.cw211-prediction')?.outerHTML || '';
+    card.classList.add('cw231-favorite-shell');
 
-    card.classList.add('cw231-favorite-source-link');
-    card.dataset.cw231Action = 'match';
-    card.dataset.cw231Match = String(match.matchId);
-    card.dataset.cw231Round = String(Number(match.raw?.round_number) || 0);
-    card.setAttribute('role', 'button');
-    card.setAttribute('aria-label', 'Открыть ближайший матч любимого клуба');
-    card.tabIndex = 0;
-    card.innerHTML =
-      '<small>' + (live ? 'Матч идёт' : 'Ближайший матч') + '</small>' +
-      '<div class="cw231-favorite-match-teams">' +
-        '<span class="cw231-favorite-team home">' + __cw231Logo(match.homeTeam) + '<b>' + esc(match.homeTeam?.name || '—') + '</b></span>' +
-        '<span class="cw231-favorite-match-score">' + (live ? esc(score) : '—') + '</span>' +
-        '<span class="cw231-favorite-team away"><b>' + esc(match.awayTeam?.name || '—') + '</b>' + __cw231Logo(match.awayTeam) + '</span>' +
-      '</div>' +
-      '<div class="cw231-favorite-match-status">' + esc(status) + '</div>' +
-      prediction;
+    if (match?.matchId) {
+      const live = match.status === 'live';
+      const score = __cw231Score(match);
+      const status = __cw231Status(match);
+
+      card.classList.add('cw231-favorite-source-link');
+      card.dataset.cw231Action = 'match';
+      card.dataset.cw231Match = String(match.matchId);
+      card.dataset.cw231Round = String(Number(match.raw?.round_number) || 0);
+      card.setAttribute('role', 'button');
+      card.setAttribute('aria-label', 'Открыть ближайший матч любимого клуба');
+      card.tabIndex = 0;
+      card.innerHTML =
+        '<small>' + (live ? 'Матч идёт' : 'Ближайший матч') + '</small>' +
+        '<div class="cw231-favorite-match-teams">' +
+          '<span class="cw231-favorite-team home">' + __cw231Logo(match.homeTeam) + '<b>' + esc(match.homeTeam?.name || '—') + '</b></span>' +
+          '<span class="cw231-favorite-match-score">' + (live ? esc(score) : '—') + '</span>' +
+          '<span class="cw231-favorite-team away"><b>' + esc(match.awayTeam?.name || '—') + '</b>' + __cw231Logo(match.awayTeam) + '</span>' +
+        '</div>' +
+        '<div class="cw231-favorite-match-status">' + esc(status) + '</div>' +
+        prediction;
+    } else {
+      card.removeAttribute('data-cw231-action');
+      card.removeAttribute('data-cw231-match');
+      card.removeAttribute('data-cw231-round');
+      card.removeAttribute('role');
+      card.removeAttribute('aria-label');
+      card.removeAttribute('tabindex');
+      card.classList.remove('cw231-favorite-source-link');
+      card.innerHTML =
+        '<small>Ближайший матч</small>' +
+        '<div class="cw231-favorite-match-teams cw231-favorite-match-placeholder" aria-hidden="true">' +
+          '<span class="cw231-favorite-team home"><span class="cw231-favorite-logo-placeholder"></span><b>—</b></span>' +
+          '<span class="cw231-favorite-match-score">—</span>' +
+          '<span class="cw231-favorite-team away"><b>—</b><span class="cw231-favorite-logo-placeholder"></span></span>' +
+        '</div>' +
+        '<div class="cw231-favorite-match-status cw231-favorite-match-placeholder" aria-hidden="true">—</div>' +
+        prediction;
+    }
   }
 
   return favorite.outerHTML;
