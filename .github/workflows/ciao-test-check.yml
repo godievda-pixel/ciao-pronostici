@@ -41,11 +41,24 @@ jobs:
         if: github.event_name == 'push'
         run: npm run inspect:api-contract
 
+      - name: Probe ESPN provider contract
+        if: github.event_name == 'push'
+        run: node scripts/probe-espn-provider.mjs
+
       - name: Upload v23.2 API contract observation
         if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
           name: ciao-v23-2-api-contract
           path: cloudflare-test/artifacts/api-contract-observed.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload ESPN provider observation
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ciao-v23-2-espn-provider
+          path: cloudflare-test/artifacts/espn-provider-probe.json
           if-no-files-found: error
           retention-days: 7
