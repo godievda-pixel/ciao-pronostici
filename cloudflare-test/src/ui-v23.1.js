@@ -40,22 +40,48 @@
   }
 
   function parseNearest(text) {
-    const parts = String(text || '')
-      .split('·')
-      .map((part) => part.trim())
-      .filter(Boolean);
+    const normalized = String(text || '')
+      .replace(/\s+/g, ' ')
+      .trim();
 
-    if (parts.length < 2) return null;
+    const dotMatch = normalized.match(
+      /Ближайший матч\s*[·:]?\s*([^·]+?)\s*·\s*(.+)$/i,
+    );
 
-    const label = /^Ближайший матч$/i.test(parts[0]) ? parts.shift() : 'Ближайший матч';
-    const match = parts.shift() || '';
-    const time = parts.join(' · ');
+    if (dotMatch) {
+      return {
+        label: 'Ближайший матч',
+        match: dotMatch[1].trim(),
+        time: dotMatch[2].trim(),
+      };
+    }
 
-    return { label, match, time };
+    return null;
+  }
+
+  function extractNearest(empty) {
+    const children = [...empty.children].filter((node) => {
+      if (!(node instanceof HTMLElement)) return false;
+      return !node.matches(
+        '.cw231-empty__title,.cw231-empty__next-card',
+      );
+    });
+
+    for (const node of children) {
+      const nearest = parseNearest(node.textContent);
+      if (nearest) return { nearest, source: node };
+    }
+
+    const nearest = parseNearest(empty.textContent);
+    return nearest ? { nearest, source: null } : null;
   }
 
   function enhanceEmpty(empty) {
     if (!empty) return;
+
+    empty.querySelectorAll('.cw231-empty__icon,.cw231-empty__hint').forEach((node) => {
+      node.remove();
+    });
 
     let title = empty.querySelector('.cw231-empty__title');
     if (!title) {
@@ -66,34 +92,20 @@
       }
     }
 
-    if (title && !empty.querySelector('.cw231-empty__icon')) {
-      title.before(element('div', 'cw231-empty__icon', '⚽'));
-    }
+    if (!title || empty.querySelector('.cw231-empty__next-card')) return;
 
-    if (title && !empty.querySelector('.cw231-empty__hint')) {
-      title.after(element('div', 'cw231-empty__hint', 'Следующий матч уже на горизонте'));
-    }
-
-    if (empty.querySelector('.cw231-empty__next-card')) return;
-
-    const candidates = [...empty.children].filter((node) => {
-      if (!(node instanceof HTMLElement)) return false;
-      if (node.matches('.cw231-empty__icon,.cw231-empty__title,.cw231-empty__hint')) return false;
-      return /Ближайший матч/i.test(node.textContent || '');
-    });
-
-    const current = candidates[0];
-    if (!current) return;
-
-    const nearest = parseNearest(current.textContent);
-    if (!nearest) return;
+    const found = extractNearest(empty);
+    if (!found) return;
 
     const card = element('div', 'cw231-empty__next-card');
-    card.appendChild(element('div', 'cw231-empty__next-label', nearest.label));
-    card.appendChild(element('div', 'cw231-empty__match', nearest.match));
-    if (nearest.time) card.appendChild(element('div', 'cw231-empty__time', nearest.time));
+    card.appendChild(element('div', 'cw231-empty__next-label', found.nearest.label));
+    card.appendChild(element('div', 'cw231-empty__match', found.nearest.match));
+    if (found.nearest.time) {
+      card.appendChild(element('div', 'cw231-empty__time', found.nearest.time));
+    }
 
-    current.replaceWith(card);
+    if (found.source) found.source.replaceWith(card);
+    else empty.appendChild(card);
   }
 
   function polish() {
