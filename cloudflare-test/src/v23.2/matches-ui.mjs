@@ -290,16 +290,27 @@ export function installMatchesUi(
     loadScreen,
   });
 
+  const handleNav = nav => {
+    defer(() => {
+      if (nav?.dataset?.tab === 'calendar') controller.openHub();
+      else controller.close();
+    });
+  };
+
+  const navButtons = documentRef.querySelectorAll?.('button[data-tab]') || [];
+  for (const nav of navButtons) {
+    if (!nav?.addEventListener || nav.dataset?.cw232NavBound === '1') continue;
+    if (nav.dataset) nav.dataset.cw232NavBound = '1';
+    nav.addEventListener('click', () => handleNav(nav));
+  }
+
   documentRef.addEventListener('click', event => {
     const target = event?.target;
     if (!target?.closest) return;
 
     const nav = target.closest('button[data-tab]');
     if (nav) {
-      defer(() => {
-        if (nav.dataset?.tab === 'calendar') controller.openHub();
-        else controller.close();
-      });
+      if (nav.dataset?.cw232NavBound !== '1') handleNav(nav);
       return;
     }
 
