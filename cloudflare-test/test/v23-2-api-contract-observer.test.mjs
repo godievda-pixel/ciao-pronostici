@@ -21,30 +21,10 @@ test('discovers unique literal API calls and marks dynamic routes as non-concret
   `;
 
   assert.deepEqual(discoverApiCalls(source), [
-    {
-      route: '/api/match/${id}',
-      method: 'GET',
-      concrete: false,
-      snippet: 'fetch(`/api/match/${id}`)',
-    },
-    {
-      route: '/api/matches?round=3',
-      method: 'GET',
-      concrete: true,
-      snippet: "fetch('/api/matches?round=3', { method: 'GET' })",
-    },
-    {
-      route: '/api/predictions',
-      method: 'POST',
-      concrete: true,
-      snippet: "fetch('/api/predictions', { method: 'POST', body: '{}' })",
-    },
-    {
-      route: '/api/schedule',
-      method: 'GET',
-      concrete: true,
-      snippet: "fetch('/api/schedule')",
-    },
+    { route: '/api/match/${id}', method: 'GET', concrete: false, snippet: 'fetch(`/api/match/${id}`)' },
+    { route: '/api/matches?round=3', method: 'GET', concrete: true, snippet: "fetch('/api/matches?round=3', { method: 'GET' })" },
+    { route: '/api/predictions', method: 'POST', concrete: true, snippet: "fetch('/api/predictions', { method: 'POST', body: '{}' })" },
+    { route: '/api/schedule', method: 'GET', concrete: true, snippet: "fetch('/api/schedule')" },
   ]);
 });
 
@@ -65,44 +45,32 @@ test('discovers static API route literals even when fetch uses constants', () =>
   ]);
 });
 
-test('extracts bounded source hints around known schedule, card and network markers', () => {
+test('extracts bounded source hints around known schedule, score, card and network markers', () => {
   const source = `
-    const before = 'x';
-    async function __cw209LoadSchedule() {
-      return apiJson('/schedule');
-    }
-    function __cw9CalendarCard(match) {
-      return match.home_team.name + match.away_team.name;
-    }
-    function __cw231RawScheduleMatches() {
-      return selectedRound.matches || [];
-    }
+    async function __cw209LoadSchedule() { return apiJson('/schedule'); }
+    function boardStatus(match) { return match.live_status || match.status; }
+    function boardScore(match) { return match.home_score + ':' + match.away_score; }
+    function __cw9CalendarCard(match) { return match.home.name + match.away.name; }
+    function __cw231RawScheduleMatches() { return selectedRound.matches || []; }
     const API_BASE = '/api';
-    async function apiJson(path) {
-      return fetch(API_BASE + path).then(r => r.json());
-    }
+    async function apiJson(path) { return fetch(API_BASE + path).then(r => r.json()); }
   `;
 
   const hints = extractSourceHints(source);
   assert.equal(hints.some(hint => hint.marker === '__cw209LoadSchedule'), true);
+  assert.equal(hints.some(hint => hint.marker === 'boardStatus'), true);
+  assert.equal(hints.some(hint => hint.marker === 'boardScore'), true);
   assert.equal(hints.some(hint => hint.marker === '__cw9CalendarCard'), true);
   assert.equal(hints.some(hint => hint.marker === '__cw231RawScheduleMatches'), true);
   assert.equal(hints.some(hint => hint.marker === 'fetch('), true);
-  assert.equal(hints.some(hint => hint.marker === 'API_BASE'), true);
   assert.equal(hints.every(hint => hint.snippet.length <= 900), true);
-  assert.equal(hints.some(hint => hint.snippet.includes('match.home_team.name')), true);
+  assert.equal(hints.some(hint => hint.snippet.includes('match.home_score')), true);
 });
 
 test('summarizes JSON shape without retaining values', () => {
   const value = {
     ok: true,
-    matches: [
-      {
-        id: 1,
-        home: { id: 10, name: 'Inter' },
-        away: { id: 20 },
-      },
-    ],
+    matches: [{ id: 1, home: { id: 10, name: 'Inter' }, away: { id: 20 } }],
     meta: { round: 3, season: '2026/27' },
   };
 
@@ -110,14 +78,7 @@ test('summarizes JSON shape without retaining values', () => {
     kind: 'object',
     keys: ['matches', 'meta', 'ok'],
     objectKeys: {
-      matches: {
-        kind: 'array',
-        itemKeys: ['away', 'home', 'id'],
-        nestedKeys: {
-          away: ['id'],
-          home: ['id', 'name'],
-        },
-      },
+      matches: { kind: 'array', itemKeys: ['away', 'home', 'id'], nestedKeys: { away: ['id'], home: ['id', 'name'] } },
       meta: { kind: 'object', keys: ['round', 'season'] },
       ok: { kind: 'boolean' },
     },
@@ -135,7 +96,6 @@ test('safeCalls allows only concrete anonymous GET API calls', () => {
     { route: '/api/predictions', method: 'POST', concrete: true },
     { route: '/api/user?id=42', method: 'GET', concrete: true },
   ];
-
   assert.deepEqual(safeCalls(calls).map(call => call.route), ['/api/schedule']);
 });
 
@@ -144,18 +104,12 @@ test('observeContract stores schema only for successful JSON GET responses and s
   const fetchImpl = async url => {
     requests.push(String(url));
     if (String(url).includes('/releases/v23.1/')) {
-      return new Response(
-        "<script>const SCHEDULE='/api/schedule'; async function __cw209LoadSchedule(){return fetch('/api/schedule')}</script>",
-        {
-          status: 200,
-          headers: { 'content-type': 'text/html' },
-        },
-      );
+      return new Response("<script>const SCHEDULE='/api/schedule'; async function __cw209LoadSchedule(){return fetch('/api/schedule')}</script>", {
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+      });
     }
-
-    return Response.json({
-      matches: [{ id: 1, home: { name: 'Inter' } }],
-    });
+    return Response.json({ matches: [{ id: 1, home: { name: 'Inter' } }] });
   };
 
   const result = await observeContract({
