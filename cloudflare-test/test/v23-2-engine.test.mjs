@@ -67,7 +67,7 @@ test('favorite team next match scans every competition', () => {
   );
 });
 
-test('browser entry exposes core only and has no rendering side effects', async () => {
+test('browser entry exposes inert data client and has no rendering or auto-fetch side effects', async () => {
   const source = await readFile(new URL('../src/v23.2/index.mjs', import.meta.url), 'utf8');
   assert.match(source, /globalThis\.CiaoV232Core/);
   assert.doesNotMatch(source, /document\.|MutationObserver|setInterval|setTimeout|fetch\(/);
@@ -76,4 +76,6 @@ test('browser entry exposes core only and has no rendering side effects', async 
   await import(`../src/v23.2/index.mjs?test=${Date.now()}`);
   assert.equal(globalThis.CiaoV232Core.version, '23.2-core');
   assert.equal(globalThis.CiaoV232Core.competitions.length, 5);
+  assert.equal(typeof globalThis.CiaoV232Core.resolveTelegramInitData, 'function');
+  assert.equal(typeof globalThis.CiaoV232Core.loadCompetitionMatches, 'function');
 });
