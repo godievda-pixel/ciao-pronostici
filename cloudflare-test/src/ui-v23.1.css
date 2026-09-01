@@ -168,9 +168,7 @@
   transition:transform .16s ease,border-color .16s ease,background .16s ease!important;
 }
 
-#ciao-miniapp-root .cw231-empty__next-card:active{
-  transform:scale(.985)!important;
-}
+#ciao-miniapp-root .cw231-empty__next-card:active{transform:scale(.985)!important}
 
 #ciao-miniapp-root .cw231-empty__next-label{
   color:rgba(153,170,226,.56)!important;
@@ -241,19 +239,65 @@
 
 #ciao-miniapp-root .cw231-favorite-source-link{
   cursor:pointer!important;
-  pointer-events:auto!important;
-  touch-action:manipulation!important;
   transition:transform .16s ease,border-color .16s ease,background .16s ease!important;
 }
 
-#ciao-miniapp-root .cw231-favorite-source-link:active{
-  transform:scale(.985)!important;
-}
+#ciao-miniapp-root .cw231-favorite-source-link:active{transform:scale(.985)!important}
 
 #ciao-miniapp-root .cw231-favorite-source-link:focus-visible,
 #ciao-miniapp-root .cw231-empty__next-card:focus-visible{
   outline:2px solid rgba(90,122,255,.72)!important;
   outline-offset:2px!important;
+}
+
+#ciao-miniapp-root .cw231-favorite-match-teams{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)!important;
+  align-items:center!important;
+  gap:7px!important;
+  margin-top:8px!important;
+}
+
+#ciao-miniapp-root .cw231-favorite-team{
+  min-width:0!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:5px!important;
+  color:#fff!important;
+}
+
+#ciao-miniapp-root .cw231-favorite-team.away{justify-content:flex-end!important}
+
+#ciao-miniapp-root .cw231-favorite-team b{
+  min-width:0!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+  font-size:9px!important;
+  line-height:1.2!important;
+}
+
+#ciao-miniapp-root .cw231-favorite-team img{
+  width:22px!important;
+  height:22px!important;
+  flex:0 0 22px!important;
+  object-fit:contain!important;
+}
+
+#ciao-miniapp-root .cw231-favorite-match-score{
+  color:#fff!important;
+  font-family:'Unbounded','Manrope',sans-serif!important;
+  font-size:10px!important;
+  font-weight:800!important;
+  white-space:nowrap!important;
+}
+
+#ciao-miniapp-root .cw231-favorite-match-status{
+  margin-top:7px!important;
+  color:rgba(150,168,220,.78)!important;
+  font-size:7.5px!important;
+  font-weight:700!important;
+  text-align:center!important;
 }
 
 @media(max-width:390px){
@@ -285,4 +329,11 @@
     height:22px!important;
     flex-basis:22px!important;
   }
+  #ciao-miniapp-root .cw231-favorite-match-teams{gap:5px!important}
+  #ciao-miniapp-root .cw231-favorite-team img{
+    width:20px!important;
+    height:20px!important;
+    flex-basis:20px!important;
+  }
+  #ciao-miniapp-root .cw231-favorite-team b{font-size:8.5px!important}
 }
