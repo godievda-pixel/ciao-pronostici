@@ -15,6 +15,8 @@ export function resolveTelegramInitData(root = globalThis) {
 export async function loadCompetitionMatches(
   competition,
   {
+    from = '',
+    to = '',
     initData = resolveTelegramInitData(),
     fetchImpl = globalThis.fetch,
   } = {},
@@ -28,8 +30,12 @@ export async function loadCompetitionMatches(
     throw createClientError('fetch_unavailable');
   }
 
+  const query = new URLSearchParams({ competition });
+  if (from) query.set('from', String(from));
+  if (to) query.set('to', String(to));
+
   const response = await fetchImpl(
-    `/api/v23.2/matches?competition=${encodeURIComponent(competition)}`,
+    `/api/v23.2/matches?${query.toString()}`,
     {
       method: 'GET',
       headers: {
