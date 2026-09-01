@@ -123,12 +123,12 @@ test('safeCalls allows only concrete anonymous GET API calls', () => {
   assert.deepEqual(safeCalls(calls).map(call => call.route), ['/api/schedule']);
 });
 
-test('observeContract stores schema only for successful JSON GET responses and static source facts', async () => {
+test('observeContract stores schema, request discriminators and static source facts', async () => {
   const requests = [];
   const fetchImpl = async url => {
     requests.push(String(url));
     if (String(url).includes('/releases/v23.1/')) {
-      return new Response("<script>const SCHEDULE='/api/schedule'; async function __cw209LoadSchedule(){return fetch('/api/schedule')}</script>", {
+      return new Response("<script>const SCHEDULE='/api/schedule'; async function __cw209LoadSchedule(){return fetch('/api/schedule')} const req={action:'live_updates',competition:'serie_a',competition_id:135,league:'Serie A',league_id:135,tournament:'league',tournament_id:1};</script>", {
         status: 200,
         headers: { 'content-type': 'text/html' },
       });
@@ -147,5 +147,15 @@ test('observeContract stores schema only for successful JSON GET responses and s
   assert.deepEqual(result.probes[0].shape.keys, ['matches']);
   assert.deepEqual(result.routeLiterals, ['/api/schedule']);
   assert.equal(result.sourceHints.some(hint => hint.marker === '__cw209LoadSchedule'), true);
+  assert.deepEqual(result.requestLiterals, {
+    action: ['live_updates'],
+    competition: ['serie_a'],
+    competition_key: [],
+    competition_id: ['135'],
+    league: ['Serie A'],
+    league_id: ['135'],
+    tournament: ['league'],
+    tournament_id: ['1'],
+  });
   assert.equal(JSON.stringify(result).includes('Inter'), false);
 });
