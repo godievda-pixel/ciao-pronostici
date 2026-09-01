@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 
-const URL = 'https://ciao-web-app-test.ciao-web.workers.dev/';
+const ORIGIN = 'https://ciao-web-app-test.ciao-web.workers.dev/';
 const EXPECTED = [
   'id="ciao-v232-core"',
   'id="ciao-v232-matches-ui"',
@@ -30,7 +30,7 @@ async function probeModules() {
   const rows = [];
   for (const path of MODULES) {
     try {
-      const { response, text } = await fetchText(new URL(path, URL));
+      const { response, text } = await fetchText(new globalThis.URL(path, ORIGIN));
       rows.push({
         path,
         status: response.status,
@@ -57,7 +57,7 @@ async function probe() {
   for (let index = 0; index < 9; index += 1) {
     const startedAt = new Date().toISOString();
     try {
-      const { response, text: html } = await fetchText(URL);
+      const { response, text: html } = await fetchText(ORIGIN);
       const markers = Object.fromEntries(EXPECTED.map(marker => [marker, html.includes(marker)]));
       attempts.push({
         attempt: index + 1,
@@ -85,7 +85,7 @@ async function probe() {
 
   const modules = await probeModules();
   const report = {
-    url: URL,
+    url: ORIGIN,
     expected: EXPECTED,
     observedAt: new Date().toISOString(),
     attempts,
