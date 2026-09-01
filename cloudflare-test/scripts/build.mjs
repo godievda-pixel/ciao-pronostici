@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -10,6 +10,8 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const cssPath = resolve(root, 'src/ui-v23.1.css');
 const jsPath = resolve(root, 'src/ui-v23.1.js');
 const outPath = resolve(root, 'dist/index.html');
+const v232SourceDir = resolve(root, 'src/v23.2');
+const v232OutDir = resolve(root, 'dist/v23.2');
 
 export function applyScheduleSourcePatch(input) {
   let source = String(input);
@@ -144,6 +146,25 @@ export function applyPatch(baseHtml, css, js) {
   return html;
 }
 
+export function injectV232Entry(input) {
+  const html = String(input);
+  if (html.includes('id="ciao-v232-core"')) return html;
+  if (!/<\/body>/i.test(html)) throw new Error('v23.2 module entry requires body anchor');
+  return html.replace(
+    /<\/body>/i,
+    '<script type="module" id="ciao-v232-core" src="/v23.2/index.mjs"></script>\n</body>',
+  );
+}
+
+export async function copyV232Modules() {
+  await mkdir(v232OutDir, { recursive: true });
+  const files = (await readdir(v232SourceDir)).filter(name => name.endsWith('.mjs'));
+  for (const name of files) {
+    await copyFile(resolve(v232SourceDir, name), resolve(v232OutDir, name));
+  }
+  return files.sort();
+}
+
 async function loadBase() {
   if (process.env.BASE_FILE) return readFile(resolve(process.env.BASE_FILE), 'utf8');
   const url = process.env.BASE_URL || DEFAULT_BASE_URL;
@@ -169,7 +190,8 @@ export async function build() {
     throw new Error('v23.1 favorite normalized link patch did not apply');
   }
 
-  const html = applyPatch(favoritePatched, css, js);
+  await copyV232Modules();
+  const html = injectV232Entry(applyPatch(favoritePatched, css, js));
   await mkdir(dirname(outPath), { recursive: true });
   await writeFile(outPath, html, 'utf8');
   return { output: outPath, bytes: Buffer.byteLength(html), build: TEST_BUILD };
