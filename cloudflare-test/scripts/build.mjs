@@ -43,6 +43,23 @@ export function applyScheduleSourcePatch(input) {
   return source.slice(0, start) + replacement + source.slice(end);
 }
 
+export function applyFavoriteMatchResolverPatch(input) {
+  let source = String(input);
+  if (source.includes('cw231-favorite-calendar-resolver')) return source;
+
+  const startNeedle = 'function __cw211FavoriteMatch(t,d){';
+  const start = source.indexOf(startNeedle);
+  if (start < 0) return source;
+
+  const endNeedle = '\n  }';
+  const end = source.indexOf(endNeedle, start);
+  if (end < 0) throw new Error('v23.1 favorite match resolver end anchor missing');
+
+  const replacement = `function __cw211FavoriteMatch(t,d){\n    /* cw231-favorite-calendar-resolver */\n    const id=Number(t?.id)||0,live=__cw2017ActiveLeagueMatches().find(m=>Number(m?.home?.id)===id||Number(m?.away?.id)===id);if(live)return {...live,id:Number(live.id),__kind:'live'};\n    const now=Date.now(),calendarMatches=[];\n    for(const round of __cw209Schedule?.rounds||[])for(const match of round?.matches||[]){\n      const matchId=Number(match?.id||match?.match_id)||0,kickoff=new Date(match?.kickoff_at).getTime();\n      const homeId=Number(match?.home?.id||match?.home_team_id||match?.home_team?.id)||0,awayId=Number(match?.away?.id||match?.away_team_id||match?.away_team?.id)||0;\n      if(matchId&&Number.isFinite(kickoff)&&kickoff>=now-120000&&(homeId===id||awayId===id))calendarMatches.push(match);\n    }\n    const calendarMatch=calendarMatches.sort((a,b)=>new Date(a.kickoff_at)-new Date(b.kickoff_at))[0]||null;\n    if(calendarMatch)return {...calendarMatch,id:Number(calendarMatch.id||calendarMatch.match_id)||0,__kind:'next'};\n    const next=d?.overview?.next_match||null;if(next)return {...next,id:Number(next.id||next.match_id)||0,__kind:'next'};return null;\n  }`;
+
+  return source.slice(0, start) + replacement + source.slice(end + endNeedle.length);
+}
+
 export function applyFavoriteMatchSourcePatch(input) {
   let source = String(input);
   if (source.includes('cw231-favorite-source-link')) return source;
@@ -72,20 +89,13 @@ async function loadBase() {
   return response.text();
 }
 
-function diag(source, needle, label) {
-  const at = source.indexOf(needle);
-  if (at < 0) return console.log(`DIAG ${label}: missing`);
-  console.log(`DIAG ${label}:`, source.slice(Math.max(0, at - 700), at + 1600));
-}
-
 export async function build() {
   const [base, css, js] = await Promise.all([loadBase(), readFile(cssPath, 'utf8'), readFile(jsPath, 'utf8')]);
-  diag(base, 'function __cw211FavoriteMatch', '__cw211FavoriteMatch');
-  diag(base, 'overview.next_match', 'overview.next_match');
-  diag(base, 'm=__cw211FavoriteMatch', 'favorite dashboard mid');
   const schedulePatched = applyScheduleSourcePatch(base);
   if (!schedulePatched.includes('cw231-empty__schedule-source')) throw new Error('v23.1 rawSchedule source patch did not apply');
-  const favoritePatched = applyFavoriteMatchSourcePatch(schedulePatched);
+  const resolverPatched = applyFavoriteMatchResolverPatch(schedulePatched);
+  if (!resolverPatched.includes('cw231-favorite-calendar-resolver')) throw new Error('v23.1 favorite calendar resolver patch did not apply');
+  const favoritePatched = applyFavoriteMatchSourcePatch(resolverPatched);
   if (!favoritePatched.includes('cw231-favorite-source-link')) throw new Error('v23.1 favorite match source patch did not apply');
   const html = applyPatch(favoritePatched, css, js);
   await mkdir(dirname(outPath), { recursive: true });
