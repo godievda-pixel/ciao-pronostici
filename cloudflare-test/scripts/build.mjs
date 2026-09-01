@@ -11,6 +11,22 @@ const cssPath = resolve(root, 'src/ui-v23.1.css');
 const jsPath = resolve(root, 'src/ui-v23.1.js');
 const outPath = resolve(root, 'dist/index.html');
 
+function diagnoseCalendarLoader(input) {
+  const source = String(input);
+  for (const needle of ['__cw209Schedule=', '/api/schedule', 'schedule-fast', 'function __cw209']) {
+    let from = 0;
+    let count = 0;
+    while (count < 8) {
+      const at = source.indexOf(needle, from);
+      if (at < 0) break;
+      console.log(`DIAG ${needle} ${count + 1}:`, source.slice(Math.max(0, at - 700), at + 1800));
+      from = at + needle.length;
+      count += 1;
+    }
+    if (!count) console.log(`DIAG ${needle}: NOT FOUND`);
+  }
+}
+
 export function applyScheduleSourcePatch(input) {
   const source = String(input);
   if (source.includes('cw231-empty__schedule-source')) return source;
@@ -69,6 +85,7 @@ export async function build() {
     readFile(cssPath, 'utf8'),
     readFile(jsPath, 'utf8'),
   ]);
+  diagnoseCalendarLoader(base);
   const schedulePatched = applyScheduleSourcePatch(base);
   if (!schedulePatched.includes('cw231-empty__schedule-source')) {
     throw new Error('v23.1 rawSchedule source patch did not apply');
