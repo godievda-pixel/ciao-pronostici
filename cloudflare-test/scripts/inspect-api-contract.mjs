@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   discoverApiCalls,
+  extractSourceHints,
   summarizeJsonShape,
 } from '../src/v23.2/api-contract-observer.mjs';
 
@@ -38,6 +39,7 @@ export async function observeContract({ baseUrl, testOrigin, fetchImpl = fetch }
 
   const source = await baseResponse.text();
   const calls = discoverApiCalls(source);
+  const sourceHints = extractSourceHints(source);
   const safe = safeCalls(calls);
   const probes = [];
 
@@ -79,6 +81,7 @@ export async function observeContract({ baseUrl, testOrigin, fetchImpl = fetch }
     baseUrl,
     testOrigin,
     calls,
+    sourceHints,
     safeGetRoutes: safe.map(call => call.route),
     probes,
   };
@@ -97,6 +100,7 @@ export async function main() {
   console.log(JSON.stringify({
     ok: true,
     discovered: result.calls.length,
+    sourceHints: result.sourceHints.length,
     safeGetRoutes: result.safeGetRoutes.length,
     probed: result.probes.length,
     output: outputPath,
