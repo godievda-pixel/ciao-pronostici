@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { applyScheduleSourcePatch, applyFavoriteMatchSourcePatch } from '../scripts/build.mjs';
+import {
+  applyScheduleSourcePatch,
+  applyFavoriteMatchSourcePatch,
+  applyFavoriteMatchResolverPatch,
+} from '../scripts/build.mjs';
 
 test('nearest Serie A card has both club logos and opens match center', () => {
   const source = `
@@ -23,6 +27,23 @@ test('nearest Serie A card has both club logos and opens match center', () => {
   assert.match(patched, /data-cw231-action="match"/);
   assert.match(patched, /data-cw231-match="\$\{nearest\.matchId\}"/);
   assert.match(patched, /data-cw231-round="\$\{Number\(nearest\.raw\?\.round_number\) \|\| 0\}"/);
+});
+
+test('favorite match resolver prefers full Serie A calendar so match center has a real id', () => {
+  const source = `
+  function __cw211FavoriteMatch(t,d){
+    const id=Number(t?.id)||0,live=__cw2017ActiveLeagueMatches().find(m=>Number(m?.home?.id)===id||Number(m?.away?.id)===id);if(live)return {...live,id:Number(live.id),__kind:'live'};
+    const next=d?.overview?.next_match||null;if(next)return {...next,id:Number(next.id||next.match_id)||0,__kind:'next'};return null;
+  }
+  `;
+
+  const patched = applyFavoriteMatchResolverPatch(source);
+
+  assert.match(patched, /__cw209Schedule\?\.rounds/);
+  assert.match(patched, /home\?\.id/);
+  assert.match(patched, /away\?\.id/);
+  assert.match(patched, /kickoff_at/);
+  assert.match(patched, /id:Number\(calendarMatch\.id\|\|calendarMatch\.match_id\)\|\|0/);
 });
 
 test('favorite club nearest-match card is born with the native match-center binding attribute', () => {
