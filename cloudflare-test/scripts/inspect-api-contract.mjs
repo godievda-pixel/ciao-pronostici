@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import {
   discoverApiCalls,
   discoverApiRouteLiterals,
+  discoverObjectLiteralValues,
   extractSourceHints,
   summarizeJsonShape,
 } from '../src/v23.2/api-contract-observer.mjs';
@@ -12,6 +13,16 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const outputPath = resolve(root, 'artifacts/api-contract-observed.json');
 
 const PERSONAL_ROUTE_PATTERN = /(?:user|profile|prediction|rank|auth|telegram|admin|me)(?:\/|\?|$)/i;
+const REQUEST_LITERAL_KEYS = Object.freeze([
+  'action',
+  'competition',
+  'competition_key',
+  'competition_id',
+  'league',
+  'league_id',
+  'tournament',
+  'tournament_id',
+]);
 
 export function safeCalls(calls) {
   return calls.filter(call =>
@@ -30,6 +41,12 @@ function contentType(response) {
     .toLowerCase();
 }
 
+function requestLiterals(source) {
+  return Object.fromEntries(
+    REQUEST_LITERAL_KEYS.map(key => [key, discoverObjectLiteralValues(source, key)]),
+  );
+}
+
 export async function observeContract({ baseUrl, testOrigin, fetchImpl = fetch }) {
   const baseResponse = await fetchImpl(baseUrl, {
     headers: { 'cache-control': 'no-cache' },
@@ -42,6 +59,7 @@ export async function observeContract({ baseUrl, testOrigin, fetchImpl = fetch }
   const calls = discoverApiCalls(source);
   const routeLiterals = discoverApiRouteLiterals(source);
   const sourceHints = extractSourceHints(source);
+  const literals = requestLiterals(source);
   const safe = safeCalls(calls);
   const probes = [];
 
@@ -85,6 +103,7 @@ export async function observeContract({ baseUrl, testOrigin, fetchImpl = fetch }
     calls,
     routeLiterals,
     sourceHints,
+    requestLiterals: literals,
     safeGetRoutes: safe.map(call => call.route),
     probes,
   };
@@ -105,6 +124,7 @@ export async function main() {
     discovered: result.calls.length,
     routeLiterals: result.routeLiterals.length,
     sourceHints: result.sourceHints.length,
+    requestLiteralKeys: Object.keys(result.requestLiterals).length,
     safeGetRoutes: result.safeGetRoutes.length,
     probed: result.probes.length,
     output: outputPath,
