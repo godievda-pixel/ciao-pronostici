@@ -11,6 +11,24 @@ const cssPath = resolve(root, 'src/ui-v23.1.css');
 const jsPath = resolve(root, 'src/ui-v23.1.js');
 const outPath = resolve(root, 'dist/index.html');
 
+function diagnoseBase(source) {
+  const text = String(source);
+  const fnAt = text.indexOf('function __cw231NearestMatch');
+  console.log('DIAG nearest function:', fnAt >= 0 ? text.slice(fnAt, fnAt + 1400) : 'NOT FOUND');
+
+  const points = [];
+  let from = 0;
+  while (points.length < 6) {
+    const at = text.indexOf('rawSchedule', from);
+    if (at < 0) break;
+    points.push(at);
+    from = at + 11;
+  }
+  points.forEach((at, index) => {
+    console.log(`DIAG rawSchedule ${index + 1}:`, text.slice(Math.max(0, at - 260), at + 520));
+  });
+}
+
 export function applyScheduleSourcePatch(input) {
   const source = String(input);
   if (source.includes('cw231-empty__schedule-source')) return source;
@@ -69,6 +87,7 @@ export async function build() {
     readFile(cssPath, 'utf8'),
     readFile(jsPath, 'utf8'),
   ]);
+  diagnoseBase(base);
   const schedulePatched = applyScheduleSourcePatch(base);
   if (!schedulePatched.includes('cw231-empty__schedule-source')) {
     throw new Error('v23.1 rawSchedule source patch did not apply');
