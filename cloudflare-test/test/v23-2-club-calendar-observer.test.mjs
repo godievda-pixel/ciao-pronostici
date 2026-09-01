@@ -32,3 +32,15 @@ test('captures the legacy club calendar renderer where match metadata is consume
   assert.match(hint.snippet, /competition_name/);
   assert.match(hint.snippet, /m\?\.all/);
 });
+
+test('captures source after club calendar rows are selected for rendering', () => {
+  const source = `
+    const rows=all.filter(x=>Number(x.round_number)===selected);
+    const cards=rows.map(x=>x.competition_name + x.status + x.home.name + x.away.name);
+  `;
+  const hints = extractSourceHints(source);
+  const hint = hints.find(item => item.marker === 'const rows=all.filter');
+  assert.ok(hint);
+  assert.match(hint.snippet, /round_number/);
+  assert.match(hint.snippet, /competition_name/);
+});
