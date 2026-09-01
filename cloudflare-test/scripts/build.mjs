@@ -11,22 +11,20 @@ const cssPath = resolve(root, 'src/ui-v23.1.css');
 const jsPath = resolve(root, 'src/ui-v23.1.js');
 const outPath = resolve(root, 'dist/index.html');
 
+function printAround(text, needle, label, span = 1800) {
+  const at = text.indexOf(needle);
+  console.log(`DIAG ${label}:`, at >= 0 ? text.slice(at, at + span) : 'NOT FOUND');
+}
+
 function diagnoseBase(source) {
   const text = String(source);
-  const fnAt = text.indexOf('function __cw231NearestMatch');
-  console.log('DIAG nearest function:', fnAt >= 0 ? text.slice(fnAt, fnAt + 1400) : 'NOT FOUND');
+  printAround(text, 'function __cw231NearestMatch', 'nearest function', 1400);
+  printAround(text, 'function __cw231RawScheduleMatches', 'raw schedule function', 2200);
 
-  const points = [];
-  let from = 0;
-  while (points.length < 6) {
-    const at = text.indexOf('rawSchedule', from);
-    if (at < 0) break;
-    points.push(at);
-    from = at + 11;
+  for (const needle of ['nextMatch', 'next_match', 'БЛИЖАЙШИЙ МАТЧ', 'Ближайший матч']) {
+    const at = text.indexOf(needle);
+    console.log(`DIAG ${needle}:`, at >= 0 ? text.slice(Math.max(0, at - 700), at + 1800) : 'NOT FOUND');
   }
-  points.forEach((at, index) => {
-    console.log(`DIAG rawSchedule ${index + 1}:`, text.slice(Math.max(0, at - 260), at + 520));
-  });
 }
 
 export function applyScheduleSourcePatch(input) {
