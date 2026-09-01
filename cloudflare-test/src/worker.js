@@ -1,31 +1,29 @@
 import { adaptSerieASchedule } from './v23.2/serie-a-adapter.mjs';
+import { fetchEspnMatches } from './v23.2/espn-provider.mjs';
 
 const TEST_BUILD = 'ciao-web-v23-1-github-test-20260901';
 const V23_2_MATCHES = '/api/v23.2/matches';
 const LEGACY_SERIE_A_SCHEDULE = '/api/ciao-schedule-fast-v1';
+const EXTERNAL_COMPETITIONS = new Set(['coppa_italia', 'ucl', 'uel', 'uecl']);
 
 function errorJson(status, payload) {
   return Response.json({ ok: false, ...payload }, { status });
 }
 
-async function handleV23_2Matches(request, env, url) {
-  if (request.method !== 'GET') {
-    return errorJson(405, { error: 'method_not_allowed' });
-  }
+function dateText(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  return date.toISOString().slice(0, 10);
+}
 
-  const initData = request.headers.get('x-telegram-init-data') || '';
-  if (!initData) {
-    return errorJson(401, { error: 'telegram_auth_required' });
-  }
+function defaultDateRange(now = new Date()) {
+  const from = new Date(now);
+  from.setUTCDate(from.getUTCDate() - 45);
+  const to = new Date(now);
+  to.setUTCDate(to.getUTCDate() + 120);
+  return { from: dateText(from), to: dateText(to) };
+}
 
-  const competition = String(url.searchParams.get('competition') || '');
-  if (competition !== 'serie_a') {
-    return errorJson(501, {
-      error: 'competition_not_wired',
-      competition,
-    });
-  }
-
+async function handleSerieAMatches(request, env, initData) {
   const upstreamRequest = new Request(
     new URL(LEGACY_SERIE_A_SCHEDULE, request.url),
     {
@@ -55,6 +53,58 @@ async function handleV23_2Matches(request, env, url) {
   return Response.json({
     ok: true,
     data: adaptSerieASchedule(payload),
+  });
+}
+
+async function handleExternalMatches(competition, url) {
+  const fallback = defaultDateRange();
+  const from = String(url.searchParams.get('from') || fallback.from);
+  const to = String(url.searchParams.get('to') || fallback.to);
+
+  try {
+    const matches = await fetchEspnMatches({ competition, from, to });
+    return Response.json({
+      ok: true,
+      data: {
+        competition,
+        from,
+        to,
+        matches,
+      },
+    });
+  } catch (error) {
+    const message = String(error?.message || error || '');
+    if (/invalid date|date range|range exceeds/i.test(message)) {
+      return errorJson(400, { error: 'invalid_date_range' });
+    }
+    return errorJson(502, {
+      error: 'competition_upstream_failed',
+      competition,
+    });
+  }
+}
+
+async function handleV23_2Matches(request, env, url) {
+  if (request.method !== 'GET') {
+    return errorJson(405, { error: 'method_not_allowed' });
+  }
+
+  const initData = request.headers.get('x-telegram-init-data') || '';
+  if (!initData) {
+    return errorJson(401, { error: 'telegram_auth_required' });
+  }
+
+  const competition = String(url.searchParams.get('competition') || '');
+  if (competition === 'serie_a') {
+    return handleSerieAMatches(request, env, initData);
+  }
+  if (EXTERNAL_COMPETITIONS.has(competition)) {
+    return handleExternalMatches(competition, url);
+  }
+
+  return errorJson(501, {
+    error: 'competition_not_wired',
+    competition,
   });
 }
 
