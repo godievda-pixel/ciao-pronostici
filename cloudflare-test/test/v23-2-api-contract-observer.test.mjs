@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   discoverApiCalls,
+  extractSourceHints,
   summarizeJsonShape,
 } from '../src/v23.2/api-contract-observer.mjs';
 import {
@@ -44,6 +45,26 @@ test('discovers unique literal API calls and marks dynamic routes as non-concret
       snippet: "fetch('/api/schedule')",
     },
   ]);
+});
+
+test('extracts bounded source hints around known schedule and network markers', () => {
+  const source = `
+    const before = 'x';
+    async function __cw209LoadSchedule() {
+      return apiJson('/schedule');
+    }
+    const API_BASE = '/api';
+    async function apiJson(path) {
+      return fetch(API_BASE + path).then(r => r.json());
+    }
+  `;
+
+  const hints = extractSourceHints(source);
+  assert.equal(hints.some(hint => hint.marker === '__cw209LoadSchedule'), true);
+  assert.equal(hints.some(hint => hint.marker === 'fetch('), true);
+  assert.equal(hints.some(hint => hint.marker === 'API_BASE'), true);
+  assert.equal(hints.every(hint => hint.snippet.length <= 900), true);
+  assert.equal(hints.some(hint => hint.snippet.includes("apiJson('/schedule')")), true);
 });
 
 test('summarizes JSON shape without retaining values', () => {
@@ -92,15 +113,18 @@ test('safeCalls allows only concrete anonymous GET API calls', () => {
   assert.deepEqual(safeCalls(calls).map(call => call.route), ['/api/schedule']);
 });
 
-test('observeContract stores schema only for successful JSON GET responses', async () => {
+test('observeContract stores schema only for successful JSON GET responses and source hints', async () => {
   const requests = [];
   const fetchImpl = async url => {
     requests.push(String(url));
     if (String(url).includes('/releases/v23.1/')) {
-      return new Response("<script>fetch('/api/schedule')</script>", {
-        status: 200,
-        headers: { 'content-type': 'text/html' },
-      });
+      return new Response(
+        "<script>async function __cw209LoadSchedule(){return fetch('/api/schedule')}</script>",
+        {
+          status: 200,
+          headers: { 'content-type': 'text/html' },
+        },
+      );
     }
 
     return Response.json({
@@ -117,5 +141,6 @@ test('observeContract stores schema only for successful JSON GET responses', asy
   assert.equal(requests.at(-1), 'https://test.example/api/schedule');
   assert.equal(result.probes[0].status, 200);
   assert.deepEqual(result.probes[0].shape.keys, ['matches']);
+  assert.equal(result.sourceHints.some(hint => hint.marker === '__cw209LoadSchedule'), true);
   assert.equal(JSON.stringify(result).includes('Inter'), false);
 });
