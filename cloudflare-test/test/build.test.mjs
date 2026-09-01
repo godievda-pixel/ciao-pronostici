@@ -42,3 +42,18 @@ test('premium home sources define the approved today card and spacing', async ()
   assert.match(premiumJs, /cw231-empty__next-card/);
   assert.match(premiumJs, /Ближайший матч/);
 });
+
+test('compact empty state uses live nearest-match text without decorative icon or filler copy', async () => {
+  const [premiumCss, premiumJs] = await Promise.all([
+    readFile(new URL('../src/ui-v23.1.css', import.meta.url), 'utf8'),
+    readFile(new URL('../src/ui-v23.1.js', import.meta.url), 'utf8'),
+  ]);
+
+  assert.doesNotMatch(premiumJs, /cw231-empty__icon/);
+  assert.doesNotMatch(premiumJs, /Следующий матч уже на горизонте/);
+  assert.doesNotMatch(premiumJs, /Дженоа|Комо/);
+  assert.match(premiumJs, /empty\.textContent/);
+  assert.match(premiumJs, /cw231-empty__next-card/);
+  assert.match(premiumCss, /min-height:\s*128px!important/);
+  assert.match(premiumCss, /margin-top:\s*12px!important/);
+});
