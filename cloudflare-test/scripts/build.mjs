@@ -11,6 +11,29 @@ const cssPath = resolve(root, 'src/ui-v23.1.css');
 const jsPath = resolve(root, 'src/ui-v23.1.js');
 const outPath = resolve(root, 'dist/index.html');
 
+export function applyScheduleSourcePatch(input) {
+  const source = String(input);
+  if (source.includes('cw231-empty__schedule-source')) return source;
+
+  const startNeedle = 'const nearest = visible.length ? null : __cw231NearestMatch(rawSchedule);';
+  const start = source.indexOf(startNeedle);
+  if (start < 0) return source;
+
+  const bodyStart = source.indexOf('const body = visible.length', start);
+  if (bodyStart < 0) throw new Error('v23.1 today body anchor missing');
+
+  const nextAnchor = "let dateLabel = '';";
+  let end = source.indexOf(nextAnchor, bodyStart);
+  if (end < 0) end = source.length;
+
+  const indentMatch = source.slice(Math.max(0, start - 8), start).match(/(^|\n)([ \t]*)$/);
+  const i = indentMatch?.[2] || '  ';
+
+  const replacement = `${i}const nearest = visible.length ? null : __cw231NearestMatch(rawSchedule);\n${i}const body = visible.length\n${i}  ? \`<div class="cw231-today-list">\${visible.map(__cw231TodayCard).join('')}</div>\`\n${i}  : \`<div class="cw231-empty cw231-empty__schedule-source">\n${i}      <div class="cw231-empty__title">Сегодня матчей нет</div>\n${i}      \${nearest ? \`<div class="cw231-empty__next-card">\n${i}        <div class="cw231-empty__next-label">Ближайший матч</div>\n${i}        <div class="cw231-empty__match">\${esc(nearest.homeTeam?.name || '—')} — \${esc(nearest.awayTeam?.name || '—')}</div>\n${i}        <div class="cw231-empty__time">\${__cw231Status(nearest)}</div>\n${i}      </div>\` : ''}\n${i}    </div>\`;\n\n`;
+
+  return source.slice(0, start) + replacement + source.slice(end);
+}
+
 export function applyPatch(baseHtml, css, js) {
   let html = String(baseHtml);
   if (!html.includes(BASE_BUILD)) {
@@ -46,7 +69,11 @@ export async function build() {
     readFile(cssPath, 'utf8'),
     readFile(jsPath, 'utf8'),
   ]);
-  const html = applyPatch(base, css, js);
+  const schedulePatched = applyScheduleSourcePatch(base);
+  if (!schedulePatched.includes('cw231-empty__schedule-source')) {
+    throw new Error('v23.1 rawSchedule source patch did not apply');
+  }
+  const html = applyPatch(schedulePatched, css, js);
   await mkdir(dirname(outPath), { recursive: true });
   await writeFile(outPath, html, 'utf8');
   return { output: outPath, bytes: Buffer.byteLength(html), build: TEST_BUILD };
