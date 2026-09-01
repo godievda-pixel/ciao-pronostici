@@ -10,22 +10,22 @@ const PROBES = Object.freeze([
   {
     key: 'coppa_italia',
     kind: 'scoreboard',
-    url: `${ESPN_BASE}/ita.coppa_italia/scoreboard?dates=20251201-20251231`,
+    url: `${ESPN_BASE}/ita.coppa_italia/scoreboard?dates=20260801-20260930`,
   },
   {
     key: 'ucl',
     kind: 'scoreboard',
-    url: `${ESPN_BASE}/uefa.champions/scoreboard?dates=20250901-20250930`,
+    url: `${ESPN_BASE}/uefa.champions/scoreboard?dates=20260801-20260930`,
   },
   {
     key: 'uel',
     kind: 'scoreboard',
-    url: `${ESPN_BASE}/uefa.europa/scoreboard?dates=20250901-20251031`,
+    url: `${ESPN_BASE}/uefa.europa/scoreboard?dates=20260801-20260930`,
   },
   {
     key: 'uecl',
     kind: 'scoreboard',
-    url: `${ESPN_BASE}/uefa.europa.conf/scoreboard?dates=20251001-20251031`,
+    url: `${ESPN_BASE}/uefa.europa.conf/scoreboard?dates=20260801-20260930`,
   },
   {
     key: 'italy_teams',
