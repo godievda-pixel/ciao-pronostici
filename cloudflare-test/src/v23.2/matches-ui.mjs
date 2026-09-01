@@ -262,7 +262,8 @@ function ensureOverlay(documentRef) {
   overlay.className = 'cw232-matches-overlay';
   overlay.hidden = true;
   overlay.setAttribute?.('aria-live', 'polite');
-  documentRef.body?.appendChild?.(overlay);
+  const mount = documentRef.getElementById('ciao-miniapp-root') || documentRef.body;
+  mount?.appendChild?.(overlay);
   return overlay;
 }
 
