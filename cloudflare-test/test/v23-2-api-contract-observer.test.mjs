@@ -61,8 +61,9 @@ test('discovers literal request discriminators without evaluating source', () =>
   assert.deepEqual(discoverObjectLiteralValues(source, 'tournament_id'), ['2']);
 });
 
-test('extracts bounded source hints around known schedule, club calendar, fast-api, score, transport, card and network markers', () => {
+test('extracts bounded source hints around known schedule, club calendar, matches navigation, fast-api, score, transport, card and network markers', () => {
   const source = `
+    const NAV = '<button data-tab="matches">Матчи</button>';
     async function __cw209LoadSchedule() { return apiJson('/schedule'); }
     const CLUB_CALENDAR = '/api/ciao-club-calendar-fast-v1';
     async function loadClubCalendar(teamId) { return __cw9Post(CLUB_CALENDAR, { team_id: teamId }); }
@@ -78,6 +79,7 @@ test('extracts bounded source hints around known schedule, club calendar, fast-a
   `;
 
   const hints = extractSourceHints(source);
+  assert.equal(hints.some(hint => hint.marker === 'Матчи'), true);
   assert.equal(hints.some(hint => hint.marker === '__cw209LoadSchedule'), true);
   assert.equal(hints.some(hint => hint.marker === '/api/ciao-club-calendar-fast-v1'), true);
   assert.equal(hints.some(hint => hint.marker === '__cw9FastApi('), true);
