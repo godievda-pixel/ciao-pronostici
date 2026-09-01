@@ -45,6 +45,10 @@ jobs:
         if: github.event_name == 'push'
         run: node scripts/probe-espn-provider.mjs
 
+      - name: Probe deployed TEST markers
+        if: github.event_name == 'push'
+        run: node scripts/probe-test-deployment.mjs
+
       - name: Upload v23.2 API contract observation
         if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
@@ -60,5 +64,14 @@ jobs:
         with:
           name: ciao-v23-2-espn-provider
           path: cloudflare-test/artifacts/espn-provider-probe.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload TEST deployment observation
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ciao-test-deployment-probe
+          path: cloudflare-test/artifacts/test-deployment-probe.json
           if-no-files-found: error
           retention-days: 7
