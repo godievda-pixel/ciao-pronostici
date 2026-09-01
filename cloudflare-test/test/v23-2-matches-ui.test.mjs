@@ -5,6 +5,7 @@ import {
   renderMatchesHub,
   renderCompetitionScreen,
   loadCompetitionScreen,
+  createMatchesUiController,
 } from '../src/v23.2/matches-ui.mjs';
 
 test('season date range spans the current European football season', () => {
@@ -93,4 +94,29 @@ test('competition screen loader requests the whole current season and returns re
   }]);
   assert.match(html, /Милан/);
   assert.match(html, /Ливерпуль/);
+});
+
+test('matches controller opens the hub, loads external competitions and preserves legacy Serie A fallback', async () => {
+  const shown = [];
+  let hidden = 0;
+  const loaded = [];
+  const controller = createMatchesUiController({
+    show(html) { shown.push(html); },
+    hide() { hidden += 1; },
+    async loadScreen(competition) {
+      loaded.push(competition);
+      return `<section data-loaded="${competition}">${competition}</section>`;
+    },
+  });
+
+  controller.openHub();
+  assert.match(shown.at(-1), /data-cw232-view="hub"/);
+
+  await controller.openCompetition('ucl');
+  assert.deepEqual(loaded, ['ucl']);
+  assert.match(shown.at(-1), /data-loaded="ucl"/);
+
+  await controller.openCompetition('serie_a');
+  assert.equal(hidden, 1);
+  assert.deepEqual(loaded, ['ucl']);
 });
