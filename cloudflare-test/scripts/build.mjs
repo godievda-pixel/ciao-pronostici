@@ -147,13 +147,24 @@ export function applyPatch(baseHtml, css, js) {
 }
 
 export function injectV232Entry(input) {
-  const html = String(input);
-  if (html.includes('id="ciao-v232-core"')) return html;
+  let html = String(input);
   if (!/<\/body>/i.test(html)) throw new Error('v23.2 module entry requires body anchor');
-  return html.replace(
-    /<\/body>/i,
-    '<script type="module" id="ciao-v232-core" src="/v23.2/index.mjs"></script>\n</body>',
-  );
+
+  if (!html.includes('id="ciao-v232-core"')) {
+    html = html.replace(
+      /<\/body>/i,
+      '<script type="module" id="ciao-v232-core" src="/v23.2/index.mjs"></script>\n</body>',
+    );
+  }
+
+  if (!html.includes('id="ciao-v232-matches-ui"')) {
+    html = html.replace(
+      /<\/body>/i,
+      '<script type="module" id="ciao-v232-matches-ui" src="/v23.2/matches-ui.mjs"></script>\n</body>',
+    );
+  }
+
+  return html;
 }
 
 export async function copyV232Modules() {
