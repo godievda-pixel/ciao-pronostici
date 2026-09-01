@@ -4,6 +4,7 @@ import {
   seasonDateRange,
   renderMatchesHub,
   renderCompetitionScreen,
+  loadCompetitionScreen,
 } from '../src/v23.2/matches-ui.mjs';
 
 test('season date range spans the current European football season', () => {
@@ -59,4 +60,37 @@ test('Champions League screen renders its own theme, stage and canonical matches
   assert.match(html, /Арсенал/);
   assert.match(html, /https:\/\/img\.test\/inter\.png/);
   assert.match(html, /https:\/\/img\.test\/arsenal\.png/);
+});
+
+test('competition screen loader requests the whole current season and returns rendered HTML', async () => {
+  const calls = [];
+  const loadMatches = async (competition, options) => {
+    calls.push({ competition, options });
+    return {
+      competition,
+      matches: [{
+        matchId: 'ucl:901',
+        competition: 'ucl',
+        stage: 'League Phase',
+        kickoffAt: '2026-09-20T19:00:00Z',
+        status: 'scheduled',
+        homeTeam: { id: '1', name: 'Милан', crestUrl: '' },
+        awayTeam: { id: '2', name: 'Ливерпуль', crestUrl: '' },
+        homeScore: null,
+        awayScore: null,
+      }],
+    };
+  };
+
+  const html = await loadCompetitionScreen('ucl', {
+    now: new Date('2026-09-01T12:00:00Z'),
+    loadMatches,
+  });
+
+  assert.deepEqual(calls, [{
+    competition: 'ucl',
+    options: { from: '2026-07-01', to: '2027-06-30' },
+  }]);
+  assert.match(html, /Милан/);
+  assert.match(html, /Ливерпуль/);
 });
