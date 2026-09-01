@@ -16,7 +16,7 @@ Included competitions:
 - `uel` — only UEFA Europa League matches involving at least one Italian club.
 - `uecl` — only UEFA Conference League matches involving at least one Italian club.
 
-The same normalized match must power Home, Matches, Predictions, Match Center and Rankings. The system must not maintain separate per-screen copies of schedule logic.
+The same normalized match powers Home, Matches, Predictions, Match Center and Rankings. The system does not maintain separate per-screen copies of schedule logic.
 
 ## 2. Non-goals
 
@@ -35,7 +35,7 @@ Use a hybrid API + frontend engine approach.
 
 ### 3.1 `ciao-web-api`
 
-The API is the source of normalized competition and match data. Upstream provider-specific data is isolated behind adapters. The frontend must not need to know which upstream provider supplied a match.
+The API is the source of normalized competition and match data. Upstream provider-specific data is isolated behind adapters. The frontend does not need to know which upstream provider supplied a match.
 
 Responsibilities:
 
@@ -66,7 +66,7 @@ The Tournament Engine is shared by Home, Matches, Predictions, Match Center and 
 
 ## 4. Canonical match model
 
-Every match must normalize to one stable shape:
+Every match normalizes to one stable shape:
 
 ```text
 matchId
@@ -93,11 +93,11 @@ rawVersion
 - `matchId` is stable across screens and updates.
 - `competition` is one of `serie_a`, `coppa_italia`, `ucl`, `uel`, `uecl`.
 - `kickoffAt` is an absolute timestamp; the client formats it in the user's locale/timezone.
-- `status` uses a normalized finite set such as `scheduled`, `live`, `finished`, `postponed`, `cancelled`.
+- `status` is exactly one of `scheduled`, `live`, `finished`, `postponed`, `cancelled`.
 - `minute` is populated only when meaningful.
 - `aggregateScore` and `leg` are optional and used only when the competition stage requires them.
-- `predictionDeadline` is authoritative for prediction locking and must not depend on delayed LIVE polling.
-- `rawVersion` may be used internally for debugging/cache invalidation but is not a user-facing identifier.
+- `predictionDeadline` is authoritative for prediction locking and does not depend on delayed LIVE polling.
+- `rawVersion` is internal metadata for cache/debugging and is not a user-facing identifier.
 
 `homeTeam` and `awayTeam` include at minimum a stable team ID, display name, country association and crest/logo URL when available.
 
@@ -117,11 +117,11 @@ Return a match only when at least one participating club is identified as Italia
 
 Filtering happens in `ciao-web-api`, not independently in the client.
 
-## 6. API shape
+## 6. Frontend-facing API contract
 
-The exact upstream provider remains replaceable, but the frontend-facing contract is stable.
+The exact upstream provider remains replaceable, but the frontend-facing contract is fixed.
 
-Recommended routes:
+Routes:
 
 ```text
 GET /api/v23.2/competitions
@@ -129,11 +129,12 @@ GET /api/v23.2/matches?competition=<key>&from=<iso>&to=<iso>
 GET /api/v23.2/matches/:matchId
 GET /api/v23.2/predictions/available
 GET /api/v23.2/rankings?competition=<key|overall>
+GET /api/v23.2/rankings/users/:userId
 ```
 
-Responses include a compatible `dataVersion` and a server timestamp.
+Responses include `dataVersion` and a server timestamp.
 
-The first implementation may adapt existing endpoints internally, but screens must consume the normalized v23.2 contract rather than provider-specific shapes.
+The first implementation can adapt existing endpoints internally, but screens consume the normalized v23.2 contract rather than provider-specific shapes.
 
 ## 7. Data flow and LIVE updates
 
@@ -149,7 +150,7 @@ upstream source
 
 ### LIVE behavior
 
-- Active LIVE matches refresh approximately every 15–30 seconds.
+- Active LIVE matches refresh every 15–30 seconds.
 - Upcoming scheduled matches refresh less frequently.
 - Finished matches stop high-frequency polling.
 - A LIVE refresh updates changed fields in place; it does not replace entire screens.
@@ -173,7 +174,7 @@ Use two cache layers.
 
 ### API cache
 
-Short-lived server cache keyed by competition/window and tuned by match state.
+Use a short-lived server cache keyed by competition/window and tuned by match state.
 
 ### Client snapshot cache
 
@@ -182,8 +183,8 @@ The client keeps the last successful compatible snapshot so Mini App startup can
 If data refresh fails:
 
 - keep the last successful data visible;
-- show a compact non-blocking status such as `Данные могут быть неактуальны`;
-- for LIVE data use `Обновление задерживается`;
+- show `Данные могут быть неактуальны` for stale non-LIVE data;
+- show `Обновление задерживается` for LIVE refresh delay;
 - never replace a populated screen with an empty error state solely because refresh failed.
 
 If `dataVersion` is incompatible with the current frontend, use the last compatible snapshot rather than guessing at the new schema.
@@ -204,9 +205,9 @@ Deep-link match route:
 /match/:matchId
 ```
 
-A match can be opened from Home, Matches, Predictions or a Telegram link without separate match-center logic.
+A match opens from Home, Matches, Predictions or a Telegram link without separate match-center logic.
 
-Back navigation must restore the originating screen state, including:
+Back navigation restores the originating screen state, including:
 
 - competition;
 - round/stage;
@@ -228,9 +229,9 @@ Competition cards:
 - Europa League
 - Conference League
 
-Each card may show the next relevant match/date and a count of upcoming matches.
+Each card shows the next relevant match/date and the number of upcoming matches.
 
-A compact top block may show the nearest upcoming matches involving Italian clubs across competitions.
+A compact top block shows the nearest upcoming matches involving Italian clubs across competitions.
 
 ### 10.2 Competition screens
 
@@ -238,7 +239,7 @@ Each competition opens a dedicated screen with its own visual theme while preser
 
 #### Serie A
 
-- `Ближайшие / Тур / Календарь` views.
+- `Ближайшие / Тур / Календарь` views;
 - round selector;
 - all matches in the selected round;
 - LIVE matches prioritized;
@@ -248,15 +249,15 @@ Each competition opens a dedicated screen with its own visual theme while preser
 
 Stage-oriented navigation rather than league rounds.
 
-Typical labels are derived from the actual season format, e.g. `1/32`, `1/16`, `1/8`, `1/4`, `1/2`, `Финал` where applicable.
+Stage labels are derived from the actual season format, e.g. `1/32`, `1/16`, `1/8`, `1/4`, `1/2`, `Финал` when those stages exist.
 
-Two-leg aggregate data is displayed only when the current competition format actually uses it.
+Two-leg aggregate data is displayed only when the current competition format uses it.
 
 #### UCL / UEL / UECL
 
 Show only matches involving Italian clubs.
 
-Stage navigation adapts to the season format, for example:
+Stage navigation is driven by normalized stage metadata and adapts to the current season format. Typical flow is:
 
 `Лига → Плей-офф → 1/8 → 1/4 → 1/2 → Финал`
 
@@ -304,7 +305,7 @@ European competitions include only matches involving Italian clubs.
 
 ### 12.2 Grouping
 
-Group available predictions by date using user-friendly labels such as:
+Group available predictions by date using user-friendly labels:
 
 - Сегодня
 - Завтра
@@ -321,7 +322,7 @@ A prediction card includes:
 - prediction state;
 - current user's prediction if submitted.
 
-Quick prediction entry must be possible directly from the list without opening Match Center.
+Quick prediction entry is available directly from the list without opening Match Center.
 
 Clicking the match identity area opens Match Center.
 
@@ -373,7 +374,7 @@ resultType
 Rules:
 
 - `competition` is derived from the match, not manually chosen by the user.
-- scoring formula remains unchanged from the current Ciao, Web! Prediction League.
+- the scoring formula remains unchanged from the current Ciao, Web! Prediction League.
 - after a match is finalized, scoring is computed once for the authoritative final result.
 - `points` and `resultType` are stored on the prediction result.
 - prediction locking uses `predictionDeadline`, not the arrival of LIVE state.
@@ -408,6 +409,8 @@ overall = serie_a + coppa_italia + ucl + uel + uecl
 
 A user with no participation in one competition contributes zero for that competition.
 
+The overall table includes users who have at least one submitted prediction in any included competition.
+
 ### 14.4 User summary
 
 The ranking screen shows the current user's:
@@ -420,7 +423,7 @@ The ranking screen shows the current user's:
 - correct outcomes;
 - average points per prediction.
 
-The overall view may show the point split by competition.
+The overall view also shows the point split by competition.
 
 ### 14.5 Ranking movement
 
@@ -450,9 +453,9 @@ Show:
 
 ## 16. Home integration
 
-Home remains compact and personalized.
+Home remains compact and personalized and consumes the same Tournament Engine.
 
-It consumes the same Tournament Engine and may show:
+It shows:
 
 - favorite club's nearest match across included competitions;
 - `Кальчо сегодня` from the unified schedule;
@@ -571,7 +574,7 @@ Telegram TEST is the final visual/interaction validation before Production.
 
 ## 22. Implementation decomposition
 
-The architecture is one coherent design, but implementation should be split into independently verifiable milestones:
+The architecture is one coherent design, but implementation is split into independently verifiable milestones:
 
 1. Multi-competition API normalization + competition metadata.
 2. Frontend Tournament Engine + theme/config layer.
@@ -580,4 +583,4 @@ The architecture is one coherent design, but implementation should be split into
 5. Rankings + snapshots + participant profile.
 6. Home + Match Center migration and full regression pass.
 
-No milestone is considered complete until its tests and TEST build are green.
+No milestone is complete until its tests and TEST build are green.
