@@ -87,6 +87,7 @@ export function discoverObjectLiteralValues(source, key) {
 }
 
 const SOURCE_HINT_MARKERS = Object.freeze([
+  'Матчи',
   '__cw209LoadSchedule',
   '/api/ciao-club-calendar-fast-v1',
   '__cw9Post(__CW208_CLUB_CALENDAR',
