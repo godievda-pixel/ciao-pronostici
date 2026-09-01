@@ -1,0 +1,56 @@
+export const COMPETITION_KEYS = Object.freeze([
+  'serie_a',
+  'coppa_italia',
+  'ucl',
+  'uel',
+  'uecl',
+]);
+
+export const COMPETITIONS = Object.freeze({
+  serie_a: Object.freeze({
+    key: 'serie_a',
+    title: 'Serie A',
+    shortTitle: 'Serie A',
+    theme: 'serie-a',
+    navigation: 'rounds',
+    european: false,
+  }),
+  coppa_italia: Object.freeze({
+    key: 'coppa_italia',
+    title: 'Coppa Italia',
+    shortTitle: 'Кубок',
+    theme: 'coppa',
+    navigation: 'stages',
+    european: false,
+  }),
+  ucl: Object.freeze({
+    key: 'ucl',
+    title: 'Champions League',
+    shortTitle: 'ЛЧ',
+    theme: 'champions',
+    navigation: 'stages',
+    european: true,
+  }),
+  uel: Object.freeze({
+    key: 'uel',
+    title: 'Europa League',
+    shortTitle: 'ЛЕ',
+    theme: 'europa',
+    navigation: 'stages',
+    european: true,
+  }),
+  uecl: Object.freeze({
+    key: 'uecl',
+    title: 'Conference League',
+    shortTitle: 'ЛК',
+    theme: 'conference',
+    navigation: 'stages',
+    european: true,
+  }),
+});
+
+export function getCompetitionConfig(key) {
+  const config = COMPETITIONS[key];
+  if (!config) throw new Error(`Unknown competition: ${key}`);
+  return config;
+}
