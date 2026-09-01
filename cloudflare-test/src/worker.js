@@ -23,6 +23,14 @@ function defaultDateRange(now = new Date()) {
   return { from: dateText(from), to: dateText(to) };
 }
 
+function noStoreStaticResponse(response) {
+  const result = new Response(response.body, response);
+  result.headers.set('cache-control', 'no-store, no-cache, must-revalidate, max-age=0');
+  result.headers.set('pragma', 'no-cache');
+  result.headers.set('expires', '0');
+  return result;
+}
+
 async function handleSerieAMatches(request, env, initData) {
   const upstreamRequest = new Request(
     new URL(LEGACY_SERIE_A_SCHEDULE, request.url),
@@ -129,6 +137,6 @@ export default {
       return env.CIAO_WEB_API.fetch(request);
     }
 
-    return env.ASSETS.fetch(request);
+    return noStoreStaticResponse(await env.ASSETS.fetch(request));
   },
 };
