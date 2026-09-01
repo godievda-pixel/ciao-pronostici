@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   discoverApiCalls,
   discoverApiRouteLiterals,
+  discoverObjectLiteralValues,
   extractSourceHints,
   summarizeJsonShape,
 } from '../src/v23.2/api-contract-observer.mjs';
@@ -43,6 +44,21 @@ test('discovers static API route literals even when fetch uses constants', () =>
     '/api/ciao-match-center-fast-v3',
     '/api/ciao-schedule-fast-v1',
   ]);
+});
+
+test('discovers literal request discriminators without evaluating source', () => {
+  const source = `
+    post(API, { action:'live_updates', competition:'serie_a', league_id:135 });
+    post(API, { action: "round", competition_key: 'ucl', tournament_id: 2 });
+    post(API, { action:'live_updates', league_id: 135 });
+    post(API, { action: dynamicAction, competition: competitionKey });
+  `;
+
+  assert.deepEqual(discoverObjectLiteralValues(source, 'action'), ['live_updates', 'round']);
+  assert.deepEqual(discoverObjectLiteralValues(source, 'competition'), ['serie_a']);
+  assert.deepEqual(discoverObjectLiteralValues(source, 'competition_key'), ['ucl']);
+  assert.deepEqual(discoverObjectLiteralValues(source, 'league_id'), ['135']);
+  assert.deepEqual(discoverObjectLiteralValues(source, 'tournament_id'), ['2']);
 });
 
 test('extracts bounded source hints around known schedule, club calendar, fast-api, score, transport, card and network markers', () => {
