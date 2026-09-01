@@ -3,8 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import {
   applyScheduleSourcePatch,
-  applyFavoriteMatchSourcePatch,
-  applyFavoriteMatchResolverPatch,
+  applyFavoriteHtmlSourcePatch,
 } from '../scripts/build.mjs';
 
 test('nearest Serie A card has both club logos and opens match center', () => {
@@ -26,39 +25,29 @@ test('nearest Serie A card has both club logos and opens match center', () => {
   assert.match(patched, /__cw231Logo\(nearest\.awayTeam\)/);
   assert.match(patched, /data-cw231-action="match"/);
   assert.match(patched, /data-cw231-match="\$\{nearest\.matchId\}"/);
-  assert.match(patched, /data-cw231-round="\$\{Number\(nearest\.raw\?\.round_number\) \|\| 0\}"/);
 });
 
-test('favorite match resolver prefers full Serie A calendar so match center has a real id', () => {
+test('favorite home card resolves its clickable id through the same normalized Serie A calendar as Today', () => {
   const source = `
-  function __cw211FavoriteMatch(t,d){
-    const id=Number(t?.id)||0,live=__cw2017ActiveLeagueMatches().find(m=>Number(m?.home?.id)===id||Number(m?.away?.id)===id);if(live)return {...live,id:Number(live.id),__kind:'live'};
-    const next=d?.overview?.next_match||null;if(next)return {...next,id:Number(next.id||next.match_id)||0,__kind:'next'};return null;
+  function __cw231FavoriteHtml() {
+    const host = document.createElement('div');
+    host.innerHTML = __cw231LegacyHomeAndPredict();
+    return host.querySelector('.cw18-favorite-home,.cw2017-favorite-reminder')?.outerHTML || '';
   }
   `;
 
-  const patched = applyFavoriteMatchResolverPatch(source);
+  const patched = applyFavoriteHtmlSourcePatch(source);
 
-  assert.match(patched, /__cw209Schedule\?\.rounds/);
-  assert.match(patched, /home\?\.id/);
-  assert.match(patched, /away\?\.id/);
-  assert.match(patched, /kickoff_at/);
-  assert.match(patched, /id:Number\(calendarMatch\.id\|\|calendarMatch\.match_id\)\|\|0/);
-});
-
-test('favorite club nearest-match card uses the same delegated v23.1 match action as the working today card', () => {
-  const source = `
-    return \`<div class="cw211-favorite-body"><div class="cw211-info-card"><small>Форма</small></div><div class="cw211-info-card"><small>\${m?.__kind==='live'?'Матч идёт':'Ближайший матч'}</small><div class="cw211-match-line"></div></div></div>\`;
-  `;
-
-  const patched = applyFavoriteMatchSourcePatch(source);
-
+  assert.match(patched, /__cw231RawScheduleMatches\(\)/);
+  assert.match(patched, /CiaoV23Today\.normalizeMatch/);
+  assert.match(patched, /match\.matchId/);
+  assert.match(patched, /homeTeam\?\.id/);
+  assert.match(patched, /awayTeam\?\.id/);
+  assert.match(patched, /homeTeam\?\.name/);
+  assert.match(patched, /awayTeam\?\.name/);
+  assert.match(patched, /card\.dataset\.cw231Action = 'match'/);
+  assert.match(patched, /card\.dataset\.cw231Match = String\(match\.matchId\)/);
   assert.match(patched, /cw231-favorite-source-link/);
-  assert.match(patched, /data-cw231-action="match"/);
-  assert.match(patched, /data-cw231-match="\$\{mid\}"/);
-  assert.match(patched, /data-cw231-round="\$\{Number\(m\?\.round_number\) \|\| 0\}"/);
-  assert.match(patched, /role="button"/);
-  assert.match(patched, /tabindex="0"/);
 });
 
 test('runtime no longer depends on clicking a hidden match-center button', async () => {
