@@ -36,3 +36,16 @@ jobs:
 
       - name: Build TEST artifact
         run: npm run build
+
+      - name: Observe v23.1 API contract
+        if: github.event_name == 'push'
+        run: npm run inspect:api-contract
+
+      - name: Upload v23.2 API contract observation
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ciao-v23-2-api-contract
+          path: cloudflare-test/artifacts/api-contract-observed.json
+          if-no-files-found: error
+          retention-days: 7
