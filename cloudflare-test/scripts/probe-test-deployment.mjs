@@ -69,6 +69,9 @@ async function probeModules() {
         contentSecurityPolicy: response.headers.get('content-security-policy'),
         bytes: Buffer.byteLength(text),
         hasInstallMatchesUi: path.endsWith('/matches-ui.mjs') ? text.includes('installMatchesUi') : undefined,
+        hasTournamentCapture: path.endsWith('/matches-ui.mjs')
+          ? text.includes('event.stopPropagation?.();') && text.includes('controller.openCompetition(card.dataset.cw232Competition)')
+          : undefined,
         hasCoreMarker: path.endsWith('/index.mjs') ? text.includes('CiaoV232Core') : undefined,
       });
     } catch (error) {
@@ -117,6 +120,7 @@ async function probe() {
   }
 
   const modules = await probeModules();
+  const matchesModule = modules.find(item => item.path.endsWith('/matches-ui.mjs'));
   const report = {
     url: ORIGIN,
     expected: EXPECTED,
@@ -134,6 +138,10 @@ async function probe() {
     modules,
     navigation: report.navigation.map(item => ({ marker: item.marker, found: item.found, index: item.index })),
   }));
+
+  if (!matchesModule?.hasTournamentCapture) {
+    throw new Error('deployed TEST does not contain tournament capture navigation fix');
+  }
 }
 
 probe().catch(error => {
