@@ -59,6 +59,8 @@ export function discoverApiRouteLiterals(source) {
 
 const SOURCE_HINT_MARKERS = Object.freeze([
   '__cw209LoadSchedule',
+  'boardStatus',
+  'boardScore',
   '__cw209CalendarHtml',
   '__cw9CalendarCard',
   '__cw231RawScheduleMatches',
