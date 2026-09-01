@@ -25,11 +25,12 @@ test('nearest Serie A card has both club logos and opens match center', () => {
   assert.match(patched, /data-cw231-round="\$\{Number\(nearest\.raw\?\.round_number\) \|\| 0\}"/);
 });
 
-test('favorite club nearest-match card is promoted to the existing match-center trigger', async () => {
+test('favorite club nearest-match card invokes the already-bound match-center trigger', async () => {
   const js = await readFile(new URL('../src/ui-v23.1.js', import.meta.url), 'utf8');
 
   assert.match(js, /cw211-match-btn\[data-cw211-match\]/);
-  assert.match(js, /dataset\.cw211Match/);
   assert.match(js, /cw231-favorite-match-card/);
+  assert.match(js, /addEventListener\(['"]click['"]/);
+  assert.match(js, /trigger\.click\(\)/);
   assert.match(js, /tabIndex\s*=\s*0/);
 });
