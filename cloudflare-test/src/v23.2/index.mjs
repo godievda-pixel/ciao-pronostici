@@ -15,6 +15,10 @@ import {
   availablePredictions,
   nextMatchForTeam,
 } from './tournament-engine.mjs';
+import {
+  resolveTelegramInitData,
+  loadCompetitionMatches,
+} from './data-client.mjs';
 
 globalThis.CiaoV232Core = Object.freeze({
   version: '23.2-core',
@@ -29,4 +33,6 @@ globalThis.CiaoV232Core = Object.freeze({
   groupForCompetition,
   availablePredictions,
   nextMatchForTeam,
+  resolveTelegramInitData,
+  loadCompetitionMatches,
 });
