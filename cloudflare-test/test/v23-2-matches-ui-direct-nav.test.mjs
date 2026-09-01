@@ -75,3 +75,21 @@ test('capture listener opens the hub for a calendar button created after install
   assert.equal(overlay.hidden, false);
   assert.match(overlay.innerHTML, /data-cw232-view="hub"/);
 });
+
+test('matches overlay mounts inside the miniapp root so it cannot sit behind the legacy app stacking context', () => {
+  const { documentRef, nodes } = fakeDocument([]);
+  let mounted = null;
+  const miniappRoot = {
+    id: 'ciao-miniapp-root',
+    appendChild(node) {
+      mounted = node;
+      if (node.id) nodes.set(node.id, node);
+    },
+  };
+  nodes.set('ciao-miniapp-root', miniappRoot);
+
+  installMatchesUi(documentRef, { defer: fn => fn() });
+
+  assert.ok(mounted, 'overlay must be mounted inside #ciao-miniapp-root');
+  assert.equal(mounted.id, 'ciao-v232-matches-overlay');
+});
