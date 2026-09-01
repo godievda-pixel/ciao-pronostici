@@ -1,111 +1,76 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  buildEspnScoreboardUrl,
+  fetchEspnMatches,
+  fetchItalianEspnTeamIds,
+} from '../src/v23.2/espn-provider.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const outputPath = resolve(root, 'artifacts/espn-provider-probe.json');
-const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports/soccer';
+const RANGE = Object.freeze({ from: '2026-07-01', to: '2027-06-30' });
+const COMPETITIONS = Object.freeze(['coppa_italia', 'ucl', 'uel', 'uecl']);
 
-const PROBES = Object.freeze([
-  {
-    key: 'coppa_italia',
-    kind: 'scoreboard',
-    url: `${ESPN_BASE}/ita.coppa_italia/scoreboard?dates=20260801-20260930`,
-  },
-  {
-    key: 'ucl',
-    kind: 'scoreboard',
-    url: `${ESPN_BASE}/uefa.champions/scoreboard?dates=20260801-20260930`,
-  },
-  {
-    key: 'uel',
-    kind: 'scoreboard',
-    url: `${ESPN_BASE}/uefa.europa/scoreboard?dates=20260801-20260930`,
-  },
-  {
-    key: 'uecl',
-    kind: 'scoreboard',
-    url: `${ESPN_BASE}/uefa.europa.conf/scoreboard?dates=20260801-20260930`,
-  },
-  {
-    key: 'italy_teams',
-    kind: 'teams',
-    url: `${ESPN_BASE}/ita.1/teams`,
-  },
-]);
-
-function keys(value) {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? Object.keys(value).sort()
-    : [];
-}
-
-function scoreboardShape(json) {
-  const event = Array.isArray(json?.events) ? json.events[0] : null;
-  const competition = Array.isArray(event?.competitions) ? event.competitions[0] : null;
-  const competitor = Array.isArray(competition?.competitors) ? competition.competitors[0] : null;
+async function fetchRawCount(competition, fetchImpl) {
+  const url = buildEspnScoreboardUrl(competition, RANGE.from, RANGE.to);
+  const response = await fetchImpl(url, {
+    headers: {
+      accept: 'application/json',
+      'cache-control': 'no-cache',
+    },
+  });
+  const type = String(response.headers.get('content-type') || '').toLowerCase();
+  if (!response.ok || !type.includes('json')) {
+    return { status: response.status, contentType: type, rawCount: -1 };
+  }
+  const json = await response.json();
   return {
-    rootKeys: keys(json),
-    leagueKeys: keys(Array.isArray(json?.leagues) ? json.leagues[0] : null),
-    eventCount: Array.isArray(json?.events) ? json.events.length : -1,
-    eventKeys: keys(event),
-    competitionKeys: keys(competition),
-    competitorKeys: keys(competitor),
-    teamKeys: keys(competitor?.team),
-  };
-}
-
-function teamsShape(json) {
-  const sport = Array.isArray(json?.sports) ? json.sports[0] : null;
-  const league = Array.isArray(sport?.leagues) ? sport.leagues[0] : null;
-  const teamEntry = Array.isArray(league?.teams) ? league.teams[0] : null;
-  return {
-    rootKeys: keys(json),
-    sportKeys: keys(sport),
-    leagueKeys: keys(league),
-    teamCount: Array.isArray(league?.teams) ? league.teams.length : -1,
-    teamEntryKeys: keys(teamEntry),
-    teamKeys: keys(teamEntry?.team),
+    status: response.status,
+    contentType: type.split(';')[0],
+    rawCount: Array.isArray(json?.events) ? json.events.length : -1,
   };
 }
 
 export async function probeEspnProvider(fetchImpl = fetch) {
+  const italianTeamIds = await fetchItalianEspnTeamIds({ fetchImpl });
   const results = [];
 
-  for (const probe of PROBES) {
-    const response = await fetchImpl(probe.url, {
-      headers: {
-        accept: 'application/json',
-        'cache-control': 'no-cache',
-      },
-    });
-    const type = String(response.headers.get('content-type') || '').toLowerCase();
-    if (!response.ok || !type.includes('json')) {
-      throw new Error(`${probe.key} probe failed: HTTP ${response.status} ${type}`);
+  for (const competition of COMPETITIONS) {
+    try {
+      const raw = await fetchRawCount(competition, fetchImpl);
+      const matches = await fetchEspnMatches({
+        competition,
+        from: RANGE.from,
+        to: RANGE.to,
+        fetchImpl,
+      });
+      results.push({
+        competition,
+        ...raw,
+        finalCount: matches.length,
+        sample: matches.slice(0, 3).map(match => ({
+          matchId: match.matchId,
+          kickoffAt: match.kickoffAt,
+          home: match.homeTeam?.name,
+          away: match.awayTeam?.name,
+          stage: match.stage,
+          round: match.round,
+        })),
+      });
+    } catch (error) {
+      results.push({
+        competition,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
-
-    const json = await response.json();
-    const shape = probe.kind === 'teams' ? teamsShape(json) : scoreboardShape(json);
-    if (probe.kind === 'scoreboard' && shape.eventCount <= 0) {
-      throw new Error(`${probe.key} probe returned no events for validation window`);
-    }
-    if (probe.kind === 'teams' && shape.teamCount <= 0) {
-      throw new Error(`${probe.key} probe returned no teams`);
-    }
-
-    results.push({
-      key: probe.key,
-      kind: probe.kind,
-      status: response.status,
-      contentType: type.split(';')[0],
-      shape,
-    });
   }
 
   return {
     observedAt: new Date().toISOString(),
     provider: 'espn-site-api',
-    authentication: 'none',
+    range: RANGE,
+    italianTeamCount: italianTeamIds.size,
     results,
   };
 }
@@ -117,10 +82,15 @@ export async function main() {
   console.log(JSON.stringify({
     ok: true,
     provider: result.provider,
+    range: result.range,
+    italianTeamCount: result.italianTeamCount,
     probes: result.results.map(item => ({
-      key: item.key,
+      competition: item.competition,
       status: item.status,
-      count: item.shape.eventCount ?? item.shape.teamCount,
+      rawCount: item.rawCount,
+      finalCount: item.finalCount,
+      error: item.error,
+      sample: item.sample,
     })),
     output: outputPath,
   }));
