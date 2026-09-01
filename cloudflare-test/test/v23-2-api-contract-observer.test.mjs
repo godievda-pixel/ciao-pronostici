@@ -45,9 +45,11 @@ test('discovers static API route literals even when fetch uses constants', () =>
   ]);
 });
 
-test('extracts bounded source hints around known schedule, score, transport, card and network markers', () => {
+test('extracts bounded source hints around known schedule, club calendar, score, transport, card and network markers', () => {
   const source = `
     async function __cw209LoadSchedule() { return apiJson('/schedule'); }
+    const CLUB_CALENDAR = '/api/ciao-club-calendar-fast-v1';
+    async function loadClubCalendar(teamId) { return __cw9Post(CLUB_CALENDAR, { team_id: teamId }); }
     async function __cw9Post(path, body) { return fetch(path, { method: 'POST', headers: { 'X-Telegram-Init-Data': initData }, body: JSON.stringify(body) }); }
     function boardStatus(match) { return match.live_status || match.status; }
     function boardScore(match) { return match.home_score + ':' + match.away_score; }
@@ -59,6 +61,7 @@ test('extracts bounded source hints around known schedule, score, transport, car
 
   const hints = extractSourceHints(source);
   assert.equal(hints.some(hint => hint.marker === '__cw209LoadSchedule'), true);
+  assert.equal(hints.some(hint => hint.marker === '/api/ciao-club-calendar-fast-v1'), true);
   assert.equal(hints.some(hint => hint.marker === '__cw9Post'), true);
   assert.equal(hints.some(hint => hint.marker === 'boardStatus'), true);
   assert.equal(hints.some(hint => hint.marker === 'boardScore'), true);
@@ -66,7 +69,7 @@ test('extracts bounded source hints around known schedule, score, transport, car
   assert.equal(hints.some(hint => hint.marker === '__cw231RawScheduleMatches'), true);
   assert.equal(hints.some(hint => hint.marker === 'fetch('), true);
   assert.equal(hints.every(hint => hint.snippet.length <= 900), true);
-  assert.equal(hints.some(hint => hint.snippet.includes('X-Telegram-Init-Data')), true);
+  assert.equal(hints.some(hint => hint.snippet.includes('team_id')), true);
 });
 
 test('summarizes JSON shape without retaining values', () => {
