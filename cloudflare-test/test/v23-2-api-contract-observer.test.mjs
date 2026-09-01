@@ -65,11 +65,14 @@ test('discovers static API route literals even when fetch uses constants', () =>
   ]);
 });
 
-test('extracts bounded source hints around known schedule and network markers', () => {
+test('extracts bounded source hints around known schedule, card and network markers', () => {
   const source = `
     const before = 'x';
     async function __cw209LoadSchedule() {
       return apiJson('/schedule');
+    }
+    function __cw9CalendarCard(match) {
+      return match.home_team.name + match.away_team.name;
     }
     function __cw231RawScheduleMatches() {
       return selectedRound.matches || [];
@@ -82,11 +85,12 @@ test('extracts bounded source hints around known schedule and network markers', 
 
   const hints = extractSourceHints(source);
   assert.equal(hints.some(hint => hint.marker === '__cw209LoadSchedule'), true);
+  assert.equal(hints.some(hint => hint.marker === '__cw9CalendarCard'), true);
   assert.equal(hints.some(hint => hint.marker === '__cw231RawScheduleMatches'), true);
   assert.equal(hints.some(hint => hint.marker === 'fetch('), true);
   assert.equal(hints.some(hint => hint.marker === 'API_BASE'), true);
   assert.equal(hints.every(hint => hint.snippet.length <= 900), true);
-  assert.equal(hints.some(hint => hint.snippet.includes("apiJson('/schedule')")), true);
+  assert.equal(hints.some(hint => hint.snippet.includes('match.home_team.name')), true);
 });
 
 test('summarizes JSON shape without retaining values', () => {
