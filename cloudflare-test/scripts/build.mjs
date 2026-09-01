@@ -14,6 +14,7 @@ const outPath = resolve(root, 'dist/index.html');
 export function applyScheduleSourcePatch(input) {
   let source = String(input);
   if (source.includes('cw231-empty__schedule-source')) return source;
+
   const homeNeedle = 'const rawSchedule = __cw231RawScheduleMatches();';
   const homeAt = source.indexOf(homeNeedle);
   if (homeAt >= 0) {
@@ -22,39 +23,77 @@ export function applyScheduleSourcePatch(input) {
     const prefetch = `${i}if (!__cw209Schedule && !__cw209ScheduleLoading && !__cw209ScheduleError && typeof __cw209LoadSchedule === 'function') {\n${i}  setTimeout(() => {\n${i}    __cw209LoadSchedule().then(() => {\n${i}      if (!matchViewId && !clubViewId && main?.querySelector?.('.cw231-today-head')) render();\n${i}    }).catch(() => {});\n${i}  }, 0);\n${i}}\n${i}${homeNeedle}`;
     source = source.slice(0, homeAt) + prefetch + source.slice(homeAt + homeNeedle.length);
   }
+
   const startNeedle = 'const nearest = visible.length ? null : __cw231NearestMatch(rawSchedule);';
   const start = source.indexOf(startNeedle);
   if (start < 0) return source;
+
   const bodyStart = source.indexOf('const body = visible.length', start);
   if (bodyStart < 0) throw new Error('v23.1 today body anchor missing');
+
   const nextAnchor = "let dateLabel = '';";
   let end = source.indexOf(nextAnchor, bodyStart);
   if (end < 0) end = source.length;
+
   const indentMatch = source.slice(Math.max(0, start - 8), start).match(/(^|\n)([ \t]*)$/);
   const i = indentMatch?.[2] || '  ';
+
   const replacement = `${i}const nearest = visible.length ? null : __cw231NearestMatch(rawSchedule);\n${i}const body = visible.length\n${i}  ? \`<div class="cw231-today-list">\${visible.map(__cw231TodayCard).join('')}</div>\`\n${i}  : \`<div class="cw231-empty cw231-empty__schedule-source">\n${i}      <div class="cw231-empty__title">Сегодня матчей нет</div>\n${i}      \${nearest ? \`<button type="button" class="cw231-empty__next-card" data-cw231-action="match" data-cw231-match="\${nearest.matchId}" data-cw231-round="\${Number(nearest.raw?.round_number) || 0}">\n${i}        <div class="cw231-empty__next-label">Ближайший матч</div>\n${i}        <div class="cw231-empty__match">\n${i}          <span class="cw231-empty__team">\${__cw231Logo(nearest.homeTeam)}<b>\${esc(nearest.homeTeam?.name || '—')}</b></span>\n${i}          <span class="cw231-empty__dash">—</span>\n${i}          <span class="cw231-empty__team away"><b>\${esc(nearest.awayTeam?.name || '—')}</b>\${__cw231Logo(nearest.awayTeam)}</span>\n${i}        </div>\n${i}        <div class="cw231-empty__time">\${__cw231Status(nearest)}</div>\n${i}      </button>\` : ''}\n${i}    </div>\`;\n\n`;
+
   return source.slice(0, start) + replacement + source.slice(end);
 }
 
-export function applyFavoriteMatchResolverPatch(input) {
+export function applyFavoriteHtmlSourcePatch(input) {
   let source = String(input);
-  if (source.includes('cw231-favorite-calendar-resolver')) return source;
-  const startNeedle = 'function __cw211FavoriteMatch(t,d){';
-  const start = source.indexOf(startNeedle);
-  if (start < 0) return source;
-  const endNeedle = '\n  }';
-  const end = source.indexOf(endNeedle, start);
-  if (end < 0) throw new Error('v23.1 favorite match resolver end anchor missing');
-  const replacement = `function __cw211FavoriteMatch(t,d){\n    /* cw231-favorite-calendar-resolver */\n    const id=Number(t?.id)||0,live=__cw2017ActiveLeagueMatches().find(m=>Number(m?.home?.id)===id||Number(m?.away?.id)===id);if(live)return {...live,id:Number(live.id),__kind:'live'};\n    const now=Date.now(),calendarMatches=[];\n    for(const round of __cw209Schedule?.rounds||[])for(const match of round?.matches||[]){\n      const matchId=Number(match?.id||match?.match_id)||0,kickoff=new Date(match?.kickoff_at).getTime();\n      const homeId=Number(match?.home?.id||match?.home_team_id||match?.home_team?.id)||0,awayId=Number(match?.away?.id||match?.away_team_id||match?.away_team?.id)||0;\n      if(matchId&&Number.isFinite(kickoff)&&kickoff>=now-120000&&(homeId===id||awayId===id))calendarMatches.push(match);\n    }\n    const calendarMatch=calendarMatches.sort((a,b)=>new Date(a.kickoff_at)-new Date(b.kickoff_at))[0]||null;\n    if(calendarMatch)return {...calendarMatch,id:Number(calendarMatch.id||calendarMatch.match_id)||0,__kind:'next'};\n    const next=d?.overview?.next_match||null;if(next)return {...next,id:Number(next.id||next.match_id)||0,__kind:'next'};return null;\n  }`;
-  return source.slice(0, start) + replacement + source.slice(end + endNeedle.length);
-}
+  if (source.includes('cw231-favorite-normalized-link')) return source;
 
-export function applyFavoriteMatchSourcePatch(input) {
-  let source = String(input);
-  if (source.includes('cw231-favorite-source-link')) return source;
-  const needle = `<div class="cw211-info-card"><small>\${m?.__kind==='live'?'Матч идёт':'Ближайший матч'}</small>`;
+  const needle = `function __cw231FavoriteHtml() {
+  const host = document.createElement('div');
+  host.innerHTML = __cw231LegacyHomeAndPredict();
+  return host.querySelector('.cw18-favorite-home,.cw2017-favorite-reminder')?.outerHTML || '';
+}`;
+
   if (!source.includes(needle)) return source;
-  const replacement = `<div class="cw211-info-card cw231-favorite-source-link" data-cw231-action="match" data-cw231-match="\${mid}" data-cw231-round="\${Number(m?.round_number) || 0}" data-cw211-match="\${mid}" role="button" tabindex="0"><small>\${m?.__kind==='live'?'Матч идёт':'Ближайший матч'}</small>`;
+
+  const replacement = `function __cw231FavoriteHtml() {
+  /* cw231-favorite-normalized-link */
+  const host = document.createElement('div');
+  host.innerHTML = __cw231LegacyHomeAndPredict();
+  const favorite = host.querySelector('.cw18-favorite-home,.cw2017-favorite-reminder');
+  if (!favorite) return '';
+
+  const favoriteTeam = S?.user?.favorite_team || null;
+  const favoriteId = Number(favoriteTeam?.id) || 0;
+  const favoriteName = String(favoriteTeam?.name || '').trim().toLowerCase();
+  const now = Date.now() - 120000;
+
+  const match = __cw231RawScheduleMatches()
+    .map(CiaoV23Today.normalizeMatch)
+    .filter(item => item.matchId && Date.parse(item.kickoffAt) >= now)
+    .filter(item => {
+      const homeId = Number(item.homeTeam?.id) || 0;
+      const awayId = Number(item.awayTeam?.id) || 0;
+      const homeName = String(item.homeTeam?.name || '').trim().toLowerCase();
+      const awayName = String(item.awayTeam?.name || '').trim().toLowerCase();
+      return (favoriteId && (homeId === favoriteId || awayId === favoriteId))
+        || (favoriteName && (homeName === favoriteName || awayName === favoriteName));
+    })
+    .sort((a, b) => Date.parse(a.kickoffAt) - Date.parse(b.kickoffAt))[0] || null;
+
+  const card = favorite.querySelector('.cw211-favorite-body .cw211-info-card:nth-child(2)');
+  if (card && match?.matchId) {
+    card.classList.add('cw231-favorite-source-link');
+    card.dataset.cw231Action = 'match';
+    card.dataset.cw231Match = String(match.matchId);
+    card.dataset.cw231Round = String(Number(match.raw?.round_number) || 0);
+    card.setAttribute('role', 'button');
+    card.setAttribute('aria-label', 'Открыть ближайший матч любимого клуба');
+    card.tabIndex = 0;
+  }
+
+  return favorite.outerHTML;
+}`;
+
   return source.replace(needle, replacement);
 }
 
@@ -63,8 +102,15 @@ export function applyPatch(baseHtml, css, js) {
   if (!html.includes(BASE_BUILD)) throw new Error(`base build marker missing: ${BASE_BUILD}`);
   if (!/<\/head>/i.test(html) || !/<\/body>/i.test(html)) throw new Error('base HTML is missing head/body anchors');
   if (/ciao-web-github-test-patch/.test(html)) return html;
-  html = html.replace(/<\/head>/i, `<meta name="ciao-test-build" content="${TEST_BUILD}">\n<style id="ciao-web-github-test-patch">\n${css}\n</style>\n</head>`);
-  html = html.replace(/<\/body>/i, `<script id="ciao-web-github-test-runtime">\n${js}\n</script>\n</body>`);
+
+  html = html.replace(
+    /<\/head>/i,
+    `<meta name="ciao-test-build" content="${TEST_BUILD}">\n<style id="ciao-web-github-test-patch">\n${css}\n</style>\n</head>`,
+  );
+  html = html.replace(
+    /<\/body>/i,
+    `<script id="ciao-web-github-test-runtime">\n${js}\n</script>\n</body>`,
+  );
   return html;
 }
 
@@ -76,22 +122,23 @@ async function loadBase() {
   return response.text();
 }
 
-function diagNeedle(source, needle) {
-  const at = source.indexOf(needle);
-  console.log(`DIAG ${needle}:`, at < 0 ? 'missing' : source.slice(Math.max(0, at - 1200), Math.min(source.length, at + 3400)));
-}
-
 export async function build() {
-  const [base, css, js] = await Promise.all([loadBase(), readFile(cssPath, 'utf8'), readFile(jsPath, 'utf8')]);
-  diagNeedle(base, 'function __cw231RawScheduleMatches()');
-  diagNeedle(base, 'function __cw231NormalizeMatch');
-  diagNeedle(base, 'normalizeMatch');
+  const [base, css, js] = await Promise.all([
+    loadBase(),
+    readFile(cssPath, 'utf8'),
+    readFile(jsPath, 'utf8'),
+  ]);
+
   const schedulePatched = applyScheduleSourcePatch(base);
-  if (!schedulePatched.includes('cw231-empty__schedule-source')) throw new Error('v23.1 rawSchedule source patch did not apply');
-  const resolverPatched = applyFavoriteMatchResolverPatch(schedulePatched);
-  if (!resolverPatched.includes('cw231-favorite-calendar-resolver')) throw new Error('v23.1 favorite calendar resolver patch did not apply');
-  const favoritePatched = applyFavoriteMatchSourcePatch(resolverPatched);
-  if (!favoritePatched.includes('cw231-favorite-source-link')) throw new Error('v23.1 favorite match source patch did not apply');
+  if (!schedulePatched.includes('cw231-empty__schedule-source')) {
+    throw new Error('v23.1 rawSchedule source patch did not apply');
+  }
+
+  const favoritePatched = applyFavoriteHtmlSourcePatch(schedulePatched);
+  if (!favoritePatched.includes('cw231-favorite-normalized-link')) {
+    throw new Error('v23.1 favorite normalized link patch did not apply');
+  }
+
   const html = applyPatch(favoritePatched, css, js);
   await mkdir(dirname(outPath), { recursive: true });
   await writeFile(outPath, html, 'utf8');
@@ -99,5 +146,10 @@ export async function build() {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  build().then((result) => console.log(JSON.stringify({ ok: true, ...result }))).catch((error) => { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1; });
+  build()
+    .then(result => console.log(JSON.stringify({ ok: true, ...result })))
+    .catch(error => {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    });
 }
