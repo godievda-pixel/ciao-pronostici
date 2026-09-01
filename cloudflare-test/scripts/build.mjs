@@ -78,15 +78,14 @@ async function loadBase() {
 
 function diagNeedle(source, needle) {
   const at = source.indexOf(needle);
-  console.log(`DIAG ${needle}:`, at < 0 ? 'missing' : source.slice(Math.max(0, at - 1500), Math.min(source.length, at + 3200)));
+  console.log(`DIAG ${needle}:`, at < 0 ? 'missing' : source.slice(Math.max(0, at - 1200), Math.min(source.length, at + 3400)));
 }
 
 export async function build() {
   const [base, css, js] = await Promise.all([loadBase(), readFile(cssPath, 'utf8'), readFile(jsPath, 'utf8')]);
-  diagNeedle(base, "querySelectorAll('[data-cw211-match]')");
-  diagNeedle(base, '__cw231BindHome()');
-  diagNeedle(base, 'bind=function');
-  diagNeedle(base, 'bind = function');
+  diagNeedle(base, 'function __cw231RawScheduleMatches()');
+  diagNeedle(base, 'function __cw231NormalizeMatch');
+  diagNeedle(base, 'normalizeMatch');
   const schedulePatched = applyScheduleSourcePatch(base);
   if (!schedulePatched.includes('cw231-empty__schedule-source')) throw new Error('v23.1 rawSchedule source patch did not apply');
   const resolverPatched = applyFavoriteMatchResolverPatch(schedulePatched);
