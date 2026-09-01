@@ -47,13 +47,8 @@ export function applyFavoriteHtmlSourcePatch(input) {
   let source = String(input);
   if (source.includes('cw231-favorite-normalized-link')) return source;
 
-  const needle = `function __cw231FavoriteHtml() {
-  const host = document.createElement('div');
-  host.innerHTML = __cw231LegacyHomeAndPredict();
-  return host.querySelector('.cw18-favorite-home,.cw2017-favorite-reminder')?.outerHTML || '';
-}`;
-
-  if (!source.includes(needle)) return source;
+  const pattern = /function\s+__cw231FavoriteHtml\s*\(\)\s*\{\s*const\s+host\s*=\s*document\.createElement\('div'\);\s*host\.innerHTML\s*=\s*__cw231LegacyHomeAndPredict\(\);\s*return\s+host\.querySelector\('\.cw18-favorite-home,\.cw2017-favorite-reminder'\)\?\.outerHTML\s*\|\|\s*'';\s*\}/;
+  if (!pattern.test(source)) return source;
 
   const replacement = `function __cw231FavoriteHtml() {
   /* cw231-favorite-normalized-link */
@@ -94,7 +89,7 @@ export function applyFavoriteHtmlSourcePatch(input) {
   return favorite.outerHTML;
 }`;
 
-  return source.replace(needle, replacement);
+  return source.replace(pattern, replacement);
 }
 
 export function applyPatch(baseHtml, css, js) {
