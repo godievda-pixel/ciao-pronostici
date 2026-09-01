@@ -307,12 +307,17 @@ export function installMatchesUi(
   documentRef.addEventListener('click', event => {
     const target = event?.target;
     if (!target?.closest) return;
+    const nav = target.closest('button[data-tab]');
+    if (!nav || nav.dataset?.cw232NavBound === '1') return;
+    handleNav(nav);
+  }, true);
+
+  documentRef.addEventListener('click', event => {
+    const target = event?.target;
+    if (!target?.closest) return;
 
     const nav = target.closest('button[data-tab]');
-    if (nav) {
-      if (nav.dataset?.cw232NavBound !== '1') handleNav(nav);
-      return;
-    }
+    if (nav) return;
 
     const action = target.closest('[data-cw232-action]');
     if (action?.dataset?.cw232Action === 'hub') {
