@@ -16,6 +16,10 @@ function inferMethod(callText) {
   return String(match?.[1] || 'GET').toUpperCase();
 }
 
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export function discoverApiCalls(source) {
   const text = String(source);
   const calls = [];
@@ -55,6 +59,31 @@ export function discoverApiRouteLiterals(source) {
   }
 
   return [...routes].sort();
+}
+
+export function discoverObjectLiteralValues(source, key) {
+  const text = String(source);
+  const wanted = escapeRegExp(key);
+  const values = new Set();
+  let match;
+
+  const stringPattern = new RegExp(
+    `(?:["']?${wanted}["']?\\s*:\\s*)(["'])([^"'\\r\\n]*?)\\1`,
+    'g',
+  );
+  while ((match = stringPattern.exec(text))) {
+    values.add(String(match[2]));
+  }
+
+  const numberPattern = new RegExp(
+    `(?:["']?${wanted}["']?\\s*:\\s*)(-?\\d+(?:\\.\\d+)?)\\b`,
+    'g',
+  );
+  while ((match = numberPattern.exec(text))) {
+    values.add(String(match[1]));
+  }
+
+  return [...values].sort();
 }
 
 const SOURCE_HINT_MARKERS = Object.freeze([
