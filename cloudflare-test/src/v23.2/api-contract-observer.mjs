@@ -2,6 +2,15 @@ function normalizeSnippet(value) {
   return String(value).replace(/\s+/g, ' ').trim().slice(0, 240);
 }
 
+function sanitizeSourceSnippet(value) {
+  return String(value)
+    .replace(/eyJ[A-Za-z0-9_-]{30,}(?:\.[A-Za-z0-9_-]{10,}){1,2}/g, '[redacted-token]')
+    .replace(/[A-Za-z0-9_-]{80,}/g, '[redacted-long-literal]')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 900);
+}
+
 function inferMethod(callText) {
   const match = String(callText).match(/method\s*:\s*['\"]([A-Za-z]+)['\"]/i);
   return String(match?.[1] || 'GET').toUpperCase();
@@ -33,6 +42,43 @@ export function discoverApiCalls(source) {
   return [...unique.values()].sort((a, b) =>
     a.route.localeCompare(b.route) || a.method.localeCompare(b.method)
   );
+}
+
+const SOURCE_HINT_MARKERS = Object.freeze([
+  '__cw209LoadSchedule',
+  '/api/',
+  'fetch(',
+  'API_BASE',
+  'apiFetch',
+  'apiJson',
+]);
+
+export function extractSourceHints(source) {
+  const text = String(source);
+  const hints = [];
+
+  for (const marker of SOURCE_HINT_MARKERS) {
+    let from = 0;
+    let foundForMarker = 0;
+
+    while (hints.length < 12 && foundForMarker < 3) {
+      const index = text.indexOf(marker, from);
+      if (index < 0) break;
+
+      const start = Math.max(0, index - 300);
+      const end = Math.min(text.length, index + 600);
+      hints.push({
+        marker,
+        index,
+        snippet: sanitizeSourceSnippet(text.slice(start, end)),
+      });
+
+      foundForMarker += 1;
+      from = index + marker.length;
+    }
+  }
+
+  return hints;
 }
 
 function primitiveKind(value) {
