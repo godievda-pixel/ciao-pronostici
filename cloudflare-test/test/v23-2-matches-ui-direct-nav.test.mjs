@@ -2,18 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { installMatchesUi } from '../src/v23.2/matches-ui.mjs';
 
-test('installer binds directly to the existing calendar nav button so legacy bubbling cannot hide the hub', () => {
+function fakeDocument(initialNav = []) {
   const nodes = new Map();
-  const documentListeners = {};
-  const calendarListeners = {};
-  const calendar = {
-    dataset: { tab: 'calendar' },
-    addEventListener(type, handler) { calendarListeners[type] = handler; },
-  };
-  const profile = {
-    dataset: { tab: 'profile' },
-    addEventListener() {},
-  };
+  const documentListeners = [];
   const append = node => { if (node.id) nodes.set(node.id, node); };
   const documentRef = {
     head: { appendChild: append },
@@ -33,15 +24,52 @@ test('installer binds directly to the existing calendar nav button so legacy bub
     },
     getElementById(id) { return nodes.get(id) || null; },
     querySelectorAll(selector) {
-      return selector === 'button[data-tab]' ? [calendar, profile] : [];
+      return selector === 'button[data-tab]' ? initialNav : [];
     },
-    addEventListener(type, handler) { documentListeners[type] = handler; },
+    addEventListener(type, handler, options) {
+      documentListeners.push({ type, handler, options });
+    },
   };
+  return { documentRef, documentListeners, nodes };
+}
+
+test('installer binds directly to the existing calendar nav button so legacy bubbling cannot hide the hub', () => {
+  const calendarListeners = {};
+  const calendar = {
+    dataset: { tab: 'calendar' },
+    addEventListener(type, handler) { calendarListeners[type] = handler; },
+  };
+  const profile = {
+    dataset: { tab: 'profile' },
+    addEventListener() {},
+  };
+  const { documentRef, nodes } = fakeDocument([calendar, profile]);
 
   installMatchesUi(documentRef, { defer: fn => fn() });
 
   assert.equal(typeof calendarListeners.click, 'function');
   calendarListeners.click({ preventDefault() {} });
+
+  const overlay = nodes.get('ciao-v232-matches-overlay');
+  assert.equal(overlay.hidden, false);
+  assert.match(overlay.innerHTML, /data-cw232-view="hub"/);
+});
+
+test('capture listener opens the hub for a calendar button created after install even when legacy stops bubbling', () => {
+  const { documentRef, documentListeners, nodes } = fakeDocument([]);
+  installMatchesUi(documentRef, { defer: fn => fn() });
+
+  const capture = documentListeners.find(item => item.type === 'click' && item.options === true);
+  assert.ok(capture, 'calendar navigation must be observed in capture phase');
+
+  const replacementCalendar = { dataset: { tab: 'calendar' } };
+  const target = {
+    closest(selector) {
+      return selector === 'button[data-tab]' ? replacementCalendar : null;
+    },
+  };
+
+  capture.handler({ target });
 
   const overlay = nodes.get('ciao-v232-matches-overlay');
   assert.equal(overlay.hidden, false);
