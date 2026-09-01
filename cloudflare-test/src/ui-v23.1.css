@@ -1,0 +1,62 @@
+/* Ciao, Web! v23.1 GitHub TEST polish */
+#ciao-miniapp-root .cw231-prediction-tabs{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:8px!important;
+  width:100%!important;
+  padding:5px!important;
+  box-sizing:border-box!important;
+  background:rgba(8,18,55,.78)!important;
+  border:1px solid rgba(111,137,255,.14)!important;
+  border-radius:18px!important;
+  overflow:visible!important;
+}
+#ciao-miniapp-root .cw231-prediction-tabs button{
+  min-width:0!important;
+  width:100%!important;
+  height:44px!important;
+  margin:0!important;
+  padding:0 12px!important;
+  border:1px solid transparent!important;
+  border-radius:14px!important;
+  background:transparent!important;
+  color:rgba(225,231,255,.68)!important;
+  font-weight:800!important;
+  white-space:nowrap!important;
+}
+#ciao-miniapp-root .cw231-prediction-tabs button[aria-selected="true"]{
+  color:#fff!important;
+  background:linear-gradient(135deg,var(--primary-2,#315cff),var(--primary,#1937df))!important;
+  border-color:rgba(112,143,255,.45)!important;
+  box-shadow:0 6px 20px rgba(32,70,255,.20)!important;
+}
+#ciao-miniapp-root .cw231-today-head{
+  align-items:center!important;
+  gap:14px!important;
+  margin-bottom:12px!important;
+}
+#ciao-miniapp-root .cw231-today-head h2{
+  margin:0!important;
+  color:#fff!important;
+  font-size:20px!important;
+  font-weight:800!important;
+  line-height:1.15!important;
+  letter-spacing:-.03em!important;
+}
+#ciao-miniapp-root .cw231-filters{
+  display:flex!important;
+  align-items:center!important;
+  gap:8px!important;
+  margin-bottom:20px!important;
+}
+#ciao-miniapp-root .cw231-filters button{
+  height:36px!important;
+  margin:0!important;
+  padding:0 15px!important;
+  border-radius:12px!important;
+}
+@media(max-width:390px){
+  #ciao-miniapp-root .cw231-prediction-tabs{gap:6px!important;padding:4px!important;border-radius:17px!important}
+  #ciao-miniapp-root .cw231-prediction-tabs button{height:42px!important;padding:0 10px!important;font-size:13px!important;border-radius:13px!important}
+  #ciao-miniapp-root .cw231-today-head h2{font-size:19px!important}
+}
