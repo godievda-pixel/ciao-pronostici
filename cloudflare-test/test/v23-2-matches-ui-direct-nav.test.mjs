@@ -76,6 +76,38 @@ test('capture listener opens the hub for a calendar button created after install
   assert.match(overlay.innerHTML, /data-cw232-view="hub"/);
 });
 
+test('capture listener opens a tournament before legacy miniapp bubbling can stop the card click', async () => {
+  const { documentRef, documentListeners, nodes } = fakeDocument([]);
+  const loaded = [];
+  installMatchesUi(documentRef, {
+    defer: fn => fn(),
+    async loadScreen(competition) {
+      loaded.push(competition);
+      return `<section data-loaded="${competition}">${competition}</section>`;
+    },
+  });
+
+  const capture = documentListeners.find(item => item.type === 'click' && item.options === true);
+  assert.ok(capture, 'v23.2 interactions must be observed in capture phase');
+
+  const card = { dataset: { cw232Competition: 'ucl' } };
+  const target = {
+    closest(selector) {
+      if (selector === 'button[data-tab]') return null;
+      if (selector === '.cw232-tournament-card[data-cw232-competition]') return card;
+      return null;
+    },
+  };
+
+  capture.handler({ target, preventDefault() {} });
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  assert.deepEqual(loaded, ['ucl']);
+  const overlay = nodes.get('ciao-v232-matches-overlay');
+  assert.equal(overlay.hidden, false);
+  assert.match(overlay.innerHTML, /data-loaded="ucl"/);
+});
+
 test('matches overlay mounts inside the miniapp root so it cannot sit behind the legacy app stacking context', () => {
   const { documentRef, nodes } = fakeDocument([]);
   let mounted = null;
