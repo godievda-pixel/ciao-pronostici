@@ -1,4 +1,5 @@
 import { COMPETITION_KEYS, getCompetitionConfig } from './competition-config.mjs';
+import { loadCompetitionMatches } from './data-client.mjs';
 import { groupForCompetition, sortChronologically } from './tournament-engine.mjs';
 
 function esc(value) {
@@ -141,4 +142,16 @@ export function renderCompetitionScreen(competition, data = {}) {
     </header>
     ${body}
   </section>`;
+}
+
+export async function loadCompetitionScreen(
+  competition,
+  {
+    now = new Date(),
+    loadMatches = loadCompetitionMatches,
+  } = {},
+) {
+  const range = seasonDateRange(now);
+  const data = await loadMatches(competition, range);
+  return renderCompetitionScreen(competition, data);
 }
