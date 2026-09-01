@@ -46,7 +46,7 @@ test('favorite match resolver prefers full Serie A calendar so match center has 
   assert.match(patched, /id:Number\(calendarMatch\.id\|\|calendarMatch\.match_id\)\|\|0/);
 });
 
-test('favorite club nearest-match card is born with the native match-center binding attribute', () => {
+test('favorite club nearest-match card uses the same delegated v23.1 match action as the working today card', () => {
   const source = `
     return \`<div class="cw211-favorite-body"><div class="cw211-info-card"><small>Форма</small></div><div class="cw211-info-card"><small>\${m?.__kind==='live'?'Матч идёт':'Ближайший матч'}</small><div class="cw211-match-line"></div></div></div>\`;
   `;
@@ -54,7 +54,9 @@ test('favorite club nearest-match card is born with the native match-center bind
   const patched = applyFavoriteMatchSourcePatch(source);
 
   assert.match(patched, /cw231-favorite-source-link/);
-  assert.match(patched, /data-cw211-match="\$\{mid\}"/);
+  assert.match(patched, /data-cw231-action="match"/);
+  assert.match(patched, /data-cw231-match="\$\{mid\}"/);
+  assert.match(patched, /data-cw231-round="\$\{Number\(m\?\.round_number\) \|\| 0\}"/);
   assert.match(patched, /role="button"/);
   assert.match(patched, /tabindex="0"/);
 });
