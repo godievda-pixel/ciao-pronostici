@@ -155,3 +155,80 @@ export async function loadCompetitionScreen(
   const data = await loadMatches(competition, range);
   return renderCompetitionScreen(competition, data);
 }
+
+function renderLoading(competition) {
+  const config = getCompetitionConfig(competition);
+  return `<section class="cw232-competition cw232-loading" data-cw232-view="competition" data-cw232-competition="${esc(competition)}" data-cw232-theme="${esc(config.theme)}">
+    <header class="cw232-competition__head">
+      <button type="button" class="cw232-back" data-cw232-action="hub" aria-label="Назад к турнирам">←</button>
+      <div><span class="cw232-matches-kicker">Матчи</span><h2>${esc(config.title)}</h2><p>Загружаем календарь…</p></div>
+    </header>
+    <div class="cw232-loading-card" aria-hidden="true"></div>
+    <div class="cw232-loading-card" aria-hidden="true"></div>
+  </section>`;
+}
+
+function renderLoadError(competition) {
+  const config = getCompetitionConfig(competition);
+  return `<section class="cw232-competition" data-cw232-view="competition" data-cw232-competition="${esc(competition)}" data-cw232-theme="${esc(config.theme)}">
+    <header class="cw232-competition__head">
+      <button type="button" class="cw232-back" data-cw232-action="hub" aria-label="Назад к турнирам">←</button>
+      <div><span class="cw232-matches-kicker">Матчи</span><h2>${esc(config.title)}</h2><p>Не удалось загрузить календарь</p></div>
+    </header>
+    <button type="button" class="cw232-retry" data-cw232-action="retry" data-cw232-competition="${esc(competition)}">Повторить</button>
+  </section>`;
+}
+
+export function createMatchesUiController({
+  show,
+  hide,
+  loadScreen = loadCompetitionScreen,
+} = {}) {
+  if (typeof show !== 'function' || typeof hide !== 'function') {
+    throw new Error('Matches UI controller requires show and hide');
+  }
+
+  let requestVersion = 0;
+  let activeCompetition = '';
+
+  function openHub() {
+    requestVersion += 1;
+    activeCompetition = '';
+    show(renderMatchesHub());
+  }
+
+  function close() {
+    requestVersion += 1;
+    activeCompetition = '';
+    hide();
+  }
+
+  async function openCompetition(competition) {
+    getCompetitionConfig(competition);
+    if (competition === 'serie_a') {
+      close();
+      return 'legacy';
+    }
+
+    const version = ++requestVersion;
+    activeCompetition = competition;
+    show(renderLoading(competition));
+
+    try {
+      const html = await loadScreen(competition);
+      if (version !== requestVersion || activeCompetition !== competition) return 'stale';
+      show(html);
+      return 'loaded';
+    } catch {
+      if (version !== requestVersion || activeCompetition !== competition) return 'stale';
+      show(renderLoadError(competition));
+      return 'error';
+    }
+  }
+
+  return Object.freeze({
+    openHub,
+    openCompetition,
+    close,
+  });
+}
