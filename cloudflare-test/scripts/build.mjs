@@ -67,7 +67,7 @@ export function applyFavoriteMatchSourcePatch(input) {
   const needle = `<div class="cw211-info-card"><small>\${m?.__kind==='live'?'Матч идёт':'Ближайший матч'}</small>`;
   if (!source.includes(needle)) return source;
 
-  const replacement = `<div class="cw211-info-card cw231-favorite-source-link" data-cw211-match="\${mid}" role="button" tabindex="0"><small>\${m?.__kind==='live'?'Матч идёт':'Ближайший матч'}</small>`;
+  const replacement = `<div class="cw211-info-card cw231-favorite-source-link" data-cw231-action="match" data-cw231-match="\${mid}" data-cw231-round="\${Number(m?.round_number) || 0}" data-cw211-match="\${mid}" role="button" tabindex="0"><small>\${m?.__kind==='live'?'Матч идёт':'Ближайший матч'}</small>`;
   return source.replace(needle, replacement);
 }
 
