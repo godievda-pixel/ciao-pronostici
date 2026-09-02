@@ -1,3 +1,5 @@
+export { PredictionLeague } from './v23.3/prediction-league-do.mjs';
+
 import { adaptSerieASchedule } from './v23.2/serie-a-adapter.mjs';
 import {
   BsdUpstreamError,
