@@ -32,6 +32,8 @@ const MODULES = [
   '/v23.2/coppa-bracket.mjs',
   '/v23.3/home-integration.mjs',
   '/v23.3/tables-ui.mjs',
+  '/v23.3/match-center.mjs',
+  '/v23.3/match-center-links.mjs',
 ];
 const NAV_MARKERS = [
   "root.addEventListener('click'",
@@ -252,6 +254,14 @@ async function probeModules() {
         hasTablesRuntime: path.endsWith('/tables-ui.mjs')
           ? text.includes('installTablesUi') && text.includes('ciao-v233-tables-overlay') && text.includes('coppa_italia')
           : undefined,
+        hasMatchCenterRuntime: path.endsWith('/match-center.mjs')
+          ? text.includes('createMatchCenterController')
+            && text.includes('openCanonicalMatchCenter')
+            && text.includes('15_000')
+          : undefined,
+        hasMatchCenterLinksRuntime: path.endsWith('/match-center-links.mjs')
+          ? text.includes('resolveCanonicalMatchTarget') && text.includes('installCanonicalMatchLinks')
+          : undefined,
       });
     } catch (error) {
       rows.push({
@@ -316,6 +326,8 @@ async function probe() {
   const profileModule = modules.find(item => item.path.endsWith('/profile-integration.mjs'));
   const homeModule = modules.find(item => item.path.endsWith('/home-integration.mjs'));
   const tablesModule = modules.find(item => item.path.endsWith('/tables-ui.mjs'));
+  const matchCenterModule = modules.find(item => item.path.endsWith('/match-center.mjs'));
+  const matchCenterLinksModule = modules.find(item => item.path.endsWith('/match-center-links.mjs'));
   const profileFeed = profileFeedCheck(competitions);
   const allUnknownTeamNames = [...new Set(competitions.flatMap(row => row.unknownTeamNames))]
     .sort((a, b) => a.localeCompare(b));
@@ -360,6 +372,12 @@ async function probe() {
   }
   if (!tablesModule?.hasTablesRuntime) {
     throw new Error('deployed TEST is missing v23.3 Tables runtime');
+  }
+  if (!matchCenterModule?.hasMatchCenterRuntime) {
+    throw new Error('deployed TEST is missing v23.3 Match Center runtime');
+  }
+  if (!matchCenterLinksModule?.hasMatchCenterLinksRuntime) {
+    throw new Error('deployed TEST is missing v23.3 Match Center links runtime');
   }
   if (health.bsdConfigured === true) {
     for (const row of competitions) {
