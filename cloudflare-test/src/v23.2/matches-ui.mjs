@@ -174,11 +174,6 @@ export function renderCompetitionScreen(competition, data = {}) {
   const config = getCompetitionConfig(competition);
   const matches = sortChronologically(Array.isArray(data?.matches) ? data.matches : []);
   const body = renderMatchGroups(matches, competition);
-  const competitionBody = competition === 'coppa_italia'
-    ? `${renderCoppaTabs()}
-      <div class="cw232-coppa-panel" data-cw232-coppa-panel="matches">${body}</div>
-      <div class="cw232-coppa-panel" data-cw232-coppa-panel="bracket" hidden>${renderCoppaBracket(matches)}</div>`
-    : body;
 
   return `<section class="cw232-competition" data-cw232-view="competition" data-cw232-competition="${esc(competition)}" data-cw232-theme="${esc(config.theme)}">
     <header class="cw232-competition__head">
@@ -189,7 +184,7 @@ export function renderCompetitionScreen(competition, data = {}) {
         <p>${competition === 'serie_a' || competition === 'coppa_italia' ? 'Италия' : 'Итальянские клубы'}</p>
       </div>
     </header>
-    ${competitionBody}
+    ${body}
   </section>`;
 }
 
