@@ -50,7 +50,6 @@ jobs:
         run: node scripts/probe-reset-contract.mjs
 
       - name: Probe BSD provider contract
-        if: github.event_name == 'push'
         run: node scripts/probe-bsd-provider.mjs
 
       - name: Probe deployed TEST markers
@@ -88,7 +87,7 @@ jobs:
         if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
-          name: ciao-v23-2-bsd-provider
+          name: ciao-v23-3-bsd-provider
           path: cloudflare-test/artifacts/bsd-provider-probe.json
           if-no-files-found: error
           retention-days: 7
@@ -97,7 +96,7 @@ jobs:
         if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
-          name: ciao-test-deployment-probe
+          name: ciao-v23-3-test-deployment
           path: cloudflare-test/artifacts/test-deployment-probe.json
           if-no-files-found: error
           retention-days: 7
