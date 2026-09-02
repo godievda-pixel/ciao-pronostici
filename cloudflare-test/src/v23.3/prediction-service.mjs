@@ -93,6 +93,15 @@ export function createPredictionService({ request, env, now = new Date(), deps =
     catch (error) { throw mapError(error); }
   }
 
+  async function registerParticipant(stub, authenticated) {
+    const participant = participantFrom(authenticated);
+    await internalJson(stub, '/participant', {
+      method:'POST',
+      body:{ season:env.PREDICTION_SEASON, participant },
+    });
+    return participant;
+  }
+
   async function save(body) {
     try {
       const authenticated = await user();
@@ -173,10 +182,11 @@ export function createPredictionService({ request, env, now = new Date(), deps =
 
   async function rankings({ scope = 'overall', competition } = {}) {
     try {
-      await user();
+      const authenticated = await user();
       if (scope !== 'overall' && scope !== 'competition') throw new PredictionServiceError('invalid_ranking_scope', 400);
       if (scope === 'competition' && !text(competition)) throw new PredictionServiceError('competition_required', 400);
       const { stub } = activeStub(env);
+      await registerParticipant(stub, authenticated);
       await reconcileFinishedMatches(stub);
       const params = new URLSearchParams({ scope });
       if (scope === 'competition') params.set('competition', competition);
@@ -189,6 +199,7 @@ export function createPredictionService({ request, env, now = new Date(), deps =
     try {
       const authenticated = await user();
       const { stub } = activeStub(env);
+      await registerParticipant(stub, authenticated);
       await reconcileFinishedMatches(stub);
       const params = new URLSearchParams({ user_id: authenticated.userId });
       const payload = await internalJson(stub, `/rankings/me?${params}`);
