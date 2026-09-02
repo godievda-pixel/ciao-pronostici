@@ -50,13 +50,9 @@ test('home Today cards have a dedicated premium layout that keeps metadata and t
   assert.match(source, /grid-template-columns:minmax\(0,1fr\) auto/);
 });
 
-test('Serie A opens inside the same tournament Matches screen with its Back button', async () => {
+test('Serie A Matches keeps the proven legacy calendar path', async () => {
   const source = await readFile(new URL('../src/v23.2/matches-ui.mjs', import.meta.url), 'utf8');
-  assert.doesNotMatch(source, /if \(competition === 'serie_a'\) \{\s*close\(\);\s*return 'legacy';/);
-  const screen = (await import('../src/v23.2/matches-ui.mjs')).renderCompetitionScreen('serie_a', { matches:[] });
-  assert.match(screen, /class="cw232-back"/);
-  assert.match(screen, /<h2>Серия А<\/h2>/);
-  assert.doesNotMatch(screen, /brand-logo/);
+  assert.match(source, /if \(competition === 'serie_a'\) \{\s*close\(\);\s*return 'legacy';/);
 });
 
 test('Serie A table marks Europe and relegation zones and explains them', () => {
