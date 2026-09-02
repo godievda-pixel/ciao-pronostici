@@ -78,73 +78,102 @@ test('competition screen loader requests the whole current season and returns re
         status: 'scheduled',
         homeTeam: { id: '1', name: 'Милан', crestUrl: '' },
         awayTeam: { id: '2', name: 'Ливерпуль', crestUrl: '' },
+        homeScore: null,
+        awayScore: null,
       }],
     };
   };
 
-  const html = await loadCompetitionScreen('ucl', { loadMatches, now: new Date('2026-09-01T12:00:00Z') });
-  assert.match(html, /Лига Чемпионов/);
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].competition, 'ucl');
-  assert.deepEqual(calls[0].options, { from: '2026-07-01', to: '2027-06-30' });
+  const html = await loadCompetitionScreen('ucl', {
+    now: new Date('2026-09-01T12:00:00Z'),
+    loadMatches,
+  });
+
+  assert.deepEqual(calls, [{
+    competition: 'ucl',
+    options: { from: '2026-07-01', to: '2027-06-30' },
+  }]);
+  assert.match(html, /Милан/);
+  assert.match(html, /Ливерпуль/);
 });
 
 test('matches controller opens the hub, loads external competitions and preserves legacy Serie A fallback', async () => {
-  const rendered = [];
-  let legacyCalls = 0;
+  const shown = [];
+  let hidden = 0;
+  const loaded = [];
   const controller = createMatchesUiController({
-    loadMatches: async competition => ({ competition, matches: [] }),
-    renderHtml: html => rendered.push(html),
-    openLegacySerieA: () => { legacyCalls += 1; },
-    now: () => new Date('2026-09-01T12:00:00Z'),
+    show(html) { shown.push(html); },
+    hide() { hidden += 1; },
+    async loadScreen(competition) {
+      loaded.push(competition);
+      return `<section data-loaded="${competition}">${competition}</section>`;
+    },
   });
 
   controller.openHub();
-  assert.match(rendered.at(-1), /data-cw232-view="hub"/);
+  assert.match(shown.at(-1), /data-cw232-view="hub"/);
 
   await controller.openCompetition('ucl');
-  assert.match(rendered.at(-1), /data-cw232-competition-screen="ucl"/);
+  assert.deepEqual(loaded, ['ucl']);
+  assert.match(shown.at(-1), /data-loaded="ucl"/);
 
   await controller.openCompetition('serie_a');
-  assert.equal(legacyCalls, 1);
+  assert.equal(hidden, 1);
+  assert.deepEqual(loaded, ['ucl']);
 });
 
 test('DOM installer binds the v23.2 hub to the existing calendar tab and closes on other tabs', () => {
-  const listeners = new Map();
-  const calendarButton = {
-    dataset: { tab: 'calendar' },
-    addEventListener(type, handler) { listeners.set(`calendar:${type}`, handler); },
-  };
-  const profileButton = {
-    dataset: { tab: 'profile' },
-    addEventListener(type, handler) { listeners.set(`profile:${type}`, handler); },
-  };
-  const root = {
-    querySelector(selector) {
-      if (selector === '[data-tab="calendar"]') return calendarButton;
-      if (selector === '#ciao-miniapp-root') return this;
-      return null;
+  const listeners = [];
+  const nodes = new Map();
+  const append = node => { if (node.id) nodes.set(node.id, node); };
+  const documentRef = {
+    head: { appendChild: append },
+    body: { appendChild: append },
+    createElement(tagName) {
+      return {
+        tagName,
+        id: '',
+        className: '',
+        hidden: false,
+        innerHTML: '',
+        textContent: '',
+        dataset: {},
+        setAttribute() {},
+      };
     },
-    querySelectorAll(selector) {
-      if (selector === '.nav button,[data-tab]') return [calendarButton, profileButton];
-      return [];
-    },
-    addEventListener(type, handler, capture) {
-      listeners.set(`root:${type}:${Boolean(capture)}`, handler);
-    },
-    appendChild() {},
-  };
-  let opened = 0;
-  let closed = 0;
-  const controller = {
-    openHub() { opened += 1; },
-    close() { closed += 1; },
-    openCompetition() {},
+    getElementById(id) { return nodes.get(id) || null; },
+    querySelectorAll() { return []; },
+    addEventListener(type, handler, options) { listeners.push({ type, handler, options }); },
   };
 
-  installMatchesUi(root, { controller });
-  listeners.get('calendar:click')?.({ preventDefault() {}, stopPropagation() {} });
-  assert.equal(opened, 1);
-  listeners.get('profile:click')?.({});
-  assert.equal(closed, 1);
+  installMatchesUi(documentRef, { defer: fn => fn() });
+  const overlay = nodes.get('ciao-v232-matches-overlay');
+  assert.ok(overlay);
+  assert.equal(overlay.hidden, true);
+
+  const captureClick = listeners.find(item => item.type === 'click' && item.options === true)?.handler;
+  assert.equal(typeof captureClick, 'function');
+
+  captureClick({
+    target: {
+      closest(selector) {
+        if (selector === 'button[data-tab]') return { dataset: { tab: 'calendar' } };
+        return null;
+      },
+    },
+    preventDefault() {},
+  });
+  assert.equal(overlay.hidden, false);
+  assert.match(overlay.innerHTML, /data-cw232-view="hub"/);
+
+  captureClick({
+    target: {
+      closest(selector) {
+        if (selector === 'button[data-tab]') return { dataset: { tab: 'profile' } };
+        return null;
+      },
+    },
+    preventDefault() {},
+  });
+  assert.equal(overlay.hidden, true);
 });
