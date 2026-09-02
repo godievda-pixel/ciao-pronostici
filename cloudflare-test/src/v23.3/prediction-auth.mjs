@@ -24,11 +24,61 @@ function extractUser(payload = {}) {
   return candidates.find(item => item && typeof item === 'object') || null;
 }
 
+function extractStandings(payload = {}) {
+  const candidates = [
+    payload?.standings,
+    payload?.state?.standings,
+    payload?.data?.standings,
+    payload?.data?.state?.standings,
+  ];
+  return candidates.find(Array.isArray) || [];
+}
+
 function displayName(user = {}) {
-  const explicit = text(user.display_name || user.name);
+  const explicit = text(user.display_name || user.displayName || user.name);
   if (explicit) return explicit;
   const composed = [text(user.first_name), text(user.last_name)].filter(Boolean).join(' ');
-  return composed || 'Участник';
+  if (composed) return composed;
+  const username = text(user.username);
+  return username ? `@${username}` : 'Участник';
+}
+
+function stableUserId(user = {}) {
+  const stableId = text(user.id ?? user.user_id ?? user.telegram_id ?? user.tg_id);
+  return stableId ? `telegram:${stableId}` : null;
+}
+
+function participantRoster(payload = {}, currentUser = null) {
+  const byId = new Map();
+
+  for (const row of extractStandings(payload)) {
+    if (!row || typeof row !== 'object') continue;
+    const source = row.user && typeof row.user === 'object'
+      ? { ...row, ...row.user }
+      : row;
+    const userId = stableUserId(source);
+    if (!userId) continue;
+    byId.set(userId, Object.freeze({
+      userId,
+      displayName: displayName(source),
+      username: text(source.username) || null,
+    }));
+  }
+
+  if (currentUser && typeof currentUser === 'object') {
+    const userId = stableUserId(currentUser);
+    if (userId) {
+      const current = Object.freeze({
+        userId,
+        displayName: displayName(currentUser),
+        username: text(currentUser.username) || null,
+      });
+      byId.delete(userId);
+      return Object.freeze([current, ...byId.values()]);
+    }
+  }
+
+  return Object.freeze([...byId.values()]);
 }
 
 export async function resolveAuthenticatedUser({ request, env } = {}) {
@@ -66,12 +116,16 @@ export async function resolveAuthenticatedUser({ request, env } = {}) {
   }
 
   const user = extractUser(payload);
-  const stableId = text(user?.id);
-  if (!stableId) throw new PredictionAuthError('identity_resolution_failed', 502);
+  const userId = stableUserId(user);
+  if (!user || !userId) throw new PredictionAuthError('identity_resolution_failed', 502);
 
-  return Object.freeze({
-    userId: `telegram:${stableId}`,
+  const result = {
+    userId,
     displayName: displayName(user),
     username: text(user?.username) || null,
-  });
+  };
+  const participants = participantRoster(payload, user);
+  if (participants.length) result.participants = participants;
+
+  return Object.freeze(result);
 }
