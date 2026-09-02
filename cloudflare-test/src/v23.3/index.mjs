@@ -1,13 +1,17 @@
+import './navigation-ui.mjs';
 import './home-integration.mjs';
 import './tables-ui.mjs';
 import './predictions-ui.mjs';
+import './ranking-ui.mjs';
 
 export const CiaoV233 = Object.freeze({
   version: '23.3',
+  navigation: 'enabled',
   home: 'enabled',
   tables: 'enabled',
   matchCenter: 'enabled',
   predictions: 'enabled',
+  ranking: 'enabled',
 });
 
 globalThis.CiaoV233 = CiaoV233;
