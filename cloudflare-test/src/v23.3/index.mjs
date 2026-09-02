@@ -5,6 +5,7 @@ import './serie-a-legacy-bridge.mjs';
 import './predictions-ui.mjs';
 import './ranking-ui.mjs';
 import './premium-polish-ui.mjs';
+import './round6-polish-ui.mjs';
 
 export const CiaoV233 = Object.freeze({
   version: '23.3',
@@ -15,6 +16,7 @@ export const CiaoV233 = Object.freeze({
   predictions: 'enabled',
   ranking: 'enabled',
   premiumPolish: 'enabled',
+  round6Polish: 'enabled',
 });
 
 globalThis.CiaoV233 = CiaoV233;
