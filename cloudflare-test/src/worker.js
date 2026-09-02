@@ -71,8 +71,10 @@ function normalizeLegacyStandingTeam(row = {}) {
     crestUrl: String(
       source?.crestUrl
       || source?.crest_url
+      || source?.logo_url
       || source?.logo
       || row?.team_logo
+      || row?.logo_url
       || '',
     ),
   };
