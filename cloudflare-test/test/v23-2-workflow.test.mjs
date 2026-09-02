@@ -30,7 +30,7 @@ test('Ciao TEST workflow records explicit v23.3 provider and deployment evidence
   assert.match(workflow, /name: ciao-v23-3-bsd-provider/);
   assert.match(workflow, /cloudflare-test\/artifacts\/bsd-provider-probe\.json/);
   assert.match(workflow, /name: Probe deployed TEST markers/);
-  assert.match(workflow, /run: node scripts\/probe-test-deployment\.mjs/);
+  assert.match(workflow, /run: node scripts\/probe-test-deployment-v233\.mjs/);
   assert.match(workflow, /name: ciao-v23-3-test-deployment/);
   assert.match(workflow, /cloudflare-test\/artifacts\/test-deployment-probe\.json/);
 });
