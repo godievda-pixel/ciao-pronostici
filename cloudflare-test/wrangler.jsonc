@@ -14,5 +14,23 @@
       "binding": "CIAO_WEB_API",
       "service": "ciao-web-api"
     }
+  ],
+  "vars": {
+    "CIAO_ENV": "test",
+    "PREDICTION_SEASON": "2026-27"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "PREDICTION_LEAGUE",
+        "class_name": "PredictionLeague"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "prediction-league-v1",
+      "new_sqlite_classes": ["PredictionLeague"]
+    }
   ]
 }
