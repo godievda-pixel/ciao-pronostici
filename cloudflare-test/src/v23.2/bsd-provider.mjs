@@ -10,6 +10,16 @@ const LEAGUE_NAMES = Object.freeze({
 });
 const EUROPEAN = new Set(['ucl', 'uel', 'uecl']);
 
+export class BsdUpstreamError extends Error {
+  constructor(stage, status, code = 'upstream_failed') {
+    super(`BSD ${stage} failed: HTTP ${status}`);
+    this.name = 'BsdUpstreamError';
+    this.stage = String(stage || 'unknown');
+    this.status = Number.isFinite(Number(status)) ? Number(status) : null;
+    this.code = String(code || 'upstream_failed');
+  }
+}
+
 function text(value) {
   return String(value ?? '').trim();
 }
@@ -41,15 +51,38 @@ function authHeaders(apiKey) {
   };
 }
 
-async function fetchJson(url, apiKey, fetchImpl) {
-  const response = await fetchImpl(url, { headers: authHeaders(apiKey) });
-  if (!response.ok) throw new Error(`BSD upstream failed: HTTP ${response.status}`);
+function upstreamCode(payload, fallback) {
+  if (!payload || typeof payload !== 'object') return fallback;
+  const value = payload.code ?? payload.error_code ?? payload.error?.code;
+  return text(value) || fallback;
+}
+
+async function fetchJson(url, apiKey, fetchImpl, stage) {
+  let response;
+  try {
+    response = await fetchImpl(url, { headers: authHeaders(apiKey) });
+  } catch {
+    throw new BsdUpstreamError(stage, 0, 'network_error');
+  }
+
+  if (!response.ok) {
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch {
+      // The response body is intentionally not surfaced; diagnostics stay metadata-only.
+    }
+    throw new BsdUpstreamError(stage, response.status, upstreamCode(payload, `http_${response.status}`));
+  }
+
   const type = text(response.headers.get('content-type')).toLowerCase();
-  if (type && !type.includes('json')) throw new Error(`BSD upstream returned non-JSON content: ${type}`);
+  if (type && !type.includes('json')) {
+    throw new BsdUpstreamError(stage, response.status, 'non_json_response');
+  }
   try {
     return await response.json();
   } catch {
-    throw new Error('BSD upstream returned invalid JSON');
+    throw new BsdUpstreamError(stage, response.status, 'invalid_json');
   }
 }
 
@@ -61,14 +94,14 @@ function buildUrl(path, params = {}) {
   return url;
 }
 
-async function fetchAll(path, params, apiKey, fetchImpl) {
+async function fetchAll(path, params, apiKey, fetchImpl, stage) {
   const rows = [];
   let offset = 0;
   const limit = 200;
 
   while (true) {
     const url = buildUrl(path, { ...params, limit, offset });
-    const payload = await fetchJson(url, apiKey, fetchImpl);
+    const payload = await fetchJson(url, apiKey, fetchImpl, stage);
     const page = Array.isArray(payload?.results) ? payload.results : [];
     rows.push(...page);
     const count = Number(payload?.count);
@@ -86,21 +119,26 @@ function normalizeName(value) {
 async function resolveLeague(competition, apiKey, fetchImpl) {
   const expected = LEAGUE_NAMES[competition];
   if (!expected) throw new Error(`Unsupported BSD competition: ${competition}`);
-  const leagues = await fetchAll('/leagues/', {}, apiKey, fetchImpl);
+  const leagues = await fetchAll('/leagues/', {}, apiKey, fetchImpl, 'leagues');
   const aliases = new Set(expected.map(normalizeName));
   const league = leagues.find(item => aliases.has(normalizeName(item?.name || item?.league_name)));
-  if (!league?.id) throw new Error(`BSD league not found: ${competition}`);
+  if (!league?.id) throw new BsdUpstreamError('leagues', 200, 'league_not_found');
   return league;
 }
 
 async function resolveSeason(leagueId, apiKey, fetchImpl) {
-  return fetchJson(buildUrl(`/leagues/${encodeURIComponent(leagueId)}/season/`), apiKey, fetchImpl);
+  return fetchJson(
+    buildUrl(`/leagues/${encodeURIComponent(leagueId)}/season/`),
+    apiKey,
+    fetchImpl,
+    'season',
+  );
 }
 
 async function italianTeams(apiKey, fetchImpl) {
   const teams = await fetchAll('/teams/', {
     country_code: 'IT',
-  }, apiKey, fetchImpl);
+  }, apiKey, fetchImpl, 'teams');
   return new Set(teams.map(team => text(team?.id)).filter(Boolean));
 }
 
@@ -115,7 +153,7 @@ export async function fetchBsdMatches({
   const league = await resolveLeague(competition, apiKey, fetchImpl);
   const season = await resolveSeason(league.id, apiKey, fetchImpl);
   const seasonId = season?.id;
-  if (!seasonId) throw new Error(`BSD current season not found: ${competition}`);
+  if (!seasonId) throw new BsdUpstreamError('season', 200, 'season_not_found');
 
   const [events, italianTeamIds] = await Promise.all([
     fetchAll('/events/', {
@@ -123,7 +161,7 @@ export async function fetchBsdMatches({
       season_id: seasonId,
       date_from: range.from,
       date_to: range.to,
-    }, apiKey, fetchImpl),
+    }, apiKey, fetchImpl, 'events'),
     EUROPEAN.has(competition)
       ? italianTeams(apiKey, fetchImpl)
       : Promise.resolve(new Set()),
