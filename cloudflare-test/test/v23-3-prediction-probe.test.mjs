@@ -10,7 +10,7 @@ async function probeModule() {
   }
 }
 
-test('v23.3 prediction contract probe is static and non-destructive by default', async () => {
+test('v23.3 prediction contract probe is non-destructive and reports missing test identity explicitly', async () => {
   const {
     buildStaticPredictionObservation,
     createPredictionContractReport,
@@ -30,12 +30,23 @@ test('v23.3 prediction contract probe is static and non-destructive by default',
     competitionKeys: [],
   });
 
-  const report = createPredictionContractReport({ observedContract });
+  const report = createPredictionContractReport({
+    observedContract,
+    authenticationCapability: {
+      performed: false,
+      authenticated: false,
+      status: 'BLOCKED_NO_TEST_IDENTITY',
+      readOnly: true,
+      mutatedUserData: false,
+    },
+  });
   assert.equal(report.pass, false);
-  assert.equal(report.status, 'REQUIRES_AUTHENTICATED_SMOKE');
+  assert.equal(report.status, 'BLOCKED_NO_TEST_IDENTITY');
   assert.equal(report.requiresAuthenticatedSmoke, true);
   assert.equal(report.mutatedUserData, false);
   assert.equal(report.authenticatedSmoke.performed, false);
+  assert.equal(report.authenticationCapability.readOnly, true);
+  assert.equal(report.authenticationCapability.mutatedUserData, false);
 });
 
 test('v23.3 API observer exposes an explicit static prediction capability summary', async () => {
@@ -69,7 +80,7 @@ test('v23.3 API observer exposes an explicit static prediction capability summar
   );
 });
 
-test('Ciao TEST workflow records the v23.3 prediction contract without enabling writes', async () => {
+test('Ciao TEST workflow exposes optional Telegram test identity only to the read-only prediction contract probe', async () => {
   const workflow = await readFile(
     new URL('../../.github/workflows/ciao-test-check.yml', import.meta.url),
     'utf8',
@@ -77,6 +88,7 @@ test('Ciao TEST workflow records the v23.3 prediction contract without enabling 
 
   assert.match(workflow, /name: Observe v23\.3 prediction contract/);
   assert.match(workflow, /node scripts\/probe-prediction-contract\.mjs/);
+  assert.match(workflow, /CIAO_TEST_TELEGRAM_INIT_DATA:\s*\$\{\{ secrets\.CIAO_TEST_TELEGRAM_INIT_DATA \}\}/);
   assert.match(workflow, /name: ciao-v23-3-prediction-contract/);
   assert.match(
     workflow,
