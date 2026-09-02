@@ -17,8 +17,8 @@ test('v23.3 bottom navigation is exactly the agreed six-tab structure', () => {
 
 test('predictions attach to legacy mine tab and never hijack Home predict tab', async () => {
   const source = await readFile(new URL('../src/v23.3/predictions-ui.mjs', import.meta.url), 'utf8');
-  assert.match(source, /data-tab="mine"/);
-  assert.doesNotMatch(source, /data-tab="predict"/);
+  assert.match(source, /nav\?\.dataset\?\.tab === 'mine'/);
+  assert.doesNotMatch(source, /nav\?\.dataset\?\.tab === 'predict'/);
 });
 
 test('prediction and ranking pages reuse stable content instead of sibling fixed overlays', async () => {
