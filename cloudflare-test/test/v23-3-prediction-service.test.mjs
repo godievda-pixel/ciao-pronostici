@@ -77,10 +77,10 @@ test('rankings register the authenticated participant before reconciliation and 
   const order=[];
   const ns=namespace(async req=>{
     const path=new URL(req.url).pathname; order.push(path);
-    if(path==='/participant') {
+    if(path==='/participants') {
       const body=JSON.parse(await req.text());
-      assert.deepEqual(body,{season:'2026-27',participant:{user_id:'telegram:42',display_name:'Daniil',username:'ciao42'}});
-      return Response.json({ok:true,participant:body.participant});
+      assert.deepEqual(body,{season:'2026-27',participants:[{user_id:'telegram:42',display_name:'Daniil',username:'ciao42'}]});
+      return Response.json({ok:true,participants:body.participants});
     }
     if(path==='/reconcile') return Response.json({ok:true,affected:1,skipped:0});
     if(path==='/rankings') return Response.json({ok:true,ranking:[{user_id:'telegram:42',display_name:'Daniil',points:5}]});
@@ -91,7 +91,7 @@ test('rankings register the authenticated participant before reconciliation and 
     listCanonicalPredictionMatches:async()=>({matches:[match('ucl:1',{status:'finished',homeScore:2,awayScore:1})],errors:{}}),
   }});
   const rows=await service.rankings({scope:'overall'});
-  assert.deepEqual(order,['/participant','/reconcile','/rankings']);
+  assert.deepEqual(order,['/participants','/reconcile','/rankings']);
   assert.equal(rows[0].display_name,'Daniil');
   assert.equal(rows[0].points,5);
 });
@@ -100,7 +100,7 @@ test('rankingMe registers the current user so a zero-point participant still has
   const order=[];
   const ns=namespace(async req=>{
     const path=new URL(req.url).pathname; order.push(path);
-    if(path==='/participant') return Response.json({ok:true,participant:{user_id:'telegram:42',display_name:'Daniil',username:'ciao42'}});
+    if(path==='/participants') return Response.json({ok:true,participants:[{user_id:'telegram:42',display_name:'Daniil',username:'ciao42'}]});
     if(path==='/rankings/me') return Response.json({ok:true,ranking:{position:1,user_id:'telegram:42',display_name:'Daniil',points:0}});
     throw new Error(path);
   });
@@ -109,7 +109,7 @@ test('rankingMe registers the current user so a zero-point participant still has
     listCanonicalPredictionMatches:async()=>({matches:[],errors:{}}),
   }});
   assert.deepEqual(await service.rankingMe(), {position:1,user_id:'telegram:42',display_name:'Daniil',points:0});
-  assert.deepEqual(order,['/participant','/rankings/me']);
+  assert.deepEqual(order,['/participants','/rankings/me']);
 });
 
 test('Durable Object failures map to prediction_backend_unavailable', async()=>{
