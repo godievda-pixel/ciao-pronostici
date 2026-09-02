@@ -15,7 +15,8 @@ test('v23.3 BSD provider probe covers full external tournament release evidence'
   assert.match(source, /fetchBsdMatches/);
   assert.match(source, /fetchBsdStandings/);
   assert.match(source, /fetchBsdMatchSnapshot/);
-  assert.match(source, /foreignVsForeign/);
+  assert.match(source, /italianOnly/);
+  assert.match(source, /leaked a foreign-vs-foreign UEFA fixture/);
   assert.match(source, /unknownTeamNames/);
   assert.match(source, /duplicateTie/);
   assert.match(source, /snapshot/);
@@ -43,13 +44,14 @@ test('v23.3 deployment probe verifies unified runtime and every release surface'
   assert.match(source, /documentOverflowGuard/);
   assert.match(source, /\/api\/v23\.3\/standings/);
   assert.match(source, /\/api\/v23\.3\/match-center/);
-  assert.match(source, /foreignVsForeign/);
+  assert.match(source, /italianOnly/);
   assert.match(source, /allUnknownTeamNames/);
   assert.match(source, /releaseHeldForUnknownTeams/);
   assert.match(source, /predictionsEnabled/);
   assert.match(source, /rankingEnabled/);
   assert.match(source, /probePredictionAuthGuard/);
   assert.match(source, /predictionBackend/);
+  assert.match(source, /premium-polish-ui\.mjs/);
   assert.doesNotMatch(source, /predictionsBlocked/);
 });
 
