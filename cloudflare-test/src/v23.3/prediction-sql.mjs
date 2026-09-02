@@ -76,26 +76,10 @@ export function initializePredictionSchema(sql, identity = {}) {
   const { environment, season } = assertTestIdentity(identity);
 
   sql.exec(PREDICTION_SCHEMA_SQL);
-  sql.exec(
-    'INSERT OR REPLACE INTO schema_meta (key, value) VALUES (?, ?)',
-    'schema_version',
-    PREDICTION_SCHEMA_VERSION,
-  );
-  sql.exec(
-    'INSERT OR REPLACE INTO schema_meta (key, value) VALUES (?, ?)',
-    'environment',
-    environment,
-  );
-  sql.exec(
-    'INSERT OR REPLACE INTO schema_meta (key, value) VALUES (?, ?)',
-    'season',
-    season,
-  );
-  sql.exec(
-    'INSERT OR IGNORE INTO schema_meta (key, value) VALUES (?, ?)',
-    'prediction_cache_generation',
-    '0',
-  );
+  sql.exec('INSERT OR REPLACE INTO schema_meta (key, value) VALUES (?, ?)', 'schema_version', PREDICTION_SCHEMA_VERSION);
+  sql.exec('INSERT OR REPLACE INTO schema_meta (key, value) VALUES (?, ?)', 'environment', environment);
+  sql.exec('INSERT OR REPLACE INTO schema_meta (key, value) VALUES (?, ?)', 'season', season);
+  sql.exec('INSERT OR IGNORE INTO schema_meta (key, value) VALUES (?, ?)', 'prediction_cache_generation', '0');
 }
 
 export function rows(cursor) {
@@ -169,11 +153,7 @@ export function upsertPrediction(sql, prediction = {}, nowIso, randomUUID = () =
   const home = integerScore(prediction.predicted_home);
   const away = integerScore(prediction.predicted_away);
 
-  const existing = first(sql.exec(
-    'SELECT * FROM predictions WHERE user_id = ? AND match_id = ? LIMIT 1',
-    userId, matchId,
-  ));
-
+  const existing = first(sql.exec('SELECT * FROM predictions WHERE user_id = ? AND match_id = ? LIMIT 1', userId, matchId));
   let predictionId;
   if (existing) {
     predictionId = String(existing.prediction_id);
@@ -193,8 +173,7 @@ export function upsertPrediction(sql, prediction = {}, nowIso, randomUUID = () =
          predicted_home, predicted_away, submitted_at, updated_at, locked_at,
          points, result_type, final_home, final_away, result_fingerprint, scored_at
        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, NULL)`,
-      predictionId, userId, matchId, competition, season,
-      home, away, nowIso, nowIso, lockedAt,
+      predictionId, userId, matchId, competition, season, home, away, nowIso, nowIso, lockedAt,
     );
   }
 
@@ -213,10 +192,7 @@ export function listUserPredictions(sql, { userId, competition } = {}) {
       id, competition,
     )).map(normalizePredictionRow);
   }
-  return rows(sql.exec(
-    'SELECT * FROM predictions WHERE user_id = ? ORDER BY submitted_at, match_id',
-    id,
-  )).map(normalizePredictionRow);
+  return rows(sql.exec('SELECT * FROM predictions WHERE user_id = ? ORDER BY submitted_at, match_id', id)).map(normalizePredictionRow);
 }
 
 export function reconcileMatchPredictions(sql, {
@@ -229,9 +205,13 @@ export function reconcileMatchPredictions(sql, {
   const finalH = Number(finalHome);
   const finalA = Number(finalAway);
   if (!Number.isInteger(finalH) || !Number.isInteger(finalA)) throw new Error('Invalid final score');
-  let updated = 0;
+  let affectedCount = 0;
+  let skipped = 0;
   for (const row of rows(sql.exec('SELECT * FROM predictions WHERE match_id = ?', id))) {
-    if (String(row.result_fingerprint || '') === fingerprint) continue;
+    if (String(row.result_fingerprint || '') === fingerprint) {
+      skipped += 1;
+      continue;
+    }
     const scored = scorePrediction({
       predictedHome: Number(row.predicted_home),
       predictedAway: Number(row.predicted_away),
@@ -243,9 +223,9 @@ export function reconcileMatchPredictions(sql, {
        result_fingerprint = ?, scored_at = ? WHERE prediction_id = ?`,
       Number(scored.points), text(scored.resultType), finalH, finalA, fingerprint, scoredAt, String(row.prediction_id),
     );
-    updated += 1;
+    affectedCount += 1;
   }
-  return updated;
+  return Object.freeze({ affected: affectedCount, skipped });
 }
 
 function normalizeRankingRow(row = {}) {
@@ -319,10 +299,5 @@ export function resetPredictionDomain(sql) {
      SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT)
      WHERE key = 'prediction_cache_generation'`,
   ));
-  return Object.freeze({
-    predictions,
-    points: predictions,
-    ranking,
-    caches,
-  });
+  return Object.freeze({ predictions, points: predictions, ranking, caches });
 }
