@@ -99,7 +99,7 @@ test('v23.2 matches route rejects missing Telegram auth before calling upstream'
   assert.equal(upstreamCalls, 0);
 });
 
-test('v23.2 UEFA route uses BSD v2 with server token and returns the full competition feed', async () => {
+test('v23.2 UEFA route uses BSD v2 with server token and returns only Italian-club matches', async () => {
   const previousFetch = globalThis.fetch;
   const requests = [];
   globalThis.fetch = async (url, options = {}) => {
@@ -143,8 +143,8 @@ test('v23.2 UEFA route uses BSD v2 with server token and returns the full compet
     assert.equal(response.status, 200);
     assert.equal(body.ok, true);
     assert.equal(body.data.competition, 'ucl');
-    assert.equal(body.data.matches.length, 2);
-    assert.deepEqual(body.data.matches.map(match => match.matchId), ['ucl:1001', 'ucl:1002']);
+    assert.equal(body.data.matches.length, 1);
+    assert.deepEqual(body.data.matches.map(match => match.matchId), ['ucl:1001']);
     assert.equal(body.data.matches[0].homeTeam.countryCode, 'ITA');
     assert.equal(requests.every(item => item.authorization === 'Token bsd-test-key'), true);
     assert.equal(requests.some(item => item.url.includes('sports.bzzoiro.com/api/v2/leagues/')), true);
