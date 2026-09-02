@@ -21,7 +21,7 @@ test('injects v23.2 core and matches UI module entries exactly once', () => {
   assert.equal((first.match(/id="ciao-v232-matches-ui"/g) || []).length, 1);
 });
 
-test('copies v23.2 browser modules to dist', async () => {
+test('copies v23.2 browser modules to dist including club profile enrichment', async () => {
   await copyV232Modules();
   const entry = await readFile(
     new URL('../dist/v23.2/index.mjs', import.meta.url),
@@ -35,7 +35,21 @@ test('copies v23.2 browser modules to dist', async () => {
     new URL('../dist/v23.2/matches-ui.mjs', import.meta.url),
     'utf8',
   );
+  const profile = await readFile(
+    new URL('../dist/v23.2/profile-integration.mjs', import.meta.url),
+    'utf8',
+  );
+  const profileMatches = await readFile(
+    new URL('../dist/v23.2/profile-matches.mjs', import.meta.url),
+    'utf8',
+  );
+
   assert.match(entry, /CiaoV232Core/);
+  assert.match(entry, /profile-integration\.mjs/);
   assert.match(engine, /availablePredictions/);
   assert.match(matchesUi, /createMatchesUiController/);
+  assert.match(matchesUi, /Сетка Плей-офф/);
+  assert.match(profile, /CiaoV232Profile/);
+  assert.match(profile, /cw232-profile-tournament-enrichment/);
+  assert.match(profileMatches, /profileCompetitionMatches/);
 });
