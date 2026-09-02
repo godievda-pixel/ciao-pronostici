@@ -20,8 +20,8 @@ test('v23.2 defines exactly five competition configs', () => {
 test('competition themes and navigation models are stable', () => {
   assert.deepEqual(getCompetitionConfig('serie_a'), {
     key: 'serie_a',
-    title: 'Serie A',
-    shortTitle: 'Serie A',
+    title: 'Серия А',
+    shortTitle: 'Серия А',
     theme: 'serie-a',
     navigation: 'rounds',
     european: false,
