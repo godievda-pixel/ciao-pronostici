@@ -30,19 +30,13 @@ function seasonRange(value = new Date()) {
   const year = date.getUTCFullYear();
   const month = date.getUTCMonth();
   const startYear = month >= 6 ? year : year - 1;
-  return {
-    from: `${startYear}-07-01`,
-    to: `${startYear + 1}-06-30`,
-  };
+  return { from:`${startYear}-07-01`, to:`${startYear + 1}-06-30` };
 }
 
 function kickoffText(value, timeZone) {
   const date = validDate(value);
   return new Intl.DateTimeFormat('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
+    day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit',
     ...(timeZone ? { timeZone } : {}),
   }).format(date);
 }
@@ -68,40 +62,40 @@ function scoreText(match) {
 
 function crest(team) {
   const src = String(team?.crestUrl || '').trim();
-  if (!src) return '<span class="cw233-home-logo-placeholder" aria-hidden="true"></span>';
-  return `<img class="cw233-home-logo" src="${esc(src)}" alt="" width="40" height="40" loading="eager" decoding="async">`;
+  if (!src) return '<span class="cw231-today-logo-placeholder" aria-hidden="true"></span>';
+  return `<img class="logo" src="${esc(src)}" alt="" loading="eager" decoding="sync">`;
 }
 
 function renderCard(match, timeZone) {
   const config = getCompetitionConfig(match.competition);
-  const liveOrFinished = ['live', 'finished'].includes(String(match?.status || '').toLowerCase());
-  return `<article class="cw233-home-card ${esc(match?.status || 'scheduled')}" data-cw233-competition="${esc(match.competition)}" data-cw233-match="${esc(match.matchId)}" role="button" tabindex="0">
-    <div class="cw233-home-card-top">
-      <span class="cw233-home-competition">${esc(config.title)}</span>
-      <time datetime="${esc(match.kickoffAt)}">${esc(kickoffText(match.kickoffAt, timeZone))}</time>
+  const status = String(match?.status || 'scheduled').toLowerCase();
+  const liveOrFinished = ['live','finished'].includes(status);
+  const action = status === 'scheduled' ? 'predict' : 'match-center';
+  const round = String(match?.roundLabel || match?.stage || config.title || '—');
+  return `<article class="cw231-today-card ${esc(status)}" data-cw231-match="${esc(match.matchId)}" data-cw233-competition="${esc(match.competition)}" data-cw233-match="${esc(match.matchId)}" role="button" tabindex="0">
+    <div class="cw231-today-card-top"><span class="cw231-today-competition">${esc(config.title)}</span><time datetime="${esc(match.kickoffAt)}">${esc(kickoffText(match.kickoffAt, timeZone))}</time></div>
+    <div class="cw231-today-match">
+      <div class="cw231-today-team">${crest(match.homeTeam)}<b>${esc(match?.homeTeam?.name || '—')}</b></div>
+      <div class="cw231-today-score"><strong>${liveOrFinished ? esc(scoreText(match)) : '—'}</strong><span>${esc(statusText(match))}</span></div>
+      <div class="cw231-today-team away"><b>${esc(match?.awayTeam?.name || '—')}</b>${crest(match.awayTeam)}</div>
     </div>
-    <div class="cw233-home-card-main">
-      <div class="cw233-home-team">${crest(match.homeTeam)}<b>${esc(match?.homeTeam?.name || '—')}</b></div>
-      <div class="cw233-home-score"><strong>${liveOrFinished ? esc(scoreText(match)) : '—'}</strong><span>${esc(statusText(match))}</span></div>
-      <div class="cw233-home-team away"><b>${esc(match?.awayTeam?.name || '—')}</b>${crest(match.awayTeam)}</div>
-    </div>
+    <div class="cw231-today-bottom"><span>${esc(round)}</span><button type="button" data-cw231-action="${action}">${action === 'predict' ? 'Дать прогноз' : 'Матч-центр'}</button></div>
   </article>`;
 }
 
-export function renderHomeTodaySection(matches = [], {
-  now = new Date(),
-  timeZone,
-} = {}) {
+export function renderHomeTodaySection(matches = [], { now = new Date(), timeZone } = {}) {
   const selected = selectHomeMatches(matches, { now, timeZone });
   const cards = selected.map(match => renderCard(match, timeZone)).join('');
   const body = cards
-    ? `<div class="cw233-home-list">${cards}</div>`
-    : '<div class="cw233-home-empty">Сегодня и в ближайшем календаре матчей пока нет</div>';
+    ? `<div class="cw231-today-list">${cards}</div>`
+    : '<div class="cw231-empty"><div class="cw231-empty__title">Сегодня и в ближайшем календаре матчей пока нет</div></div>';
+  const count = selected.length;
 
-  return `<section class="cw231-today cw233-home-view" data-cw233-home>
-    <div class="cw231-today-head cw233-home-head">
-      <div><div class="cw233-home-eyebrow">Все турниры</div><h2>Кальчо сегодня</h2></div>
-      <span>${selected.length ? `${selected.length} матч${selected.length === 1 ? '' : 'ей'}` : 'Нет матчей'}</span>
+  return `<section class="cw231-today cw231-today-premium cw233-home-view" data-cw233-home>
+    <div class="cw231-today-glow" aria-hidden="true"></div>
+    <div class="cw231-today-head">
+      <div class="cw231-today-heading"><h2>Кальчо сегодня</h2><p class="cw231-today-subtitle">Матчи и события дня · все турниры</p></div>
+      <time>${count ? `${count} ${count === 1 ? 'матч' : count < 5 ? 'матча' : 'матчей'}` : 'Нет матчей'}</time>
     </div>
     ${body}
   </section>`;
@@ -135,12 +129,12 @@ export function createHomeRuntime({
     const matches = flattenCompetitionFeeds(feeds);
     return Object.freeze({
       hydrated,
-      loading: Boolean(pending),
+      loading:Boolean(pending),
       loadedAt,
-      data: Object.freeze({ ...feeds }),
-      errors: Object.freeze({ ...errors }),
-      matches: Object.freeze(matches),
-      selected: Object.freeze(selectHomeMatches(matches, { now: validDate(now()), timeZone })),
+      data:Object.freeze({ ...feeds }),
+      errors:Object.freeze({ ...errors }),
+      matches:Object.freeze(matches),
+      selected:Object.freeze(selectHomeMatches(matches, { now:validDate(now()), timeZone })),
     });
   };
 
@@ -148,18 +142,14 @@ export function createHomeRuntime({
     if (pending) return pending;
     const current = validDate(now());
     const currentMs = current.getTime();
-    if (hydrated && !force && currentMs - loadedAt < Math.max(0, Number(ttlMs) || 0)) {
-      return Promise.resolve(snapshot());
-    }
+    if (hydrated && !force && currentMs - loadedAt < Math.max(0, Number(ttlMs) || 0)) return Promise.resolve(snapshot());
 
     const { from, to } = seasonRange(current);
     pending = loadAllCompetitionMatches({ loadMatches, from, to })
       .then(result => {
         const nextFeeds = { ...feeds };
         for (const competition of COMPETITION_KEYS) {
-          if (Object.prototype.hasOwnProperty.call(result.data, competition)) {
-            nextFeeds[competition] = result.data[competition];
-          }
+          if (Object.prototype.hasOwnProperty.call(result.data, competition)) nextFeeds[competition] = result.data[competition];
         }
         feeds = nextFeeds;
         errors = { ...result.errors };
@@ -177,21 +167,14 @@ export function createHomeRuntime({
   const state = () => snapshot();
   const html = () => {
     if (!hydrated) return '';
-    return renderHomeTodaySection(flattenCompetitionFeeds(feeds), {
-      now: validDate(now()),
-      timeZone,
-    });
+    return renderHomeTodaySection(flattenCompetitionFeeds(feeds), { now:validDate(now()), timeZone });
   };
 
   return Object.freeze({ ensure, html, state });
 }
 
 const runtime = createHomeRuntime();
-globalThis.CiaoV233Home = Object.freeze({
-  ensure: runtime.ensure,
-  html: runtime.html,
-  state: runtime.state,
-});
+globalThis.CiaoV233Home = Object.freeze({ ensure:runtime.ensure, html:runtime.html, state:runtime.state });
 
 if (typeof globalThis.document !== 'undefined') {
   installCanonicalMatchCenter(globalThis.document);
