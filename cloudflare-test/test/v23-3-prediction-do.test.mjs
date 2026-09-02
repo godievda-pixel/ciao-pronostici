@@ -19,9 +19,7 @@ class FakeSql {
     this.calls.push({ query, params });
     const q = String(query).replace(/\s+/g, ' ').trim();
     if (/^(BEGIN|COMMIT|ROLLBACK)/i.test(q)) return cursor();
-    if (/CREATE TABLE|CREATE INDEX/i.test(q) || /INSERT OR (?:REPLACE|IGNORE) INTO schema_meta/i.test(q)) {
-      return cursor();
-    }
+    if (/CREATE TABLE|CREATE INDEX/i.test(q) || /INSERT OR (?:REPLACE|IGNORE) INTO schema_meta/i.test(q)) return cursor();
     if (/INSERT INTO participants/i.test(q)) {
       this.participants.set(params[0], { user_id: params[0], display_name: params[1], username: params[2] });
       return cursor([], 1);
@@ -40,21 +38,25 @@ class FakeSql {
       });
       return cursor([], 1);
     }
+    if (/SELECT .* FROM predictions .*WHERE match_id/i.test(q)) {
+      const matchId = params[0];
+      return cursor([...this.predictions.values()].filter(item => item.match_id === matchId));
+    }
+    if (/UPDATE predictions SET points/i.test(q) && /WHERE prediction_id/i.test(q)) {
+      const [points,resultType,finalHome,finalAway,fingerprint,scoredAt,predictionId] = params;
+      const row = this.predictions.get(predictionId);
+      this.predictions.set(predictionId, {
+        ...row, points, result_type:resultType, final_home:finalHome, final_away:finalAway,
+        result_fingerprint:fingerprint, scored_at:scoredAt,
+      });
+      return cursor([], 1);
+    }
     if (/UPDATE predictions SET/i.test(q) && /WHERE prediction_id/i.test(q)) {
       const [home,away,updatedAt,lockedAt,predictionId] = params;
       const row = this.predictions.get(predictionId);
       this.predictions.set(predictionId, {
-        ...row,
-        predicted_home:home,
-        predicted_away:away,
-        updated_at:updatedAt,
-        locked_at:lockedAt,
-        points:null,
-        result_type:null,
-        final_home:null,
-        final_away:null,
-        result_fingerprint:null,
-        scored_at:null,
+        ...row, predicted_home:home, predicted_away:away, updated_at:updatedAt, locked_at:lockedAt,
+        points:null,result_type:null,final_home:null,final_away:null,result_fingerprint:null,scored_at:null,
       });
       return cursor([], 1);
     }
@@ -63,21 +65,10 @@ class FakeSql {
       return cursor(row ? [row] : []);
     }
     if (/GROUP BY .*user_id/i.test(q)) return cursor(this.rankingRows);
-    if (/DELETE FROM predictions/i.test(q)) {
-      const n = this.predictions.size;
-      this.predictions.clear();
-      return cursor([], n);
-    }
+    if (/DELETE FROM predictions/i.test(q)) { const n=this.predictions.size; this.predictions.clear(); return cursor([], n); }
     if (/DELETE FROM ranking_snapshots/i.test(q)) return cursor([], 1);
-    if (/DELETE FROM participants/i.test(q)) {
-      const n = this.participants.size;
-      this.participants.clear();
-      return cursor([], n);
-    }
-    if (/UPDATE schema_meta/i.test(q) && /prediction_cache_generation/i.test(q)) {
-      this.cacheGeneration += 1;
-      return cursor([], 1);
-    }
+    if (/DELETE FROM participants/i.test(q)) { const n=this.participants.size; this.participants.clear(); return cursor([], n); }
+    if (/UPDATE schema_meta/i.test(q) && /prediction_cache_generation/i.test(q)) { this.cacheGeneration += 1; return cursor([],1); }
     return cursor();
   }
 }
@@ -88,18 +79,11 @@ function stateWith(sql) {
 
 function writeRequest(home, away) {
   return new Request('https://do.internal/write', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       participant: { user_id:'telegram:42', display_name:'Daniil', username:'ciao42' },
       season:'2026-27',
-      predictions:[{
-        match_id:'ucl:601024',
-        competition:'ucl',
-        predicted_home:home,
-        predicted_away:away,
-        locked_at:'2026-09-16T18:45:00.000Z',
-      }],
+      predictions:[{ match_id:'ucl:601024', competition:'ucl', predicted_home:home, predicted_away:away, locked_at:'2026-09-16T18:45:00.000Z' }],
     }),
   });
 }
@@ -116,9 +100,7 @@ test('internal write is an upsert keyed by user and match while preserving predi
   const sql = new FakeSql();
   let uuidCalls = 0;
   const league = new PredictionLeague(stateWith(sql), {
-    CIAO_ENV:'test',
-    PREDICTION_SEASON:'2026-27',
-    PREDICTION_RANDOM_UUID: () => `pred-${++uuidCalls}`,
+    CIAO_ENV:'test', PREDICTION_SEASON:'2026-27', PREDICTION_RANDOM_UUID: () => `pred-${++uuidCalls}`,
   });
   const first = await (await league.fetch(writeRequest(2,1))).json();
   const second = await (await league.fetch(writeRequest(3,1))).json();
@@ -150,17 +132,12 @@ test('internal reset clears prediction domain and increments cache generation on
   sql.participants.set('telegram:42', {});
   const league = new PredictionLeague(stateWith(sql), { CIAO_ENV:'test', PREDICTION_SEASON:'2026-27' });
   const response = await league.fetch(new Request('https://do.internal/reset', {
-    method:'POST',
-    headers:{'content-type':'application/json'},
-    body:JSON.stringify({ environment:'test', season:'2026-27' }),
+    method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({ environment:'test', season:'2026-27' }),
   }));
   const body = await response.json();
   assert.equal(response.status, 200);
   assert.deepEqual(body.stages, {
-    predictions:{ok:true,affected:2},
-    points:{ok:true,affected:2},
-    ranking:{ok:true,affected:1},
-    caches:{ok:true,affected:1},
+    predictions:{ok:true,affected:2}, points:{ok:true,affected:2}, ranking:{ok:true,affected:1}, caches:{ok:true,affected:1},
   });
   assert.equal(sql.calls.some(item => /DELETE FROM schema_meta/i.test(item.query)), false);
   assert.equal(sql.cacheGeneration, 1);
@@ -171,11 +148,40 @@ test('internal reset rejects non-TEST identity before mutation', async () => {
   const league = new PredictionLeague(stateWith(sql), { CIAO_ENV:'test', PREDICTION_SEASON:'2026-27' });
   const before = sql.calls.length;
   const response = await league.fetch(new Request('https://do.internal/reset', {
-    method:'POST',
-    headers:{'content-type':'application/json'},
-    body:JSON.stringify({ environment:'production', season:'2026-27' }),
+    method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({ environment:'production', season:'2026-27' }),
   }));
   assert.equal(response.status, 403);
   const mutationCalls = sql.calls.slice(before).filter(item => /DELETE|UPDATE schema_meta/i.test(item.query));
   assert.equal(mutationCalls.length, 0);
+});
+
+test('internal reconciliation is idempotent and recomputes corrected results', async () => {
+  const sql = new FakeSql();
+  sql.predictions.set('p1', {
+    prediction_id:'p1', user_id:'telegram:42', match_id:'ucl:601024', competition:'ucl', season:'2026-27',
+    predicted_home:2, predicted_away:1, submitted_at:'s', updated_at:'u', locked_at:'l',
+    points:null,result_type:null,final_home:null,final_away:null,result_fingerprint:null,scored_at:null,
+  });
+  const league = new PredictionLeague(stateWith(sql), { CIAO_ENV:'test', PREDICTION_SEASON:'2026-27' });
+  const reconcile = async (finalHome, finalAway, fingerprint) => {
+    const response = await league.fetch(new Request('https://do.internal/reconcile', {
+      method:'POST', headers:{'content-type':'application/json'},
+      body:JSON.stringify({ matchId:'ucl:601024', finalHome, finalAway, resultFingerprint:fingerprint, scoredAt:'2026-09-16T21:00:00Z' }),
+    }));
+    return { response, body: await response.json() };
+  };
+
+  const first = await reconcile(2,1,'ucl:601024|2:1|v1');
+  assert.equal(first.response.status, 200);
+  assert.deepEqual(first.body, { ok:true, affected:1, skipped:0 });
+  assert.equal(sql.predictions.get('p1').points, 5);
+  assert.equal(sql.predictions.get('p1').result_type, 'exact');
+
+  const second = await reconcile(2,1,'ucl:601024|2:1|v1');
+  assert.deepEqual(second.body, { ok:true, affected:0, skipped:1 });
+
+  const corrected = await reconcile(2,2,'ucl:601024|2:2|v2');
+  assert.deepEqual(corrected.body, { ok:true, affected:1, skipped:0 });
+  assert.equal(sql.predictions.get('p1').points, 0);
+  assert.equal(sql.predictions.get('p1').result_type, 'miss');
 });
