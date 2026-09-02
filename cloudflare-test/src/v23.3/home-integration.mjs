@@ -76,7 +76,7 @@ function renderCard(match, timeZone) {
     <div class="cw231-today-card-top"><span class="cw231-today-competition">${esc(config.title)}</span><time datetime="${esc(match.kickoffAt)}">${esc(kickoffText(match.kickoffAt, timeZone))}</time></div>
     <div class="cw231-today-match">
       <div class="cw231-today-team">${crest(match.homeTeam)}<b>${esc(match?.homeTeam?.name || '—')}</b></div>
-      <div class="cw231-today-score"><strong>${liveOrFinished ? esc(scoreText(match)) : '—'}</strong><span>${esc(statusText(match))}</span></div>
+      <div class="cw231-today-score"><strong class="cw231-today-score-value">${liveOrFinished ? esc(scoreText(match)) : '—'}</strong><span class="cw231-today-score-status">${esc(statusText(match))}</span></div>
       <div class="cw231-today-team away"><b>${esc(match?.awayTeam?.name || '—')}</b>${crest(match.awayTeam)}</div>
     </div>
     <div class="cw231-today-bottom"><span>${esc(round)}</span><button type="button" data-cw231-action="${action}">${action === 'predict' ? 'Дать прогноз' : 'Матч-центр'}</button></div>
@@ -182,7 +182,5 @@ if (typeof globalThis.document !== 'undefined') {
 }
 
 try {
-  if (typeof globalThis.dispatchEvent === 'function' && typeof globalThis.Event === 'function') {
-    globalThis.dispatchEvent(new globalThis.Event('ciao-v233-home-ready'));
-  }
+  if (typeof globalThis.dispatchEvent === 'function' && typeof globalThis.Event === 'function') globalThis.dispatchEvent(new globalThis.Event('ciao-v233-home-ready'));
 } catch {}
