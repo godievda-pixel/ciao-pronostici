@@ -72,7 +72,17 @@ let pageActive = false;
 let loadingMatches = false;
 
 function initData() { return text(globalThis.Telegram?.WebApp?.initData); }
+function telegramUser() { return globalThis.Telegram?.WebApp?.initDataUnsafe?.user || null; }
 function contentNode() { return document.querySelector('#ciao-miniapp-root .content'); }
+
+export function resolvePredictionDisplayName(current, tgUser) {
+  const serverName = text(current?.display_name || current?.displayName || current?.name);
+  if (serverName) return serverName;
+  const telegramName = [text(tgUser?.first_name), text(tgUser?.last_name)].filter(Boolean).join(' ');
+  if (telegramName) return telegramName;
+  const username = text(current?.username || tgUser?.username).replace(/^@/, '');
+  return username ? `@${username}` : 'Участник';
+}
 
 function formatKickoff(value) {
   const date = new Date(value);
@@ -106,8 +116,8 @@ function scoreFor(match) {
 }
 
 function heroHtml() {
-  const name = text(me?.display_name) || 'Ciao, Web!';
-  const username = text(me?.username);
+  const name = resolvePredictionDisplayName(me, telegramUser());
+  const username = text(me?.username || telegramUser()?.username).replace(/^@/, '');
   const rank = Number(me?.position);
   return `<div class="hero"><div class="hero-top"><div><h2>${esc(name)}</h2><p>${username ? `@${esc(username)}` : 'Прогнозы на все турниры'}</p></div><div><div class="rank">${rank > 0 ? `#${rank}` : '—'}</div><p>место</p></div></div></div>`;
 }
@@ -202,7 +212,7 @@ async function open() {
   } catch (error) {
     loadingMatches = false;
     const main = contentNode();
-    if (pageActive && main) main.innerHTML = `<div class="empty">${esc(error?.code || 'Не удалось загрузить прогнозы')}</div>`;
+    if (pageActive && main) main.innerHTML = `${heroHtml()}${tabsHtml()}${filtersHtml()}<div class="empty">${esc(error?.code || 'Не удалось загрузить прогнозы')}</div>`;
   }
 }
 
