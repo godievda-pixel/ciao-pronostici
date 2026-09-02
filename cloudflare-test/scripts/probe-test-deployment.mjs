@@ -60,6 +60,52 @@ async function probeHealth() {
   }
 }
 
+async function probeLiveCompetition() {
+  const url = new globalThis.URL('/api/v23.2/matches', ORIGIN);
+  url.searchParams.set('competition', 'ucl');
+  url.searchParams.set('from', '2026-07-01');
+  url.searchParams.set('to', '2027-06-30');
+  try {
+    const response = await fetch(url, {
+      headers: {
+        accept: 'application/json',
+        'cache-control': 'no-cache, no-store, max-age=0',
+        'x-telegram-init-data': 'deployment-probe',
+      },
+    });
+    let payload = null;
+    try { payload = await response.json(); } catch {}
+    const matches = Array.isArray(payload?.data?.matches) ? payload.data.matches : [];
+    return {
+      status: response.status,
+      ok: Boolean(response.ok && payload?.ok),
+      provider: payload?.data?.provider || payload?.provider || null,
+      competition: payload?.data?.competition || payload?.competition || null,
+      matchCount: matches.length,
+      sample: matches.slice(0, 3).map(match => ({
+        matchId: match?.matchId || null,
+        kickoffAt: match?.kickoffAt || null,
+        home: match?.homeTeam?.name || null,
+        away: match?.awayTeam?.name || null,
+      })),
+      error: payload?.error || null,
+      upstreamStage: payload?.upstream_stage || null,
+      upstreamStatus: payload?.upstream_status ?? null,
+      upstreamCode: payload?.upstream_code || null,
+    };
+  } catch (error) {
+    return {
+      status: 0,
+      ok: false,
+      matchCount: 0,
+      error: error instanceof Error ? error.message : String(error),
+      upstreamStage: null,
+      upstreamStatus: null,
+      upstreamCode: null,
+    };
+  }
+}
+
 function snippets(text, markers) {
   return markers.map(marker => {
     const index = text.indexOf(marker);
@@ -137,7 +183,11 @@ async function probe() {
     if (index < 8) await sleep(10_000);
   }
 
-  const [modules, health] = await Promise.all([probeModules(), probeHealth()]);
+  const [modules, health, liveUcl] = await Promise.all([
+    probeModules(),
+    probeHealth(),
+    probeLiveCompetition(),
+  ]);
   const matchesModule = modules.find(item => item.path.endsWith('/matches-ui.mjs'));
   const report = {
     url: ORIGIN,
@@ -146,6 +196,7 @@ async function probe() {
     attempts,
     latest: attempts.at(-1) || null,
     health,
+    liveUcl,
     modules,
     navigation: snippets(latestHtml, NAV_MARKERS),
   };
@@ -155,12 +206,22 @@ async function probe() {
   console.log(JSON.stringify({
     latest: report.latest,
     health,
+    liveUcl,
     modules,
     navigation: report.navigation.map(item => ({ marker: item.marker, found: item.found, index: item.index })),
   }));
 
   if (!matchesModule?.hasTournamentCapture) {
     throw new Error('deployed TEST does not contain tournament capture navigation fix');
+  }
+  if (health.bsdConfigured === true && (!liveUcl.ok || liveUcl.matchCount < 1)) {
+    throw new Error(
+      `deployed TEST BSD UCL probe failed: status=${liveUcl.status}`
+      + ` stage=${liveUcl.upstreamStage || 'unknown'}`
+      + ` upstreamStatus=${liveUcl.upstreamStatus ?? 'unknown'}`
+      + ` code=${liveUcl.upstreamCode || 'unknown'}`
+      + ` error=${liveUcl.error || 'none'} matches=${liveUcl.matchCount}`,
+    );
   }
 }
 

@@ -1,5 +1,5 @@
 import { adaptSerieASchedule } from './v23.2/serie-a-adapter.mjs';
-import { fetchBsdMatches } from './v23.2/bsd-provider.mjs';
+import { BsdUpstreamError, fetchBsdMatches } from './v23.2/bsd-provider.mjs';
 
 const TEST_BUILD = 'ciao-web-v23-2-bsd-test-20260902';
 const V23_2_MATCHES = '/api/v23.2/matches';
@@ -91,10 +91,15 @@ async function handleExternalMatches(competition, url, env) {
     if (/invalid date|date range|range exceeds/i.test(message)) {
       return errorJson(400, { error: 'invalid_date_range' });
     }
+
+    const upstream = error instanceof BsdUpstreamError ? error : null;
     return errorJson(502, {
       error: 'competition_upstream_failed',
       provider: 'bsd-v2',
       competition,
+      upstream_stage: upstream?.stage || 'unknown',
+      upstream_status: upstream?.status ?? null,
+      upstream_code: upstream?.code || 'unknown_error',
     });
   }
 }
