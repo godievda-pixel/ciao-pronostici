@@ -46,7 +46,11 @@ test('v23.3 deployment probe verifies unified runtime and every release surface'
   assert.match(source, /foreignVsForeign/);
   assert.match(source, /allUnknownTeamNames/);
   assert.match(source, /releaseHeldForUnknownTeams/);
-  assert.match(source, /predictionsBlocked/);
+  assert.match(source, /predictionsEnabled/);
+  assert.match(source, /rankingEnabled/);
+  assert.match(source, /probePredictionAuthGuard/);
+  assert.match(source, /predictionBackend/);
+  assert.doesNotMatch(source, /predictionsBlocked/);
 });
 
 test('v23.3 workflow uploads explicitly versioned provider and deployment evidence', async () => {
