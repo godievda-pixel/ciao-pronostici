@@ -31,6 +31,16 @@ export function normalizePredictionSeason(value) {
   throw new PredictionMatchError('season_mismatch', 409);
 }
 
+function bindResolvedSeason(match, activeSeason) {
+  const season = text(activeSeason);
+  if (!season) throw new PredictionMatchError('season_mismatch', 409);
+  const provided = text(match?.season);
+  if (provided && normalizePredictionSeason(provided) !== season) {
+    throw new PredictionMatchError('season_mismatch', 409);
+  }
+  return Object.freeze({ ...match, season });
+}
+
 export function assertPredictionWritable({ match, activeSeason, now = new Date() } = {}) {
   if (normalizePredictionSeason(match?.season) !== text(activeSeason)) {
     throw new PredictionMatchError('season_mismatch', 409);
@@ -107,10 +117,7 @@ async function loadSerieA({ request, env, adapt = adaptSerieASchedule }) {
 }
 
 function assertActiveSeason(match, activeSeason) {
-  if (normalizePredictionSeason(match?.season) !== text(activeSeason)) {
-    throw new PredictionMatchError('season_mismatch', 409);
-  }
-  return match;
+  return bindResolvedSeason(match, activeSeason);
 }
 
 export async function resolveCanonicalPredictionMatch({
@@ -193,8 +200,7 @@ export async function listCanonicalPredictionMatches({
     for (const match of Array.isArray(result.value) ? result.value : []) {
       try {
         if (text(match?.competition) !== key) continue;
-        if (normalizePredictionSeason(match?.season) !== text(env?.PREDICTION_SEASON)) continue;
-        matches.push(match);
+        matches.push(bindResolvedSeason(match, env?.PREDICTION_SEASON));
       } catch {}
     }
   });
