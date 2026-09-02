@@ -11,6 +11,7 @@ const sample = `
   function mine(){ return 'mine'; }
   async function saveAll(){ return api({action:'save_predictions',round:3,predictions:[]}); }
   async function load(){ return api({action:'state',round:3}); }
+  async function __cw11RefreshSerieA(){ return __cw9FastApi({action:'serie_a_table'}); }
   function table(){ return 'Общая таблица'; }
   async function openMatchCenter(matchId){ return matchId; }
   function __cw231HomeHtml(){ return '<section></section>'; }
