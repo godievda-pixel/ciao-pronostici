@@ -13,6 +13,8 @@ const jsPath = resolve(root, 'src/ui-v23.1.js');
 const outPath = resolve(root, 'dist/index.html');
 const v232SourceDir = resolve(root, 'src/v23.2');
 const v232OutDir = resolve(root, 'dist/v23.2');
+const v233SourceDir = resolve(root, 'src/v23.3');
+const v233OutDir = resolve(root, 'dist/v23.3');
 
 export function applyScheduleSourcePatch(input) {
   let source = String(input);
@@ -178,13 +180,21 @@ export function injectV232Entry(input) {
   return html;
 }
 
-export async function copyV232Modules() {
-  await mkdir(v232OutDir, { recursive: true });
-  const files = (await readdir(v232SourceDir)).filter(name => name.endsWith('.mjs'));
+async function copyModules(sourceDir, outDir) {
+  await mkdir(outDir, { recursive: true });
+  const files = (await readdir(sourceDir)).filter(name => name.endsWith('.mjs'));
   for (const name of files) {
-    await copyFile(resolve(v232SourceDir, name), resolve(v232OutDir, name));
+    await copyFile(resolve(sourceDir, name), resolve(outDir, name));
   }
   return files.sort();
+}
+
+export function copyV232Modules() {
+  return copyModules(v232SourceDir, v232OutDir);
+}
+
+export function copyV233Modules() {
+  return copyModules(v233SourceDir, v233OutDir);
 }
 
 async function loadBase() {
@@ -222,7 +232,7 @@ export async function build() {
     throw new Error('v23.2 club profile tournament source patch did not apply');
   }
 
-  await copyV232Modules();
+  await Promise.all([copyV232Modules(), copyV233Modules()]);
   const html = injectV232Entry(applyPatch(profilePatched, css, js));
   await mkdir(dirname(outPath), { recursive: true });
   await writeFile(outPath, html, 'utf8');
