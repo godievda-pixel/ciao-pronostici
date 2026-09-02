@@ -67,6 +67,19 @@ function participantFrom(user) {
   };
 }
 
+function participantRoster(authenticated) {
+  const byId = new Map();
+  const legacy = Array.isArray(authenticated?.participants) ? authenticated.participants : [];
+  for (const participant of legacy) {
+    if (!text(participant?.userId)) continue;
+    byId.set(participant.userId, participantFrom(participant));
+  }
+
+  const current = participantFrom(authenticated);
+  byId.delete(current.user_id);
+  return [current, ...byId.values()];
+}
+
 function predictionState(match, activeSeason, now, deps) {
   if (text(match?.status).toLowerCase() === 'finished') return 'finished';
   try {
@@ -93,13 +106,13 @@ export function createPredictionService({ request, env, now = new Date(), deps =
     catch (error) { throw mapError(error); }
   }
 
-  async function registerParticipant(stub, authenticated) {
-    const participant = participantFrom(authenticated);
-    await internalJson(stub, '/participant', {
+  async function registerParticipants(stub, authenticated) {
+    const participants = participantRoster(authenticated);
+    await internalJson(stub, '/participants', {
       method:'POST',
-      body:{ season:env.PREDICTION_SEASON, participant },
+      body:{ season:env.PREDICTION_SEASON, participants },
     });
-    return participant;
+    return participants;
   }
 
   async function save(body) {
@@ -186,7 +199,7 @@ export function createPredictionService({ request, env, now = new Date(), deps =
       if (scope !== 'overall' && scope !== 'competition') throw new PredictionServiceError('invalid_ranking_scope', 400);
       if (scope === 'competition' && !text(competition)) throw new PredictionServiceError('competition_required', 400);
       const { stub } = activeStub(env);
-      await registerParticipant(stub, authenticated);
+      await registerParticipants(stub, authenticated);
       await reconcileFinishedMatches(stub);
       const params = new URLSearchParams({ scope });
       if (scope === 'competition') params.set('competition', competition);
@@ -199,7 +212,7 @@ export function createPredictionService({ request, env, now = new Date(), deps =
     try {
       const authenticated = await user();
       const { stub } = activeStub(env);
-      await registerParticipant(stub, authenticated);
+      await registerParticipants(stub, authenticated);
       await reconcileFinishedMatches(stub);
       const params = new URLSearchParams({ user_id: authenticated.userId });
       const payload = await internalJson(stub, `/rankings/me?${params}`);
