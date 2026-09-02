@@ -49,13 +49,13 @@ export function predictionCardState(match = {}) {
     const hasScore = Number.isInteger(Number(match?.homeScore)) && Number.isInteger(Number(match?.awayScore));
     const result = hasScore ? `${Number(match.homeScore)}:${Number(match.awayScore)}` : '—';
     const points = prediction?.points == null ? '' : ` · +${Number(prediction.points)}`;
-    return Object.freeze({ kind:'finished', label:`Итог ${result}${points}` });
+    return Object.freeze({ kind:'finished', label:`Итог: ${result}${points}` });
   }
   if (prediction) {
-    return Object.freeze({ kind:'saved', label:`сохранён · ${Number(prediction.predicted_home)}:${Number(prediction.predicted_away)}` });
+    return Object.freeze({ kind:'saved', label:`Твой прогноз: ${Number(prediction.predicted_home)}:${Number(prediction.predicted_away)} ✓` });
   }
-  if (match?.state === 'locked') return Object.freeze({ kind:'locked', label:'🔒 закрыт' });
-  return Object.freeze({ kind:'open', label:'не сохранён' });
+  if (match?.state === 'locked') return Object.freeze({ kind:'locked', label:'Прогноз закрыт' });
+  return Object.freeze({ kind:'open', label:'Прогноз открыт' });
 }
 
 export function mergeAuthoritativePrediction(matches = [], prediction = {}) {
