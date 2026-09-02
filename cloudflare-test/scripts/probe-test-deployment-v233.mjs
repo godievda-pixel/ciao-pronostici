@@ -15,7 +15,7 @@ const EXTERNAL_COMPETITIONS = Object.freeze(['coppa_italia','ucl','uel','uecl'])
 const UEFA_COMPETITIONS = Object.freeze(['ucl','uel','uecl']);
 const EXPECTED_HEALTH = Object.freeze({
   service:'ciao-web-app-test',
-  build:'ciao-web-v23-3-prediction-do-test-20260902',
+  build:'ciao-web-v23-3-user-feedback-r4-20260902',
   api:'ciao-web-api',
   matchesProvider:'bsd-v2',
   predictionBackend:'durable-object-sqlite',
