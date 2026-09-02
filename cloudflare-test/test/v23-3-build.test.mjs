@@ -154,3 +154,13 @@ test('v23.3 build pipeline uses the unified entry while preserving the Home sour
   assert.match(source, /applyV233HomeBuildPatch\s*\(/);
   assert.doesNotMatch(source, /injectV233TablesEntry\s*\(\s*\n?\s*injectV233HomeEntry\s*\(/);
 });
+
+test('TEST wrangler binds the SQLite PredictionLeague without a Production binding', async () => {
+  const source = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
+  assert.match(source, /"PREDICTION_LEAGUE"/);
+  assert.match(source, /"PredictionLeague"/);
+  assert.match(source, /"new_sqlite_classes"\s*:\s*\[\s*"PredictionLeague"\s*\]/);
+  assert.match(source, /"CIAO_ENV"\s*:\s*"test"/);
+  assert.match(source, /"PREDICTION_SEASON"\s*:\s*"2026-27"/);
+  assert.doesNotMatch(source, /ciao-web-app"/);
+});
