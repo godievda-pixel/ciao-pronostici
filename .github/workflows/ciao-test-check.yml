@@ -41,9 +41,9 @@ jobs:
         if: github.event_name == 'push'
         run: npm run inspect:api-contract
 
-      - name: Probe ESPN provider contract
+      - name: Probe BSD provider contract
         if: github.event_name == 'push'
-        run: node scripts/probe-espn-provider.mjs
+        run: node scripts/probe-bsd-provider.mjs
 
       - name: Probe deployed TEST markers
         if: github.event_name == 'push'
@@ -58,12 +58,12 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Upload ESPN provider observation
+      - name: Upload BSD provider observation
         if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
-          name: ciao-v23-2-espn-provider
-          path: cloudflare-test/artifacts/espn-provider-probe.json
+          name: ciao-v23-2-bsd-provider
+          path: cloudflare-test/artifacts/bsd-provider-probe.json
           if-no-files-found: error
           retention-days: 7
 
