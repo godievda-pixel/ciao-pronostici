@@ -111,13 +111,18 @@ test('v23.2 UEFA route uses BSD v2 with server token and returns only Italian-cl
         { id: 7, name: 'Champions League', country: 'Europe' },
         { id: 8, name: 'Europa League', country: 'Europe' },
         { id: 9, name: 'Conference League', country: 'Europe' },
-        { id: 10, name: 'Coppa Italia', country: 'Italy' },
+        { id: 42, name: 'Coppa Italia', country: 'Italy' },
       ] });
     }
     if (value.includes('/api/v2/leagues/7/season/')) {
       return Response.json({ id: 2607, name: 'Champions League 2026/27', year: 2026, is_current: true });
     }
     if (value.includes('/api/v2/teams/?')) {
+      const parsed = new URL(value);
+      assert.equal(parsed.searchParams.get('country_code'), 'IT');
+      assert.equal(parsed.searchParams.has('league_id'), false);
+      assert.equal(parsed.searchParams.has('season_id'), false);
+      assert.equal(parsed.searchParams.has('in_competition'), false);
       return Response.json({ count: 1, next: null, results: [
         { id: 110, name: 'Internazionale', country_code: 'IT' },
       ] });
