@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  V233_SOURCE_MARKERS,
   discoverApiCalls,
   discoverApiRouteLiterals,
   discoverObjectLiteralValues,
@@ -31,6 +32,7 @@ const CLUB_SOURCE_MARKERS = new Set([
   '__cw209CalendarHtml',
   '__cw9CalendarCard',
 ]);
+const V233_SOURCE_MARKER_SET = new Set(V233_SOURCE_MARKERS);
 
 export function safeCalls(calls) {
   return calls.filter(call =>
@@ -130,6 +132,9 @@ export async function main() {
   const clubSourceHints = result.sourceHints
     .filter(item => CLUB_SOURCE_MARKERS.has(item.marker))
     .map(item => ({ marker: item.marker, index: item.index, snippet: item.snippet }));
+  const v233SourceHints = result.sourceHints
+    .filter(item => V233_SOURCE_MARKER_SET.has(item.marker))
+    .map(item => ({ marker: item.marker, index: item.index, snippet: item.snippet }));
 
   console.log(JSON.stringify({
     ok: true,
@@ -138,6 +143,7 @@ export async function main() {
     requestLiterals: result.requestLiterals,
     sourceHints: result.sourceHints.length,
     clubSourceHints,
+    v233SourceHints,
     safeGetRoutes: result.safeGetRoutes,
     probed: result.probes.length,
     output: outputPath,
