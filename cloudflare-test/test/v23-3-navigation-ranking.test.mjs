@@ -21,6 +21,15 @@ test('predictions attach to legacy mine tab and never hijack Home predict tab', 
   assert.doesNotMatch(source, /data-tab="predict"/);
 });
 
+test('prediction and ranking overlays explicitly close sibling v23.3 overlays before opening', async () => {
+  const predictionSource = await readFile(new URL('../src/v23.3/predictions-ui.mjs', import.meta.url), 'utf8');
+  const rankingSource = await readFile(new URL('../src/v23.3/ranking-ui.mjs', import.meta.url), 'utf8');
+  assert.match(predictionSource, /ciao-v233-ranking-overlay/);
+  assert.match(predictionSource, /ciao-v233-tables-overlay/);
+  assert.match(rankingSource, /ciao-v233-predictions-overlay/);
+  assert.match(rankingSource, /ciao-v233-tables-overlay/);
+});
+
 test('ranking filters expose overall plus all five competitions', () => {
   assert.deepEqual(RANKING_FILTERS.map(item => item.key), [
     'overall','serie_a','coppa_italia','ucl','uel','uecl',
