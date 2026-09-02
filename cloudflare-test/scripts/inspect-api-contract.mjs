@@ -122,10 +122,10 @@ export async function main() {
   console.log(JSON.stringify({
     ok: true,
     discovered: result.calls.length,
-    routeLiterals: result.routeLiterals.length,
+    routeLiterals: result.routeLiterals,
+    requestLiterals: result.requestLiterals,
     sourceHints: result.sourceHints.length,
-    requestLiteralKeys: Object.keys(result.requestLiterals).length,
-    safeGetRoutes: result.safeGetRoutes.length,
+    safeGetRoutes: result.safeGetRoutes,
     probed: result.probes.length,
     output: outputPath,
   }));
