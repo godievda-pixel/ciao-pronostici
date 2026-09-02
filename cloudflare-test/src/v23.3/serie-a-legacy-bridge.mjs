@@ -23,6 +23,47 @@ function stateRoots(payload = {}) {
     .filter(item => item && typeof item === 'object');
 }
 
+function legacyMatchTeam(match = {}, side) {
+  const direct = match?.[side];
+  const nested = match?.[`${side}_team`] || match?.[`${side}Team`];
+  const object = direct && typeof direct === 'object'
+    ? direct
+    : nested && typeof nested === 'object'
+      ? nested
+      : {};
+  const directName = typeof direct === 'string' ? direct : '';
+  const nestedName = typeof nested === 'string' ? nested : '';
+  const team = {
+    ...object,
+    id: object?.id
+      ?? object?.team_id
+      ?? match?.[`${side}_id`]
+      ?? match?.[`${side}_team_id`]
+      ?? '',
+    name: text(
+      object?.name
+      || object?.team_name
+      || directName
+      || nestedName
+      || match?.[`${side}_name`]
+      || match?.[`${side}_team_name`],
+    ),
+    logo: text(
+      object?.logo
+      || object?.logo_url
+      || object?.logoUrl
+      || object?.crest
+      || object?.crest_url
+      || object?.team_logo
+      || match?.[`${side}_logo`]
+      || match?.[`${side}_logo_url`]
+      || match?.[`${side}_team_logo`]
+      || match?.[`${side}_team_logo_url`],
+    ),
+  };
+  return teamId(team) || text(team.name) || crestUrl(team) ? team : null;
+}
+
 export function serieAStateTeams(payload = {}) {
   for (const root of stateRoots(payload)) {
     const round = root?.round && typeof root.round === 'object' ? root.round : null;
@@ -30,10 +71,10 @@ export function serieAStateTeams(payload = {}) {
     if (!matches.length) continue;
     const teams = [];
     for (const match of matches) {
-      const home = match?.homeTeam || match?.home_team || match?.home;
-      const away = match?.awayTeam || match?.away_team || match?.away;
-      if (home && typeof home === 'object') teams.push(home);
-      if (away && typeof away === 'object') teams.push(away);
+      const home = legacyMatchTeam(match, 'home');
+      const away = legacyMatchTeam(match, 'away');
+      if (home) teams.push(home);
+      if (away) teams.push(away);
     }
     if (teams.length) return teams;
   }
