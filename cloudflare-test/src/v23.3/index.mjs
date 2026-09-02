@@ -1,6 +1,7 @@
 import './navigation-ui.mjs';
 import './home-integration.mjs';
 import './tables-ui.mjs';
+import './serie-a-legacy-bridge.mjs';
 import './predictions-ui.mjs';
 import './ranking-ui.mjs';
 import './premium-polish-ui.mjs';
