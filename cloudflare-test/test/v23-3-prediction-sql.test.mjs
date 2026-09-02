@@ -78,3 +78,46 @@ test('schema initialization is TEST-only and seeds stable metadata', () => {
     /TEST prediction backend/i,
   );
 });
+
+test('prediction row normalization preserves nullable scoring state', async () => {
+  const { normalizePredictionRow, rows } = await import('../src/v23.3/prediction-sql.mjs');
+  assert.deepEqual(rows({ toArray: () => [{ id: 1 }] }), [{ id: 1 }]);
+  assert.deepEqual(
+    normalizePredictionRow({
+      prediction_id: 'p1',
+      user_id: 'telegram:42',
+      match_id: 'ucl:1',
+      competition: 'ucl',
+      season: '2026-27',
+      predicted_home: 2,
+      predicted_away: 1,
+      submitted_at: 's',
+      updated_at: 'u',
+      locked_at: 'l',
+      points: null,
+      result_type: null,
+      final_home: null,
+      final_away: null,
+      result_fingerprint: null,
+      scored_at: null,
+    }),
+    {
+      prediction_id: 'p1',
+      user_id: 'telegram:42',
+      match_id: 'ucl:1',
+      competition: 'ucl',
+      season: '2026-27',
+      predicted_home: 2,
+      predicted_away: 1,
+      submitted_at: 's',
+      updated_at: 'u',
+      locked_at: 'l',
+      points: null,
+      result_type: null,
+      final_home: null,
+      final_away: null,
+      result_fingerprint: null,
+      scored_at: null,
+    },
+  );
+});
