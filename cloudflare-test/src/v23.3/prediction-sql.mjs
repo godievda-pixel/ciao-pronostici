@@ -97,3 +97,232 @@ export function initializePredictionSchema(sql, identity = {}) {
     '0',
   );
 }
+
+export function rows(cursor) {
+  if (!cursor) return [];
+  if (typeof cursor.toArray === 'function') return cursor.toArray();
+  return Array.from(cursor);
+}
+
+export function normalizePredictionRow(row = {}) {
+  return Object.freeze({
+    prediction_id: String(row.prediction_id),
+    user_id: String(row.user_id),
+    match_id: String(row.match_id),
+    competition: String(row.competition),
+    season: String(row.season),
+    predicted_home: Number(row.predicted_home),
+    predicted_away: Number(row.predicted_away),
+    submitted_at: String(row.submitted_at),
+    updated_at: String(row.updated_at),
+    locked_at: String(row.locked_at),
+    points: row.points == null ? null : Number(row.points),
+    result_type: row.result_type == null ? null : String(row.result_type),
+    final_home: row.final_home == null ? null : Number(row.final_home),
+    final_away: row.final_away == null ? null : Number(row.final_away),
+    result_fingerprint: row.result_fingerprint == null ? null : String(row.result_fingerprint),
+    scored_at: row.scored_at == null ? null : String(row.scored_at),
+  });
+}
+
+function first(cursor) {
+  return rows(cursor)[0] || null;
+}
+
+function affected(cursor) {
+  const value = Number(cursor?.rowsWritten ?? cursor?.changes ?? 0);
+  return Number.isInteger(value) && value >= 0 ? value : 0;
+}
+
+function integerScore(value) {
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < 0 || number > 20) throw new Error('Invalid prediction score');
+  return number;
+}
+
+export function upsertParticipant(sql, participant = {}, nowIso) {
+  const userId = text(participant.user_id);
+  const displayName = text(participant.display_name) || 'Участник';
+  const username = text(participant.username) || null;
+  if (!userId) throw new Error('Prediction participant user_id is required');
+  sql.exec(
+    `INSERT INTO participants (user_id, display_name, username, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(user_id) DO UPDATE SET
+       display_name = excluded.display_name,
+       username = excluded.username,
+       updated_at = excluded.updated_at`,
+    userId, displayName, username, nowIso, nowIso,
+  );
+  return Object.freeze({ user_id: userId, display_name: displayName, username });
+}
+
+export function upsertPrediction(sql, prediction = {}, nowIso, randomUUID = () => crypto.randomUUID()) {
+  const userId = text(prediction.user_id);
+  const matchId = text(prediction.match_id);
+  const competition = text(prediction.competition);
+  const season = text(prediction.season);
+  const lockedAt = text(prediction.locked_at);
+  getCompetitionConfig(competition);
+  if (!userId || !matchId || !matchId.startsWith(`${competition}:`)) throw new Error('Invalid prediction identity');
+  if (!season || !lockedAt) throw new Error('Prediction season and locked_at are required');
+  const home = integerScore(prediction.predicted_home);
+  const away = integerScore(prediction.predicted_away);
+
+  const existing = first(sql.exec(
+    'SELECT * FROM predictions WHERE user_id = ? AND match_id = ? LIMIT 1',
+    userId, matchId,
+  ));
+
+  let predictionId;
+  if (existing) {
+    predictionId = String(existing.prediction_id);
+    sql.exec(
+      `UPDATE predictions SET
+         predicted_home = ?, predicted_away = ?, updated_at = ?, locked_at = ?,
+         points = NULL, result_type = NULL, final_home = NULL, final_away = NULL,
+         result_fingerprint = NULL, scored_at = NULL
+       WHERE prediction_id = ?`,
+      home, away, nowIso, lockedAt, predictionId,
+    );
+  } else {
+    predictionId = String(randomUUID());
+    sql.exec(
+      `INSERT INTO predictions (
+         prediction_id, user_id, match_id, competition, season,
+         predicted_home, predicted_away, submitted_at, updated_at, locked_at,
+         points, result_type, final_home, final_away, result_fingerprint, scored_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, NULL, NULL, NULL)`,
+      predictionId, userId, matchId, competition, season,
+      home, away, nowIso, nowIso, lockedAt,
+    );
+  }
+
+  const stored = first(sql.exec('SELECT * FROM predictions WHERE prediction_id = ? LIMIT 1', predictionId));
+  if (!stored) throw new Error('Prediction persistence failed');
+  return normalizePredictionRow(stored);
+}
+
+export function listUserPredictions(sql, { userId, competition } = {}) {
+  const id = text(userId);
+  if (!id) throw new Error('Prediction user id is required');
+  if (competition && competition !== 'all') {
+    getCompetitionConfig(competition);
+    return rows(sql.exec(
+      'SELECT * FROM predictions WHERE user_id = ? AND competition = ? ORDER BY submitted_at, match_id',
+      id, competition,
+    )).map(normalizePredictionRow);
+  }
+  return rows(sql.exec(
+    'SELECT * FROM predictions WHERE user_id = ? ORDER BY submitted_at, match_id',
+    id,
+  )).map(normalizePredictionRow);
+}
+
+export function reconcileMatchPredictions(sql, {
+  matchId, finalHome, finalAway, resultFingerprint, scoredAt, scorePrediction,
+} = {}) {
+  if (typeof scorePrediction !== 'function') throw new Error('scorePrediction is required');
+  const id = text(matchId);
+  const fingerprint = text(resultFingerprint);
+  if (!id || !fingerprint) throw new Error('Result identity is required');
+  const finalH = Number(finalHome);
+  const finalA = Number(finalAway);
+  if (!Number.isInteger(finalH) || !Number.isInteger(finalA)) throw new Error('Invalid final score');
+  let updated = 0;
+  for (const row of rows(sql.exec('SELECT * FROM predictions WHERE match_id = ?', id))) {
+    if (String(row.result_fingerprint || '') === fingerprint) continue;
+    const scored = scorePrediction({
+      predictedHome: Number(row.predicted_home),
+      predictedAway: Number(row.predicted_away),
+      finalHome: finalH,
+      finalAway: finalA,
+    });
+    sql.exec(
+      `UPDATE predictions SET points = ?, result_type = ?, final_home = ?, final_away = ?,
+       result_fingerprint = ?, scored_at = ? WHERE prediction_id = ?`,
+      Number(scored.points), text(scored.resultType), finalH, finalA, fingerprint, scoredAt, String(row.prediction_id),
+    );
+    updated += 1;
+  }
+  return updated;
+}
+
+function normalizeRankingRow(row = {}) {
+  return Object.freeze({
+    user_id: String(row.user_id),
+    display_name: String(row.display_name || 'Участник'),
+    username: row.username == null ? null : String(row.username),
+    points: Number(row.points || 0),
+    exact_scores: Number(row.exact_scores || 0),
+    correct_outcomes: Number(row.correct_outcomes || 0),
+    scored_predictions: Number(row.scored_predictions || 0),
+  });
+}
+
+function rankingSort(a, b) {
+  return b.points - a.points
+    || b.exact_scores - a.exact_scores
+    || b.correct_outcomes - a.correct_outcomes
+    || a.scored_predictions - b.scored_predictions
+    || a.user_id.localeCompare(b.user_id);
+}
+
+export function queryRanking(sql, { scope = 'overall', competition } = {}) {
+  const canonicalScope = rankingScope({ scope, competition });
+  const competitionFilter = canonicalScope === 'overall' ? '' : 'AND p.competition = ?';
+  const params = canonicalScope === 'overall' ? [] : [competition];
+  const result = rows(sql.exec(
+    `SELECT p.user_id, COALESCE(MAX(u.display_name), 'Участник') AS display_name,
+       MAX(u.username) AS username,
+       COALESCE(SUM(p.points), 0) AS points,
+       SUM(CASE WHEN p.result_type = 'exact' THEN 1 ELSE 0 END) AS exact_scores,
+       SUM(CASE WHEN p.result_type IN ('exact','outcome') THEN 1 ELSE 0 END) AS correct_outcomes,
+       SUM(CASE WHEN p.points IS NOT NULL THEN 1 ELSE 0 END) AS scored_predictions
+     FROM predictions p LEFT JOIN participants u ON u.user_id = p.user_id
+     WHERE 1=1 ${competitionFilter}
+     GROUP BY p.user_id`,
+    ...params,
+  )).map(normalizeRankingRow).sort(rankingSort);
+  return Object.freeze(result);
+}
+
+export function queryRankingMe(sql, { userId } = {}) {
+  const id = text(userId);
+  if (!id) throw new Error('Prediction user id is required');
+  const overall = queryRanking(sql, { scope: 'overall' });
+  const index = overall.findIndex(row => row.user_id === id);
+  return index < 0 ? null : Object.freeze({ position: index + 1, ...overall[index] });
+}
+
+export function createRankingSnapshot(sql, { scope, periodKey, payload, nowIso, randomUUID = () => crypto.randomUUID() } = {}) {
+  const canonical = rankingScope(scope?.startsWith?.('competition:')
+    ? { scope: 'competition', competition: scope.slice('competition:'.length) }
+    : { scope: scope || 'overall' });
+  const key = text(periodKey);
+  if (!key) throw new Error('Ranking snapshot period is required');
+  const snapshotId = String(randomUUID());
+  sql.exec(
+    `INSERT OR IGNORE INTO ranking_snapshots (snapshot_id, scope, period_key, created_at, payload_json)
+     VALUES (?, ?, ?, ?, ?)`,
+    snapshotId, canonical, key, nowIso, JSON.stringify(payload ?? null),
+  );
+  return Object.freeze({ snapshot_id: snapshotId, scope: canonical, period_key: key, created_at: nowIso });
+}
+
+export function resetPredictionDomain(sql) {
+  const predictions = affected(sql.exec('DELETE FROM predictions'));
+  const ranking = affected(sql.exec('DELETE FROM ranking_snapshots'));
+  affected(sql.exec('DELETE FROM participants'));
+  const caches = affected(sql.exec(
+    `UPDATE schema_meta
+     SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT)
+     WHERE key = 'prediction_cache_generation'`,
+  ));
+  return Object.freeze({
+    predictions,
+    points: predictions,
+    ranking,
+    caches,
+  });
+}
