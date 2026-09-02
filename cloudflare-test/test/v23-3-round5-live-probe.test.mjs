@@ -20,7 +20,7 @@ test('round5 deployment probe requires ranking isolation and stable Serie A cres
         return response("export const USER_FEEDBACK_ROUND5_BUILD='2026-09-02-r5'; const html='cw233-ranking-position-value cw233-ranking-name cw233-ranking-points-value cw233-ranking-points-unit';");
       }
       if (path === '/v23.3/serie-a-legacy-bridge.mjs') {
-        return response("const LEGACY_CORE_API='/api/ciao-core-api-fast-v4'; const body={action:'state'}; const marker='cw233-table-logo-fallback';");
+        return response("const LEGACY_CORE_API='/api/ciao-core-api-fast-v4'; const body={action:'state'}; const marker='cw233-table-logo-fallback'; export async function hydrateSerieATableCrests(){}");
       }
       throw new Error(`unexpected ${path}`);
     },
