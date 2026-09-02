@@ -85,12 +85,14 @@ test('v23.3 build injects the Tables module exactly once', async () => {
   assert.match(once, /src="\/v23\.3\/tables-ui\.mjs"/);
 });
 
-test('v23.3 build applies the stable Home patch and refuses a missing anchor', async () => {
+test('v23.3 build removes only the legacy SERIE A 2026/27 label and preserves the new-season notice', async () => {
   const { applyV233HomeBuildPatch } = await buildModule();
   assert.equal(typeof applyV233HomeBuildPatch, 'function');
 
+  const resetNotice = 'Начало нового сезона! Счёт обнулен, все начинают с нуля. Удачи!';
   const source = `
-    <div>Начало нового сезона! Счёт обнулен, все начинают с нуля. Удачи!</div>
+    <div class="season-label">SERIE A 2026/27</div>
+    <div class="season-notice">${resetNotice}</div>
     <script>
       function __cw231HomeHtml(){ return '<section class="cw231-today">legacy</section>'; }
       predict = __cw231HomeHtml;
@@ -99,7 +101,8 @@ test('v23.3 build applies the stable Home patch and refuses a missing anchor', a
   const patched = applyV233HomeBuildPatch(source);
 
   assert.match(patched, /cw233-home-multicompetition/);
-  assert.doesNotMatch(patched, /Начало нового сезона! Счёт обнулен/);
+  assert.doesNotMatch(patched, /SERIE A 2026\/27/);
+  assert.match(patched, /Начало нового сезона! Счёт обнулен, все начинают с нуля\. Удачи!/);
   assert.throws(
     () => applyV233HomeBuildPatch('<html><body>unexpected stable source</body></html>'),
     /v23\.3 Home anchor missing/,
