@@ -35,6 +35,24 @@ function transaction(storage, fn) {
   return fn();
 }
 
+function normalizedParticipantBatch(body, expectedSeason) {
+  if (!body || body.season !== expectedSeason || !Array.isArray(body.participants)) return null;
+  if (body.participants.length < 1 || body.participants.length > 1000) return null;
+
+  const unique = new Map();
+  for (const participant of body.participants) {
+    if (!participant || typeof participant !== 'object') return null;
+    const userId = String(participant.user_id ?? '').trim();
+    if (!userId) return null;
+    unique.set(userId, {
+      user_id:userId,
+      display_name:String(participant.display_name ?? '').trim() || 'Участник',
+      username:String(participant.username ?? '').trim() || null,
+    });
+  }
+  return [...unique.values()];
+}
+
 export class PredictionLeague {
   constructor(state, env) {
     this.state = state;
@@ -69,6 +87,19 @@ export class PredictionLeague {
           upsertParticipant(this.sql, body.participant, nowIso())
         ));
         return json({ ok: true, participant });
+      }
+
+      if (url.pathname === '/participants' && request.method === 'POST') {
+        const body = await bodyOf(request);
+        const participants = normalizedParticipantBatch(body, this.env.PREDICTION_SEASON);
+        if (!participants) {
+          return json({ ok:false, error:'invalid_participants_payload' }, 400);
+        }
+        const timestamp = nowIso();
+        const saved = transaction(this.state.storage, () => (
+          participants.map(participant => upsertParticipant(this.sql, participant, timestamp))
+        ));
+        return json({ ok:true, participants:saved });
       }
 
       if (url.pathname === '/write' && request.method === 'POST') {
