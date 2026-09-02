@@ -7,6 +7,17 @@ const CSS = `
 .cw232-tournament-card>strong{grid-area:title!important;font-size:19px!important;letter-spacing:-.025em!important;line-height:1.05!important}
 .cw232-tournament-card__arrow{grid-area:arrow!important;align-self:center!important;font-size:24px!important;opacity:.74!important}
 
+/* Today: strict grid hierarchy prevents competition, time, teams and status from colliding. */
+.cw231-today-card{display:grid!important;gap:13px!important;padding:15px 16px!important;border-radius:20px!important;overflow:hidden!important}
+.cw231-today-card-top{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;gap:12px!important;align-items:center!important;min-width:0!important}
+.cw231-today-competition{min-width:0!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;color:rgba(214,223,255,.67)!important;font-size:10px!important;font-weight:850!important;letter-spacing:.045em!important;text-transform:uppercase!important}
+.cw231-today-card-top time{white-space:nowrap!important;color:#fff!important;font-size:11px!important;font-weight:900!important;font-variant-numeric:tabular-nums!important}
+.cw231-today-match{display:grid!important;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)!important;gap:10px!important;align-items:center!important;min-width:0!important}
+.cw231-today-team{display:grid!important;grid-template-columns:26px minmax(0,1fr)!important;gap:8px!important;align-items:center!important;min-width:0!important;color:#fff!important;font-size:14px!important;font-weight:900!important;line-height:1.15!important}
+.cw231-today-team.away{grid-template-columns:minmax(0,1fr) 26px!important;text-align:right!important}.cw231-today-team img{width:26px!important;height:26px!important;object-fit:contain!important}.cw231-today-team span{min-width:0!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}
+.cw231-today-score{min-width:46px!important;text-align:center!important;color:#fff!important;font-size:18px!important;font-weight:950!important;line-height:1!important;font-variant-numeric:tabular-nums!important}
+.cw231-today-bottom{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;gap:10px!important;align-items:center!important;min-width:0!important;padding-top:10px!important;border-top:1px solid rgba(255,255,255,.065)!important}.cw231-today-bottom>*{min-width:0!important}.cw231-today-bottom button,.cw231-today-bottom a{white-space:nowrap!important}
+
 /* Tables: premium compact mobile-first table, no horizontal 650px canvas. */
 .cw233-tables-head{margin:0 0 14px!important;padding:18px 18px 17px!important;border:1px solid rgba(255,255,255,.1)!important;border-radius:22px!important;background:linear-gradient(145deg,rgba(37,74,218,.25),rgba(9,18,43,.36))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)!important}
 .cw233-tables-head>span{opacity:.48!important}.cw233-tables-head h2{font-size:29px!important}.cw233-tables-head p{margin-top:5px!important}
@@ -66,6 +77,7 @@ const CSS = `
   .cw233-standing-table tbody td{height:56px!important}
 }
 @media(max-width:390px){
+  .cw231-today-card{padding:14px!important}.cw231-today-match{gap:7px!important}.cw231-today-team{font-size:12px!important}.cw231-today-score{min-width:38px!important;font-size:16px!important}
   .cw233-ranking-hero{grid-template-columns:1fr!important;padding:16px!important}
   .cw233-ranking-hero-stats{justify-content:flex-start}.cw233-ranking-stat{align-items:flex-start}
   .cw233-ranking-row{grid-template-columns:31px 34px minmax(0,1fr) auto!important;gap:7px!important;padding:9px!important}
@@ -89,7 +101,9 @@ function fallbackLogo(img) {
   const cell = img?.closest?.('.cw233-standing-team');
   if (!cell || img.dataset.cw233FallbackApplied === '1') return;
   img.dataset.cw233FallbackApplied = '1';
-  const fallback = document.createElement('span');
+  const documentRef = img.ownerDocument || globalThis.document;
+  const fallback = documentRef?.createElement?.('span');
+  if (!fallback) return;
   fallback.className = 'cw233-table-logo cw233-table-logo--empty cw233-table-logo-fallback';
   fallback.textContent = initials(cell.querySelector('strong')?.textContent);
   img.replaceWith(fallback);
@@ -101,20 +115,16 @@ function hydrateTableLogos(documentRef) {
     if (!cell) continue;
     const image = cell.querySelector('img.cw233-table-logo');
     if (image) {
-      image.addEventListener('error', () => fallbackLogo(image), { once:true });
+      if (image.dataset.cw233ErrorBound !== '1') {
+        image.dataset.cw233ErrorBound = '1';
+        image.addEventListener('error', () => fallbackLogo(image), { once:true });
+      }
       continue;
     }
     const empty = cell.querySelector('.cw233-table-logo--empty');
-    const teamId = String(row.dataset?.cw233StandingTeam || '').trim();
-    if (!empty || !/^\d+$/.test(teamId)) continue;
-    const img = documentRef.createElement('img');
-    img.className = 'cw233-table-logo';
-    img.alt = '';
-    img.loading = 'lazy';
-    img.decoding = 'async';
-    img.src = `https://sports.bzzoiro.com/img/team/${encodeURIComponent(teamId)}/?bg=transparent`;
-    img.addEventListener('error', () => fallbackLogo(img), { once:true });
-    empty.replaceWith(img);
+    if (!empty) continue;
+    empty.classList?.add?.('cw233-table-logo-fallback');
+    if (!String(empty.textContent || '').trim()) empty.textContent = initials(cell.querySelector('strong')?.textContent);
   }
 }
 
