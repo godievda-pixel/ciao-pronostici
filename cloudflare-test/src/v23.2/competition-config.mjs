@@ -17,15 +17,15 @@ export const COMPETITIONS = Object.freeze({
   }),
   coppa_italia: Object.freeze({
     key: 'coppa_italia',
-    title: 'Coppa Italia',
-    shortTitle: 'Кубок',
+    title: 'Кубок Италии',
+    shortTitle: 'Кубок Италии',
     theme: 'coppa',
     navigation: 'stages',
     european: false,
   }),
   ucl: Object.freeze({
     key: 'ucl',
-    title: 'Champions League',
+    title: 'Лига Чемпионов',
     shortTitle: 'ЛЧ',
     theme: 'champions',
     navigation: 'stages',
@@ -33,7 +33,7 @@ export const COMPETITIONS = Object.freeze({
   }),
   uel: Object.freeze({
     key: 'uel',
-    title: 'Europa League',
+    title: 'Лига Европы',
     shortTitle: 'ЛЕ',
     theme: 'europa',
     navigation: 'stages',
@@ -41,7 +41,7 @@ export const COMPETITIONS = Object.freeze({
   }),
   uecl: Object.freeze({
     key: 'uecl',
-    title: 'Conference League',
+    title: 'Лига Конференций',
     shortTitle: 'ЛК',
     theme: 'conference',
     navigation: 'stages',
