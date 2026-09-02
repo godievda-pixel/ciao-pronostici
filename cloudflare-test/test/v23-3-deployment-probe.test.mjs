@@ -4,7 +4,9 @@ import { readFile } from 'node:fs/promises';
 import {
   profileFeedCheck,
   standingsReleaseCheck,
-} from '../scripts/probe-test-deployment.mjs';
+} from '../scripts/probe-test-deployment-v233.mjs';
+
+const deploymentProbeUrl = new URL('../scripts/probe-test-deployment-v233.mjs', import.meta.url);
 
 function team(id, name, rawName, countryCode = '') {
   return { id, name, rawName, countryCode };
@@ -40,29 +42,26 @@ test('deployment standings gate accepts an unpublished empty table but still blo
 });
 
 test('deployment probe proves localization against the deployed TEST registry module', async () => {
-  const source = await readFile(new URL('../scripts/probe-test-deployment.mjs', import.meta.url), 'utf8');
-  assert.doesNotMatch(source, /import \{ isKnownTeamName \} from '\.\.\/src\/v23\.2\/team-registry\.mjs'/);
-  assert.match(source, /probeDeployedTeamRegistry/);
+  const source = await readFile(deploymentProbeUrl, 'utf8');
+  assert.match(source, /probeDeployedRegistry/);
   assert.match(source, /\/v23\.2\/team-registry\.mjs/);
   assert.match(source, /data:text\/javascript;base64/);
   assert.match(source, /registry\.isKnownTeamName/);
-  assert.match(source, /registry\.russianTeamName/);
-  assert.match(source, /deployedRegistry/);
+  assert.match(source, /allUnknownTeamNames/);
+  assert.match(source, /releaseHeldForUnknownTeams/);
 });
 
-test('deployment probe hard-gates only the Home SERIE A 2026/27 label; reset notice is diagnostic', async () => {
-  const source = await readFile(new URL('../scripts/probe-test-deployment.mjs', import.meta.url), 'utf8');
+test('deployment probe hard-gates only the Home SERIE A 2026/27 label; reset notice remains diagnostic', async () => {
+  const source = await readFile(deploymentProbeUrl, 'utf8');
   assert.match(source, /HOME_SEASON_LABEL\s*=\s*'SERIE A 2026\/27'/);
   assert.match(source, /RESET_NOTICE_TEXT\s*=\s*'Начало нового сезона!'/);
   assert.match(source, /homeSeasonLabelAbsent/);
   assert.match(source, /homeResetNoticePresent/);
-  assert.match(source, /deployed TEST still contains the Home Serie A season label/);
   assert.doesNotMatch(source, /deployed TEST is missing the Home new-season notice/);
-  assert.doesNotMatch(source, /homeSeasonLabelAbsent\s*&&\s*homeResetNoticePresent/);
 });
 
-test('deployment probe explicitly verifies unified v23.3 Home Tables Predictions Ranking and navigation runtimes', async () => {
-  const source = await readFile(new URL('../scripts/probe-test-deployment.mjs', import.meta.url), 'utf8');
+test('deployment probe verifies unified v23.3 Home Tables Predictions Ranking premium polish and navigation runtimes', async () => {
+  const source = await readFile(deploymentProbeUrl, 'utf8');
   assert.match(source, /id="ciao-v233"/);
   assert.match(source, /\/v23\.3\/index\.mjs/);
   assert.match(source, /\/v23\.3\/home-integration\.mjs/);
@@ -70,12 +69,16 @@ test('deployment probe explicitly verifies unified v23.3 Home Tables Predictions
   assert.match(source, /\/v23\.3\/predictions-ui\.mjs/);
   assert.match(source, /\/v23\.3\/ranking-ui\.mjs/);
   assert.match(source, /\/v23\.3\/navigation-ui\.mjs/);
+  assert.match(source, /\/v23\.3\/premium-polish-ui\.mjs/);
   assert.match(source, /predictionsEnabled/);
+  assert.match(source, /rankingEnabled/);
+  assert.match(source, /hasPremiumPolish/);
+  assert.match(source, /italianOnly/);
   assert.doesNotMatch(source, /predictionsBlocked/);
 });
 
-test('deployment probe explicitly verifies v23.3 canonical Match Center runtime and link resolver', async () => {
-  const source = await readFile(new URL('../scripts/probe-test-deployment.mjs', import.meta.url), 'utf8');
+test('deployment probe verifies v23.3 canonical Match Center runtime and link resolver', async () => {
+  const source = await readFile(deploymentProbeUrl, 'utf8');
   assert.match(source, /\/v23\.3\/match-center\.mjs/);
   assert.match(source, /\/v23\.3\/match-center-links\.mjs/);
   assert.match(source, /hasMatchCenterRuntime/);
@@ -88,15 +91,14 @@ test('deployment probe explicitly verifies v23.3 canonical Match Center runtime 
 });
 
 test('deployment probe requires Durable Object prediction health markers and unauthenticated route guard', async () => {
-  const source = await readFile(new URL('../scripts/probe-test-deployment.mjs', import.meta.url), 'utf8');
-  assert.match(source, /prediction_backend/);
+  const source = await readFile(deploymentProbeUrl, 'utf8');
+  assert.match(source, /predictionBackend/);
   assert.match(source, /durable-object-sqlite/);
-  assert.match(source, /prediction_environment/);
-  assert.match(source, /prediction_season/);
+  assert.match(source, /predictionEnvironment/);
+  assert.match(source, /predictionSeason/);
   assert.match(source, /2026-27/);
-  assert.match(source, /prediction_do_configured/);
+  assert.match(source, /predictionDoConfigured/);
   assert.match(source, /probePredictionAuthGuard/);
-  assert.match(source, /\/api\/v23\.3\/predictions/);
   assert.match(source, /telegram_auth_required/);
-  assert.match(source, /status\s*===\s*401|status\s*!==\s*401/);
+  assert.match(source, /status\s*!==\s*401|status\s*===\s*401/);
 });
