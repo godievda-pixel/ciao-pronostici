@@ -12,6 +12,7 @@ function numberOrNull(value) {
 
 function rowsFrom(payload) {
   if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.rows)) return payload.rows;
   if (Array.isArray(payload?.standings)) return payload.standings;
   if (Array.isArray(payload?.results)) return payload.results;
   if (Array.isArray(payload?.data)) return payload.data;
@@ -31,9 +32,17 @@ function standingTeam(row = {}) {
   const name = text(source?.name ?? row?.team_name);
   const crestUrl = text(
     source?.logo
+      || source?.logo_url
+      || source?.logoUrl
+      || source?.team_logo
+      || source?.team_logo_url
       || source?.crest
       || source?.crest_url
       || row?.team_logo
+      || row?.team_logo_url
+      || row?.logo
+      || row?.logo_url
+      || row?.logoUrl
       || (id ? `https://sports.bzzoiro.com/img/team/${encodeURIComponent(id)}/?bg=transparent` : ''),
   );
 
