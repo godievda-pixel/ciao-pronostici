@@ -5,6 +5,7 @@ import {
   PREDICTION_SCHEMA_SQL,
   predictionObjectName,
   rankingScope,
+  initializePredictionSchema,
 } from '../src/v23.3/prediction-sql.mjs';
 
 test('prediction object identity is environment and season scoped', () => {
@@ -37,4 +38,43 @@ test('ranking scope is finite and canonical', () => {
   );
   assert.throws(() => rankingScope({ scope: 'competition' }), /competition/i);
   assert.throws(() => rankingScope({ scope: 'other' }), /scope/i);
+});
+
+test('schema initialization is TEST-only and seeds stable metadata', () => {
+  const calls = [];
+  const sql = {
+    exec(query, ...params) {
+      calls.push({ query, params });
+      return { toArray: () => [] };
+    },
+  };
+
+  initializePredictionSchema(sql, { environment: 'test', season: '2026-27' });
+
+  assert.equal(
+    calls.some(item => item.query.includes('CREATE TABLE IF NOT EXISTS predictions')),
+    true,
+  );
+  assert.equal(
+    calls.some(item => item.params.includes('schema_version') && item.params.includes('1')),
+    true,
+  );
+  assert.equal(
+    calls.some(item => item.params.includes('environment') && item.params.includes('test')),
+    true,
+  );
+  assert.equal(
+    calls.some(item => item.params.includes('season') && item.params.includes('2026-27')),
+    true,
+  );
+  assert.equal(
+    calls.some(item => item.params.includes('prediction_cache_generation') && item.params.includes('0')),
+    true,
+  );
+
+  const blocked = { exec() { throw new Error('SQL must not run'); } };
+  assert.throws(
+    () => initializePredictionSchema(blocked, { environment: 'production', season: '2026-27' }),
+    /TEST prediction backend/i,
+  );
 });
