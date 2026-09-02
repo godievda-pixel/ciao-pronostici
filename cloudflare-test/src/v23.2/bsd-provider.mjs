@@ -97,12 +97,9 @@ async function resolveSeason(leagueId, apiKey, fetchImpl) {
   return fetchJson(buildUrl(`/leagues/${encodeURIComponent(leagueId)}/season/`), apiKey, fetchImpl);
 }
 
-async function italianTeamsFor(leagueId, seasonId, apiKey, fetchImpl) {
+async function italianTeams(apiKey, fetchImpl) {
   const teams = await fetchAll('/teams/', {
-    league_id: leagueId,
-    season_id: seasonId,
     country_code: 'IT',
-    in_competition: 'true',
   }, apiKey, fetchImpl);
   return new Set(teams.map(team => text(team?.id)).filter(Boolean));
 }
@@ -128,7 +125,7 @@ export async function fetchBsdMatches({
       date_to: range.to,
     }, apiKey, fetchImpl),
     EUROPEAN.has(competition)
-      ? italianTeamsFor(league.id, seasonId, apiKey, fetchImpl)
+      ? italianTeams(apiKey, fetchImpl)
       : Promise.resolve(new Set()),
   ]);
 
