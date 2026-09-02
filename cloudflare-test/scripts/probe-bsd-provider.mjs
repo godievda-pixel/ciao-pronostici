@@ -239,9 +239,9 @@ const snapshot = await fetchBsdMatchSnapshot({
   fetchImpl,
 });
 
-const foreignVsForeign = Object.fromEntries(UEFA_COMPETITIONS.map(competition => [
+const italianOnly = Object.fromEntries(UEFA_COMPETITIONS.map(competition => [
   competition,
-  matchesByCompetition[competition].some(match => !isItalianTeam(match.homeTeam) && !isItalianTeam(match.awayTeam)),
+  matchesByCompetition[competition].every(match => isItalianTeam(match.homeTeam) || isItalianTeam(match.awayTeam)),
 ]));
 const unknownTeamNames = collectUnknownTeamNames(matchesByCompetition, standingsByCompetition);
 const coppaMatches = matchesByCompetition.coppa_italia;
@@ -258,8 +258,8 @@ if (EXTERNAL_COMPETITIONS.some(competition => !matchesByCompetition[competition]
 if (UEFA_COMPETITIONS.some(competition => !standingsByCompetition[competition]?.length)) {
   throw new Error('BSD provider probe has an empty UEFA standings feed');
 }
-if (Object.values(foreignVsForeign).some(value => value !== true)) {
-  throw new Error('BSD provider probe did not retain a foreign-vs-foreign UEFA fixture');
+if (Object.values(italianOnly).some(value => value !== true)) {
+  throw new Error('BSD provider probe leaked a foreign-vs-foreign UEFA fixture');
 }
 if (!duplicateTie.collapsed || duplicateTie.keptMatchId !== 'coppa_italia:1002') {
   throw new Error('BSD provider probe failed the Coppa single-leg duplicate guard');
@@ -287,7 +287,7 @@ const report = {
   competitions: Object.fromEntries(EXTERNAL_COMPETITIONS.map(competition => [competition, {
     matchCount: matchesByCompetition[competition].length,
     standingsCount: standingsByCompetition[competition]?.length ?? null,
-    foreignVsForeign: foreignVsForeign[competition] ?? null,
+    italianOnly: italianOnly[competition] ?? null,
   }])),
   unknownTeamNames,
   duplicateTie,
