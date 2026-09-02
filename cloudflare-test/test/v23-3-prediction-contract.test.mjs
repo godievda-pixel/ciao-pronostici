@@ -84,24 +84,42 @@ test('v23.3 prediction contract closes exactly at kickoff minus 15 minutes', asy
   );
 });
 
-test('v23.3 prediction backend gate cannot PASS without a complete isolated authenticated smoke', async () => {
+test('v23.3 prediction backend gate distinguishes missing test identity from pending authenticated smoke', async () => {
   const { evaluatePredictionGate } = await contract();
 
-  const staticOnly = evaluatePredictionGate({
+  const noIdentity = evaluatePredictionGate({
     staticObservation: {
       actions: ['state', 'save_predictions'],
       competitionKeys: [],
     },
+    testIdentityAvailable: false,
   });
-  assert.equal(staticOnly.pass, false);
-  assert.equal(staticOnly.status, 'REQUIRES_AUTHENTICATED_SMOKE');
-  assert.equal(staticOnly.requiresAuthenticatedSmoke, true);
+  assert.equal(noIdentity.pass, false);
+  assert.equal(noIdentity.status, 'BLOCKED_NO_TEST_IDENTITY');
+  assert.equal(noIdentity.requiresAuthenticatedSmoke, true);
+  assert.match(noIdentity.reasons.join(' '), /identity/i);
+
+  const identityReady = evaluatePredictionGate({
+    staticObservation: {
+      actions: ['state', 'save_predictions'],
+      competitionKeys: [],
+    },
+    testIdentityAvailable: true,
+  });
+  assert.equal(identityReady.pass, false);
+  assert.equal(identityReady.status, 'REQUIRES_AUTHENTICATED_SMOKE');
+  assert.equal(identityReady.requiresAuthenticatedSmoke, true);
+});
+
+test('v23.3 prediction backend gate cannot PASS without a complete isolated authenticated smoke', async () => {
+  const { evaluatePredictionGate } = await contract();
 
   const incomplete = evaluatePredictionGate({
     staticObservation: {
       actions: ['state', 'save_predictions'],
       competitionKeys: ['competition_key'],
     },
+    testIdentityAvailable: true,
     authenticatedSmoke: {
       performed: true,
       isolatedFixture: true,
@@ -121,6 +139,7 @@ test('v23.3 prediction backend gate cannot PASS without a complete isolated auth
       actions: ['state', 'save_predictions'],
       competitionKeys: ['competition_key'],
     },
+    testIdentityAvailable: true,
     authenticatedSmoke: {
       performed: true,
       isolatedFixture: true,
