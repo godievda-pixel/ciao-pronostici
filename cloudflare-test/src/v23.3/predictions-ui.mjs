@@ -69,6 +69,7 @@ let activeMode = 'make';
 let client = null;
 let me = null;
 let pageActive = false;
+let loadingMatches = false;
 
 function initData() { return text(globalThis.Telegram?.WebApp?.initData); }
 function contentNode() { return document.querySelector('#ciao-miniapp-root .content'); }
@@ -161,12 +162,14 @@ function mineMatchHtml(match) {
 }
 
 function makeBody(rows) {
+  if (loadingMatches) return '';
   const groups = groupPredictionMatchesByDate(rows);
   if (!groups.length) return '<div class="empty">Нет матчей для этого фильтра</div>';
   return groups.map(group => `<div class="section-title"><h3>${esc(formatDay(group.key))}</h3><span>${group.matches.length} матч.</span></div><div class="matches">${group.matches.map(makeMatchHtml).join('')}</div>`).join('');
 }
 
 function mineBody(rows) {
+  if (loadingMatches) return '';
   if (!rows.length) return '<div class="empty">Сохранённых прогнозов пока нет</div>';
   return `<div class="section-title"><h3>Мои прогнозы</h3><span>${rows.length}</span></div><div class="card mine-card">${rows.map(mineMatchHtml).join('')}</div>`;
 }
@@ -180,22 +183,24 @@ function render() {
   main.innerHTML = `${heroHtml()}${tabsHtml()}${filtersHtml()}${activeMode === 'mine' ? mineBody(selected) : makeBody(selected)}${activeMode === 'make' ? '<div class="savebar"><button type="button" class="save" data-cw233-save-all>Сохранить прогнозы</button></div>' : ''}`;
 }
 
-function loading() {
-  const main = contentNode();
-  if (main) main.innerHTML = '<div class="empty">Загружаем прогнозы…</div>';
-}
-
 async function open() {
   pageActive = true;
-  loading();
+  loadingMatches = true;
+  render();
   try {
     client = client || createPredictionClient({ initData:initData() });
-    const [data, current] = await Promise.all([client.available('all'), client.rankingMe().catch(() => null)]);
+    const data = await client.available('all');
     if (!pageActive) return;
     matches = Array.isArray(data?.matches) ? data.matches : [];
-    me = current && typeof current === 'object' ? current : null;
+    loadingMatches = false;
     render();
+    void client.rankingMe().then(current => {
+      if (!pageActive) return;
+      me = current && typeof current === 'object' ? current : null;
+      render();
+    }).catch(() => {});
   } catch (error) {
+    loadingMatches = false;
     const main = contentNode();
     if (pageActive && main) main.innerHTML = `<div class="empty">${esc(error?.code || 'Не удалось загрузить прогнозы')}</div>`;
   }

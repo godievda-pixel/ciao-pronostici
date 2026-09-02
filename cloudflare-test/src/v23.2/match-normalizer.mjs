@@ -1,4 +1,5 @@
 import { getCompetitionConfig } from './competition-config.mjs';
+import { isItalianTeam } from './italian-team.mjs';
 
 export const MATCH_STATUSES = Object.freeze([
   'scheduled',
@@ -44,6 +45,8 @@ const COUNTRY_CODES = Object.freeze({
   portugal: 'POR',
 });
 
+const ITALIAN_ONLY_COMPETITIONS = new Set(['ucl', 'uel', 'uecl']);
+
 function text(value) {
   return String(value ?? '').trim();
 }
@@ -63,7 +66,7 @@ export function normalizeTeam(raw = {}) {
       text(raw.country_code).toUpperCase()
       || COUNTRY_CODES[country.toLowerCase()]
       || '',
-    crestUrl: text(raw.logo || raw.crest || raw.crest_url),
+    crestUrl: text(raw.logo || raw.logo_url || raw.logoUrl || raw.crest || raw.crest_url || raw.team_logo),
   });
 }
 
@@ -111,5 +114,6 @@ export function normalizeMatch(raw, competition) {
 
 export function shouldIncludeMatch(match) {
   getCompetitionConfig(match.competition);
-  return true;
+  if (!ITALIAN_ONLY_COMPETITIONS.has(match.competition)) return true;
+  return isItalianTeam(match.homeTeam) || isItalianTeam(match.awayTeam);
 }

@@ -225,18 +225,18 @@ function rankingSort(a, b) {
 
 export function queryRanking(sql, { scope = 'overall', competition } = {}) {
   const canonicalScope = rankingScope({ scope, competition });
-  const competitionFilter = canonicalScope === 'overall' ? '' : 'AND p.competition = ?';
+  const competitionJoin = canonicalScope === 'overall' ? '' : 'AND p.competition = ?';
   const params = canonicalScope === 'overall' ? [] : [competition];
   const result = rows(sql.exec(
-    `SELECT p.user_id, COALESCE(MAX(u.display_name), 'Участник') AS display_name,
-       MAX(u.username) AS username,
+    `SELECT u.user_id, COALESCE(NULLIF(u.display_name, ''), 'Участник') AS display_name,
+       u.username AS username,
        COALESCE(SUM(p.points), 0) AS points,
        SUM(CASE WHEN p.result_type = 'exact' THEN 1 ELSE 0 END) AS exact_scores,
        SUM(CASE WHEN p.result_type IN ('exact','goal_difference','outcome') THEN 1 ELSE 0 END) AS correct_outcomes,
        SUM(CASE WHEN p.points IS NOT NULL THEN 1 ELSE 0 END) AS scored_predictions
-     FROM predictions p LEFT JOIN participants u ON u.user_id = p.user_id
-     WHERE 1=1 ${competitionFilter}
-     GROUP BY p.user_id`,
+     FROM participants u
+     LEFT JOIN predictions p ON p.user_id = u.user_id ${competitionJoin}
+     GROUP BY u.user_id, u.display_name, u.username`,
     ...params,
   )).map(normalizeRankingRow).sort(rankingSort);
   return Object.freeze(result);

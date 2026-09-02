@@ -69,7 +69,7 @@ function baseLeagueFetch(requests, eventFactory) {
   };
 }
 
-test('BSD full UEFA feed keeps foreign-vs-foreign matches and no longer requests Italian-team filter', async () => {
+test('BSD UEFA feed keeps only matches involving an Italian club', async () => {
   const requests = [];
   const matches = await fetchBsdMatches({
     competition: 'ucl',
@@ -79,7 +79,7 @@ test('BSD full UEFA feed keeps foreign-vs-foreign matches and no longer requests
     fetchImpl: baseLeagueFetch(requests),
   });
 
-  assert.deepEqual(matches.map(match => match.matchId), ['ucl:601024', 'ucl:601025']);
+  assert.deepEqual(matches.map(match => match.matchId), ['ucl:601024']);
   assert.equal(requests.some(value => value.includes('/teams/')), false);
 });
 

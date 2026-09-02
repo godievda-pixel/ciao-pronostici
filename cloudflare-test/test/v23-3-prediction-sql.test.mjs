@@ -6,6 +6,7 @@ import {
   predictionObjectName,
   rankingScope,
   initializePredictionSchema,
+  queryRanking,
   queryRankingMe,
 } from '../src/v23.3/prediction-sql.mjs';
 
@@ -68,11 +69,34 @@ test('prediction row normalization preserves nullable scoring state', async () =
   );
 });
 
+test('ranking includes a registered participant before the first prediction is submitted', () => {
+  const calls = [];
+  const sql = {
+    exec(query, ...params) {
+      calls.push({ query, params });
+      if (/FROM participants u\s+LEFT JOIN predictions p/i.test(String(query).replace(/\s+/g, ' '))) {
+        return { toArray: () => [{
+          user_id:'telegram:42', display_name:'Daniil', username:'ciao42', points:0,
+          exact_scores:0, correct_outcomes:0, scored_predictions:0,
+        }] };
+      }
+      return { toArray: () => [] };
+    },
+  };
+  const ranking = queryRanking(sql, { scope:'overall' });
+  assert.equal(ranking.length, 1);
+  assert.deepEqual(ranking[0], {
+    user_id:'telegram:42', display_name:'Daniil', username:'ciao42', points:0,
+    exact_scores:0, correct_outcomes:0, scored_predictions:0,
+  });
+  assert.equal(calls.some(item => /FROM participants u\s+LEFT JOIN predictions p/i.test(String(item.query).replace(/\s+/g, ' '))), true);
+});
+
 test('current-user ranking includes all five per-competition point totals', () => {
   const totals = { serie_a:4, coppa_italia:2, ucl:8, uel:3, uecl:1 };
   const sql = {
     exec(query, ...params) {
-      if (!/GROUP BY p\.user_id/i.test(query)) return { toArray: () => [] };
+      if (!/GROUP BY u\.user_id/i.test(query)) return { toArray: () => [] };
       const competition = params[0];
       const points = competition ? totals[competition] : Object.values(totals).reduce((a,b)=>a+b,0);
       return { toArray: () => [{
