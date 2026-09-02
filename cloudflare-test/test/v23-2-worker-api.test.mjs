@@ -99,7 +99,7 @@ test('v23.2 matches route rejects missing Telegram auth before calling upstream'
   assert.equal(upstreamCalls, 0);
 });
 
-test('v23.2 UEFA route uses BSD v2 with server token and returns only Italian-club matches', async () => {
+test('v23.2 UEFA route uses BSD v2 with server token and returns the full competition feed', async () => {
   const previousFetch = globalThis.fetch;
   const requests = [];
   globalThis.fetch = async (url, options = {}) => {
@@ -116,16 +116,6 @@ test('v23.2 UEFA route uses BSD v2 with server token and returns only Italian-cl
     }
     if (value.includes('/api/v2/leagues/7/season/')) {
       return Response.json({ id: 2607, name: 'Champions League 2026/27', year: 2026, is_current: true });
-    }
-    if (value.includes('/api/v2/teams/?')) {
-      const parsed = new URL(value);
-      assert.equal(parsed.searchParams.get('country_code'), 'IT');
-      assert.equal(parsed.searchParams.has('league_id'), false);
-      assert.equal(parsed.searchParams.has('season_id'), false);
-      assert.equal(parsed.searchParams.has('in_competition'), false);
-      return Response.json({ count: 1, next: null, results: [
-        { id: 110, name: 'Internazionale', country_code: 'IT' },
-      ] });
     }
     if (value.includes('/api/v2/events/?')) {
       return Response.json({ count: 2, next: null, results: [
@@ -153,13 +143,13 @@ test('v23.2 UEFA route uses BSD v2 with server token and returns only Italian-cl
     assert.equal(response.status, 200);
     assert.equal(body.ok, true);
     assert.equal(body.data.competition, 'ucl');
-    assert.equal(body.data.matches.length, 1);
-    assert.equal(body.data.matches[0].matchId, 'ucl:1001');
+    assert.equal(body.data.matches.length, 2);
+    assert.deepEqual(body.data.matches.map(match => match.matchId), ['ucl:1001', 'ucl:1002']);
     assert.equal(body.data.matches[0].homeTeam.countryCode, 'ITA');
     assert.equal(requests.every(item => item.authorization === 'Token bsd-test-key'), true);
     assert.equal(requests.some(item => item.url.includes('sports.bzzoiro.com/api/v2/leagues/')), true);
     assert.equal(requests.some(item => item.url.includes('/api/v2/leagues/7/season/')), true);
-    assert.equal(requests.some(item => item.url.includes('/api/v2/teams/?') && item.url.includes('country_code=IT')), true);
+    assert.equal(requests.some(item => item.url.includes('/api/v2/teams/?')), false);
     assert.equal(requests.some(item => item.url.includes('/api/v2/events/?') && item.url.includes('league_id=7') && item.url.includes('season_id=2607')), true);
     assert.equal(requests.some(item => item.url.includes('espn')), false);
   } finally {
