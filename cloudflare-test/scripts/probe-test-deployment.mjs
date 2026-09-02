@@ -10,8 +10,13 @@ const EXTERNAL_COMPETITIONS = Object.freeze(['coppa_italia', 'ucl', 'uel', 'uecl
 const UEFA_COMPETITIONS = Object.freeze(['ucl', 'uel', 'uecl']);
 const EXPECTED_HEALTH = Object.freeze({
   service: 'ciao-web-app-test',
-  build: 'ciao-web-v23-2-bsd-test-20260902',
+  build: 'ciao-web-v23-3-prediction-do-test-20260902',
+  api: 'ciao-web-api',
   matchesProvider: 'bsd-v2',
+  predictionBackend: 'durable-object-sqlite',
+  predictionEnvironment: 'test',
+  predictionSeason: '2026-27',
+  predictionDoConfigured: true,
 });
 const HOME_SEASON_LABEL = 'SERIE A 2026/27';
 const RESET_NOTICE_TEXT = 'Начало нового сезона!';
@@ -39,10 +44,14 @@ const MODULES = [
   '/v23.2/profile-integration.mjs',
   '/v23.2/coppa-bracket.mjs',
   '/v23.3/index.mjs',
+  '/v23.3/navigation-ui.mjs',
   '/v23.3/home-integration.mjs',
   '/v23.3/tables-ui.mjs',
   '/v23.3/match-center.mjs',
   '/v23.3/match-center-links.mjs',
+  '/v23.3/prediction-client.mjs',
+  '/v23.3/predictions-ui.mjs',
+  '/v23.3/ranking-ui.mjs',
 ];
 const NAV_MARKERS = [
   "root.addEventListener('click'",
@@ -63,8 +72,8 @@ const NAV_MARKERS = [
 
 const sleep = ms => new Promise(resolveSleep => setTimeout(resolveSleep, ms));
 
-async function fetchText(url) {
-  const response = await fetch(url, {
+async function fetchText(url, fetchImpl = fetch) {
+  const response = await fetchImpl(url, {
     headers: {
       'cache-control': 'no-cache, no-store, max-age=0',
       pragma: 'no-cache',
@@ -81,9 +90,9 @@ function telegramHeaders() {
   };
 }
 
-async function probeHealth() {
+async function probeHealth(fetchImpl = fetch) {
   try {
-    const { response, text } = await fetchText(new URL('/healthz', ORIGIN));
+    const { response, text } = await fetchText(new URL('/healthz', ORIGIN), fetchImpl);
     let json = null;
     try { json = JSON.parse(text); } catch {}
     return {
@@ -91,11 +100,40 @@ async function probeHealth() {
       ok: Boolean(response.ok && json?.ok),
       service: json?.service || null,
       build: json?.build || null,
+      api: json?.api || null,
       matchesProvider: json?.matches_provider || null,
       bsdConfigured: typeof json?.bsd_configured === 'boolean' ? json.bsd_configured : null,
+      predictionBackend: json?.prediction_backend || null,
+      predictionEnvironment: json?.prediction_environment || null,
+      predictionSeason: json?.prediction_season || null,
+      predictionDoConfigured: typeof json?.prediction_do_configured === 'boolean'
+        ? json.prediction_do_configured
+        : null,
     };
   } catch (error) {
     return { status: 0, ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+export async function probePredictionAuthGuard({ baseUrl = ORIGIN, fetchImpl = fetch } = {}) {
+  try {
+    const url = new URL('/api/v23.3/predictions?competition=all', baseUrl);
+    const response = await fetchImpl(url, {
+      method: 'GET',
+      headers: { 'cache-control': 'no-cache, no-store, max-age=0' },
+    });
+    let payload = null;
+    try { payload = await response.json(); } catch {}
+    const ok = response.status === 401
+      && payload?.ok === false
+      && payload?.error === 'telegram_auth_required';
+    return {
+      ok,
+      status: response.status,
+      error: payload?.error || null,
+    };
+  } catch (error) {
+    return { ok: false, status: 0, error: error instanceof Error ? error.message : String(error) };
   }
 }
 
@@ -129,13 +167,13 @@ function duplicateFingerprints(matches = []) {
     .map(([fingerprint, count]) => ({ fingerprint, count }));
 }
 
-async function probeDeployedTeamRegistry() {
+async function probeDeployedTeamRegistry(fetchImpl = fetch) {
   let latest = null;
   for (let attempt = 1; attempt <= 7; attempt += 1) {
     try {
       const url = new URL('/v23.2/team-registry.mjs', ORIGIN);
       url.searchParams.set('probe', `${Date.now()}-${attempt}`);
-      const { response, text } = await fetchText(url);
+      const { response, text } = await fetchText(url, fetchImpl);
       if (!response.ok) {
         latest = { ok: false, status: response.status, attempt, bytes: Buffer.byteLength(text), currentFeedReady: false };
       } else {
@@ -165,7 +203,6 @@ async function probeDeployedTeamRegistry() {
         russianTeamName: value => String(value ?? ''),
       };
     }
-
     if (latest?.ok && latest?.currentFeedReady) return latest;
     if (attempt < 7) await sleep(5_000);
   }
@@ -200,13 +237,13 @@ function unknownTeamNames(matches = [], deployedRegistry) {
   ).sort((a, b) => a.localeCompare(b));
 }
 
-async function probeLiveCompetition(competition) {
+async function probeLiveCompetition(competition, fetchImpl = fetch) {
   const url = new URL('/api/v23.2/matches', ORIGIN);
   url.searchParams.set('competition', competition);
   url.searchParams.set('from', RANGE.from);
   url.searchParams.set('to', RANGE.to);
   try {
-    const response = await fetch(url, { headers: telegramHeaders() });
+    const response = await fetchImpl(url, { headers: telegramHeaders() });
     let payload = null;
     try { payload = await response.json(); } catch {}
     const matches = Array.isArray(payload?.data?.matches) ? payload.data.matches : [];
@@ -263,11 +300,11 @@ async function probeLiveCompetition(competition) {
   }
 }
 
-async function probeStandings(competition) {
+async function probeStandings(competition, fetchImpl = fetch) {
   const url = new URL('/api/v23.3/standings', ORIGIN);
   url.searchParams.set('competition', competition);
   try {
-    const response = await fetch(url, { headers: telegramHeaders() });
+    const response = await fetchImpl(url, { headers: telegramHeaders() });
     let payload = null;
     try { payload = await response.json(); } catch {}
     const rows = Array.isArray(payload?.data?.rows) ? payload.data.rows : [];
@@ -311,7 +348,7 @@ export function standingsReleaseCheck(row = {}) {
   return { pass: true, status: 'ready' };
 }
 
-async function probeMatchCenter(match) {
+async function probeMatchCenter(match, fetchImpl = fetch) {
   if (!match?.competition || !match?.matchId) {
     return { ok: false, status: 0, error: 'no_external_match_candidate' };
   }
@@ -319,7 +356,7 @@ async function probeMatchCenter(match) {
   url.searchParams.set('competition', match.competition);
   url.searchParams.set('match_id', match.matchId);
   try {
-    const response = await fetch(url, { headers: telegramHeaders() });
+    const response = await fetchImpl(url, { headers: telegramHeaders() });
     let payload = null;
     try { payload = await response.json(); } catch {}
     const snapshot = payload?.data?.match || null;
@@ -390,13 +427,13 @@ function snippets(text, markers) {
   });
 }
 
-async function probeModules() {
+async function probeModules(fetchImpl = fetch) {
   const rows = [];
   for (const path of MODULES) {
     try {
       const url = new URL(path, ORIGIN);
       url.searchParams.set('probe', String(Date.now()));
-      const { response, text } = await fetchText(url);
+      const { response, text } = await fetchText(url, fetchImpl);
       rows.push({
         path,
         status: response.status,
@@ -419,10 +456,18 @@ async function probeModules() {
           ? text.includes("title: 'Серия А'") && text.includes("shortTitle: 'Серия А'")
           : undefined,
         hasUnifiedRuntime: path === '/v23.3/index.mjs'
-          ? text.includes('CiaoV233') && text.includes('home-integration.mjs') && text.includes('tables-ui.mjs')
+          ? text.includes('CiaoV233')
+            && text.includes('home-integration.mjs')
+            && text.includes('tables-ui.mjs')
+            && text.includes('predictions-ui.mjs')
+            && text.includes('ranking-ui.mjs')
+            && text.includes('navigation-ui.mjs')
           : undefined,
-        predictionsBlocked: path === '/v23.3/index.mjs'
-          ? text.includes("predictions: 'blocked'") && !text.includes('predictions-ui.mjs')
+        predictionsEnabled: path === '/v23.3/index.mjs'
+          ? text.includes("predictions: 'enabled'")
+          : undefined,
+        rankingEnabled: path === '/v23.3/index.mjs'
+          ? text.includes("ranking: 'enabled'")
           : undefined,
         hasHomeRuntime: path === '/v23.3/home-integration.mjs'
           ? text.includes('CiaoV233Home') && text.includes('Кальчо сегодня')
@@ -444,6 +489,18 @@ async function probeModules() {
           : undefined,
         hasMatchCenterLinksRuntime: path === '/v23.3/match-center-links.mjs'
           ? text.includes('resolveCanonicalMatchTarget') && text.includes('installCanonicalMatchLinks')
+          : undefined,
+        hasNavigationRuntime: path === '/v23.3/navigation-ui.mjs'
+          ? text.includes('NAVIGATION_LABELS') && text.includes('patchNavigation')
+          : undefined,
+        hasPredictionClient: path === '/v23.3/prediction-client.mjs'
+          ? text.includes('/api/v23.3/predictions') && text.includes('x-telegram-init-data')
+          : undefined,
+        hasPredictionsRuntime: path === '/v23.3/predictions-ui.mjs'
+          ? text.includes('installPredictionsUi') && text.includes('Сделать прогноз') && text.includes('Мои прогнозы')
+          : undefined,
+        hasRankingRuntime: path === '/v23.3/ranking-ui.mjs'
+          ? text.includes('installRankingUi') && text.includes('RANKING_FILTERS')
           : undefined,
       });
     } catch (error) {
@@ -474,7 +531,7 @@ function publicRegistrySummary(registry) {
   };
 }
 
-async function probe() {
+export async function probe({ fetchImpl = fetch } = {}) {
   const attempts = [];
   let latestHtml = '';
   for (let index = 0; index < 9; index += 1) {
@@ -482,7 +539,7 @@ async function probe() {
     try {
       const url = new URL(ORIGIN);
       url.searchParams.set('probe', `${Date.now()}-${index + 1}`);
-      const { response, text: html } = await fetchText(url);
+      const { response, text: html } = await fetchText(url, fetchImpl);
       latestHtml = html;
       const markers = Object.fromEntries(EXPECTED.map(marker => [marker, html.includes(marker)]));
       const homeSeasonLabelAbsent = !html.includes(HOME_SEASON_LABEL);
@@ -505,23 +562,20 @@ async function probe() {
         homeMultiCompetition,
         bytes: Buffer.byteLength(html),
       });
-      if (
-        response.ok
-        && EXPECTED.every(marker => markers[marker])
-        && homeSeasonLabelAbsent
-      ) break;
+      if (response.ok && EXPECTED.every(marker => markers[marker]) && homeSeasonLabelAbsent) break;
     } catch (error) {
       attempts.push({ attempt: index + 1, startedAt, error: error instanceof Error ? error.message : String(error) });
     }
     if (index < 8) await sleep(10_000);
   }
 
-  const [modules, health, deployedRegistry, rawCompetitionRows, rawStandingsRows] = await Promise.all([
-    probeModules(),
-    probeHealth(),
-    probeDeployedTeamRegistry(),
-    Promise.all(EXTERNAL_COMPETITIONS.map(probeLiveCompetition)),
-    Promise.all(UEFA_COMPETITIONS.map(probeStandings)),
+  const [modules, health, predictionAuthGuard, deployedRegistry, rawCompetitionRows, rawStandingsRows] = await Promise.all([
+    probeModules(fetchImpl),
+    probeHealth(fetchImpl),
+    probePredictionAuthGuard({ fetchImpl }),
+    probeDeployedTeamRegistry(fetchImpl),
+    Promise.all(EXTERNAL_COMPETITIONS.map(competition => probeLiveCompetition(competition, fetchImpl))),
+    Promise.all(UEFA_COMPETITIONS.map(competition => probeStandings(competition, fetchImpl))),
   ]);
 
   const competitions = rawCompetitionRows.map(row => ({
@@ -540,21 +594,27 @@ async function probe() {
   const competitionConfigModule = modules.find(item => item.path === '/v23.2/competition-config.mjs');
   const profileModule = modules.find(item => item.path === '/v23.2/profile-integration.mjs');
   const v233IndexModule = modules.find(item => item.path === '/v23.3/index.mjs');
+  const navigationModule = modules.find(item => item.path === '/v23.3/navigation-ui.mjs');
   const homeModule = modules.find(item => item.path === '/v23.3/home-integration.mjs');
   const tablesModule = modules.find(item => item.path === '/v23.3/tables-ui.mjs');
   const matchCenterModule = modules.find(item => item.path === '/v23.3/match-center.mjs');
   const matchCenterLinksModule = modules.find(item => item.path === '/v23.3/match-center-links.mjs');
+  const predictionClientModule = modules.find(item => item.path === '/v23.3/prediction-client.mjs');
+  const predictionsModule = modules.find(item => item.path === '/v23.3/predictions-ui.mjs');
+  const rankingModule = modules.find(item => item.path === '/v23.3/ranking-ui.mjs');
+
   const profileFeed = profileFeedCheck(competitions);
   const matchCenterCandidate = competitions.find(row => row.competition === 'ucl')?.matches?.[0]
     || competitions.flatMap(row => row.matches)[0]
     || null;
-  const matchCenter = await probeMatchCenter(matchCenterCandidate);
+  const matchCenter = await probeMatchCenter(matchCenterCandidate, fetchImpl);
   const allUnknownTeamNames = [...new Set([
     ...competitions.flatMap(row => row.unknownTeamNames),
     ...standings.flatMap(row => row.unknownTeamNames),
   ])].sort((a, b) => a.localeCompare(b));
   const releaseHeldForUnknownTeams = allUnknownTeamNames.length > 0;
-  const predictionsBlocked = Boolean(v233IndexModule?.predictionsBlocked);
+  const predictionsEnabled = Boolean(v233IndexModule?.predictionsEnabled);
+  const rankingEnabled = Boolean(v233IndexModule?.rankingEnabled);
   const documentOverflowGuard = Boolean(tablesModule?.documentOverflowGuard);
 
   const report = {
@@ -564,13 +624,15 @@ async function probe() {
     attempts,
     latest: attempts.at(-1) || null,
     health,
+    predictionAuthGuard,
     deployedRegistry: publicRegistrySummary(deployedRegistry),
     competitions: competitions.map(publicCompetitionSummary),
     standings: standings.map(publicStandingsSummary),
     matchCenter,
     allUnknownTeamNames,
     releaseHeldForUnknownTeams,
-    predictionsBlocked,
+    predictionsEnabled,
+    rankingEnabled,
     documentOverflowGuard,
     profileFeed,
     modules,
@@ -582,13 +644,15 @@ async function probe() {
   console.log(JSON.stringify({
     latest: report.latest,
     health,
+    predictionAuthGuard,
     deployedRegistry: report.deployedRegistry,
     competitions: report.competitions,
     standings: report.standings,
     matchCenter,
     allUnknownTeamNames,
     releaseHeldForUnknownTeams,
-    predictionsBlocked,
+    predictionsEnabled,
+    rankingEnabled,
     documentOverflowGuard,
     profileFeed,
     modules,
@@ -605,11 +669,31 @@ async function probe() {
   if (!report.latest?.homeMultiCompetition) {
     throw new Error('deployed TEST is missing the multi-competition Home marker');
   }
-  if (!health.ok
-      || health.service !== EXPECTED_HEALTH.service
-      || health.build !== EXPECTED_HEALTH.build
-      || health.matchesProvider !== EXPECTED_HEALTH.matchesProvider) {
-    throw new Error(`deployed TEST health contract mismatch: service=${health.service} build=${health.build} provider=${health.matchesProvider}`);
+  if (
+    !health.ok
+    || health.service !== EXPECTED_HEALTH.service
+    || health.build !== EXPECTED_HEALTH.build
+    || health.api !== EXPECTED_HEALTH.api
+    || health.matchesProvider !== EXPECTED_HEALTH.matchesProvider
+    || health.predictionBackend !== EXPECTED_HEALTH.predictionBackend
+    || health.predictionEnvironment !== EXPECTED_HEALTH.predictionEnvironment
+    || health.predictionSeason !== EXPECTED_HEALTH.predictionSeason
+    || health.predictionDoConfigured !== EXPECTED_HEALTH.predictionDoConfigured
+  ) {
+    throw new Error(
+      `deployed TEST health contract mismatch: service=${health.service}`
+      + ` build=${health.build}`
+      + ` provider=${health.matchesProvider}`
+      + ` prediction_backend=${health.predictionBackend}`
+      + ` prediction_environment=${health.predictionEnvironment}`
+      + ` prediction_season=${health.predictionSeason}`,
+    );
+  }
+  if (!predictionAuthGuard.ok || predictionAuthGuard.status !== 401 || predictionAuthGuard.error !== 'telegram_auth_required') {
+    throw new Error(
+      `deployed TEST prediction auth guard failed: status=${predictionAuthGuard.status}`
+      + ` error=${predictionAuthGuard.error || 'none'}`,
+    );
   }
   if (!matchesModule?.hasTournamentCapture) {
     throw new Error('deployed TEST does not contain tournament capture navigation fix');
@@ -623,8 +707,17 @@ async function probe() {
   if (!v233IndexModule?.hasUnifiedRuntime) {
     throw new Error('deployed TEST is missing unified v23.3 browser runtime');
   }
-  if (!predictionsBlocked) {
-    throw new Error('deployed TEST prediction gate is not explicitly BLOCKED');
+  if (!predictionsEnabled || !rankingEnabled) {
+    throw new Error('deployed TEST v23.3 predictions or ranking runtime is not enabled');
+  }
+  if (!navigationModule?.hasNavigationRuntime) {
+    throw new Error('deployed TEST is missing agreed v23.3 navigation runtime');
+  }
+  if (!predictionClientModule?.hasPredictionClient || !predictionsModule?.hasPredictionsRuntime) {
+    throw new Error('deployed TEST is missing server-backed predictions runtime');
+  }
+  if (!rankingModule?.hasRankingRuntime) {
+    throw new Error('deployed TEST is missing v23.3 ranking runtime');
   }
   if (!homeModule?.hasHomeRuntime || !homeModule?.homeMultiCompetition) {
     throw new Error('deployed TEST is missing v23.3 multi-competition Home runtime');
@@ -690,6 +783,8 @@ async function probe() {
       throw new Error('deployed TEST profile build is missing profile tournament runtime');
     }
   }
+
+  return report;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
