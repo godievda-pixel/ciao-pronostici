@@ -17,6 +17,8 @@ test('build copies v23.3 browser modules required by multi-competition UI', asyn
   assert.equal(files.includes('tables-ui.mjs'), true);
   assert.equal(files.includes('match-center.mjs'), true);
   assert.equal(files.includes('match-center-links.mjs'), true);
+  assert.equal(files.includes('prediction-client.mjs'), true);
+  assert.equal(files.includes('predictions-ui.mjs'), true);
 
   const competitionData = await readFile(
     new URL('../dist/v23.3/competition-data.mjs', import.meta.url),
@@ -42,6 +44,14 @@ test('build copies v23.3 browser modules required by multi-competition UI', asyn
     new URL('../dist/v23.3/match-center-links.mjs', import.meta.url),
     'utf8',
   );
+  const predictionClient = await readFile(
+    new URL('../dist/v23.3/prediction-client.mjs', import.meta.url),
+    'utf8',
+  );
+  const predictionsRuntime = await readFile(
+    new URL('../dist/v23.3/predictions-ui.mjs', import.meta.url),
+    'utf8',
+  );
 
   assert.match(competitionData, /predictionDeadlineForKickoff/);
   assert.match(dataClient, /loadCompetitionStandings/);
@@ -57,6 +67,9 @@ test('build copies v23.3 browser modules required by multi-competition UI', asyn
   assert.match(matchCenterRuntime, /openCanonicalMatchCenter/);
   assert.match(matchCenterLinksRuntime, /resolveCanonicalMatchTarget/);
   assert.match(matchCenterLinksRuntime, /installCanonicalMatchLinks/);
+  assert.match(predictionClient, /\/api\/v23\.3\/predictions/);
+  assert.match(predictionsRuntime, /installPredictionsUi/);
+  assert.doesNotMatch(`${predictionClient}\n${predictionsRuntime}`, /localStorage|indexedDB|supabase|save_predictions/i);
 });
 
 test('v23.3 build injects the Home module exactly once', async () => {
@@ -126,7 +139,7 @@ test('v23.3 unified build entry is injected exactly once and replaces split runt
   assert.match(once, /id="ciao-v232-matches-ui"/);
 });
 
-test('v23.3 browser entry assembles current runtime but exposes neither reset nor blocked predictions', async () => {
+test('v23.3 browser entry enables predictions without exposing reset tooling', async () => {
   const { copyV233Modules } = await buildModule();
   const files = await copyV233Modules();
   assert.equal(files.includes('index.mjs'), true);
@@ -137,10 +150,10 @@ test('v23.3 browser entry assembles current runtime but exposes neither reset no
   );
   assert.match(entry, /home-integration\.mjs/);
   assert.match(entry, /tables-ui\.mjs/);
+  assert.match(entry, /predictions-ui\.mjs/);
   assert.match(entry, /CiaoV233/);
   assert.match(entry, /Object\.freeze/);
-  assert.match(entry, /predictions[^\n]*blocked/i);
-  assert.doesNotMatch(entry, /predictions-ui\.mjs/);
+  assert.match(entry, /predictions[^\n]*enabled/i);
   assert.doesNotMatch(entry, /reset-contract\.mjs/);
   assert.doesNotMatch(entry, /createReset|executeReset|resetUser/i);
 });
