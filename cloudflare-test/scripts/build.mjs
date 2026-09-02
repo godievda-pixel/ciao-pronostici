@@ -1,6 +1,7 @@
 import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { applyProfileTournamentSourcePatch } from './profile-source-patch.mjs';
 
 export const BASE_BUILD = 'ciao-web-v23-1-cloudflare-test-20260901';
 export const TEST_BUILD = 'ciao-web-v23-1-github-test-20260901';
@@ -216,8 +217,13 @@ export async function build() {
     throw new Error('v23.1 stable logo source patch did not apply');
   }
 
+  const profilePatched = applyProfileTournamentSourcePatch(logoPatched);
+  if (!profilePatched.includes('cw232-profile-tournament-enrichment')) {
+    throw new Error('v23.2 club profile tournament source patch did not apply');
+  }
+
   await copyV232Modules();
-  const html = injectV232Entry(applyPatch(logoPatched, css, js));
+  const html = injectV232Entry(applyPatch(profilePatched, css, js));
   await mkdir(dirname(outPath), { recursive: true });
   await writeFile(outPath, html, 'utf8');
   return { output: outPath, bytes: Buffer.byteLength(html), build: TEST_BUILD };
