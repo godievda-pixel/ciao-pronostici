@@ -66,13 +66,16 @@ test('deployment probe proves localization against the deployed TEST registry mo
   assert.match(source, /deployedRegistry/);
 });
 
-test('deployment probe removes only the Home SERIE A 2026/27 label and preserves the reset notice', async () => {
+test('deployment probe hard-gates only the Home SERIE A 2026/27 label; reset notice is diagnostic', async () => {
   const source = await readFile(new URL('../scripts/probe-test-deployment.mjs', import.meta.url), 'utf8');
 
   assert.match(source, /HOME_SEASON_LABEL\s*=\s*'SERIE A 2026\/27'/);
   assert.match(source, /RESET_NOTICE_TEXT\s*=\s*'Начало нового сезона!'/);
   assert.match(source, /homeSeasonLabelAbsent/);
   assert.match(source, /homeResetNoticePresent/);
+  assert.match(source, /deployed TEST still contains the Home Serie A season label/);
+  assert.doesNotMatch(source, /deployed TEST is missing the Home new-season notice/);
+  assert.doesNotMatch(source, /homeSeasonLabelAbsent\s*&&\s*homeResetNoticePresent/);
   assert.doesNotMatch(source, /RESET_BANNER_TEXT/);
   assert.doesNotMatch(source, /homeResetBannerAbsent/);
 });
