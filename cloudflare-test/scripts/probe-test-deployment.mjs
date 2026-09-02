@@ -1,4 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { matchFingerprint } from '../src/v23.2/match-deduper.mjs';
 import { isKnownTeamName } from '../src/v23.2/team-registry.mjs';
 import { profileCompetitionMatches } from '../src/v23.2/profile-matches.mjs';
@@ -6,6 +8,11 @@ import { profileCompetitionMatches } from '../src/v23.2/profile-matches.mjs';
 const ORIGIN = 'https://ciao-web-app-test.ciao-web.workers.dev/';
 const RANGE = Object.freeze({ from: '2026-07-01', to: '2027-06-30' });
 const COMPETITIONS = Object.freeze(['coppa_italia', 'ucl', 'uel', 'uecl']);
+const ITALIAN_PROFILE_NAMES = new Set([
+  'Интер', 'Милан', 'Наполи', 'Рома', 'Ювентус', 'Фиорентина', 'Аталанта', 'Лацио',
+  'Болонья', 'Торино', 'Дженоа', 'Комо', 'Удинезе', 'Кальяри', 'Парма', 'Лечче',
+  'Верона', 'Сассуоло', 'Пиза', 'Кремонезе',
+]);
 const EXPECTED = [
   'id="ciao-v232-core"',
   'id="ciao-v232-matches-ui"',
@@ -39,7 +46,7 @@ const NAV_MARKERS = [
   'loading="lazy"',
 ];
 
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const sleep = ms => new Promise(resolveSleep => setTimeout(resolveSleep, ms));
 
 async function fetchText(url) {
   const response = await fetch(url, {
@@ -169,7 +176,7 @@ async function probeLiveCompetition(competition) {
   }
 }
 
-function profileFeedCheck(competitionRows) {
+export function profileFeedCheck(competitionRows) {
   const data = Object.fromEntries(
     competitionRows.map(row => [row.competition, { matches: row.matches }]),
   );
@@ -177,7 +184,10 @@ function profileFeedCheck(competitionRows) {
   for (const row of competitionRows) {
     for (const match of row.matches) {
       candidate = [match?.homeTeam, match?.awayTeam]
-        .find(team => team?.countryCode === 'ITA' && team?.name);
+        .find(team => (
+          team?.name
+          && (team?.countryCode === 'ITA' || ITALIAN_PROFILE_NAMES.has(String(team.name).trim()))
+        ));
       if (candidate) break;
     }
     if (candidate) break;
@@ -338,7 +348,7 @@ async function probe() {
     }
     const ucl = competitions.find(row => row.competition === 'ucl');
     const coppa = competitions.find(row => row.competition === 'coppa_italia');
-    if (!ucl || ucl.matchCount < 1) throw new Error('deployed TEST UCL has no Italian-club matches');
+    if (!ucl || ucl.matchCount < 1) throw new Error('deployed TEST UCL has no matches');
     if (!coppa || coppa.matchCount < 1) throw new Error('deployed TEST Coppa Italia has no matches');
     if (coppa.duplicateFingerprints.length) {
       throw new Error(`deployed TEST Coppa Italia still has ${coppa.duplicateFingerprints.length} duplicate fingerprints`);
@@ -355,7 +365,9 @@ async function probe() {
   }
 }
 
-probe().catch(error => {
-  console.error(error);
-  process.exitCode = 1;
-});
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  probe().catch(error => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}
