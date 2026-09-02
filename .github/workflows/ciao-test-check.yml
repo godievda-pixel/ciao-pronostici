@@ -56,6 +56,10 @@ jobs:
         if: github.event_name == 'push'
         run: node scripts/probe-test-deployment-v233.mjs
 
+      - name: Probe deployed round5 TEST fixes
+        if: github.event_name == 'push'
+        run: node scripts/probe-round5-deployment.mjs
+
       - name: Upload v23.2 API contract observation
         if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
@@ -98,6 +102,15 @@ jobs:
         with:
           name: ciao-v23-3-test-deployment
           path: cloudflare-test/artifacts/test-deployment-probe.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload round5 TEST deployment observation
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ciao-v23-3-round5-test-deployment
+          path: cloudflare-test/artifacts/v23-3-round5-live.json
           if-no-files-found: error
           retention-days: 7
 
