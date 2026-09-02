@@ -1,12 +1,12 @@
-const RESET_NOTICE = 'Начало нового сезона! Счёт обнулен, все начинают с нуля. Удачи!';
+const SEASON_LABEL = 'SERIE A 2026/27';
 const MARKER = 'cw233-home-multicompetition';
 
-function removeResetNotice(input) {
-  return String(input).split(RESET_NOTICE).join('');
+function removeSeasonLabel(input) {
+  return String(input).split(SEASON_LABEL).join('');
 }
 
 export function applyHomeV233SourcePatch(input) {
-  let source = removeResetNotice(input);
+  let source = removeSeasonLabel(input);
   if (source.includes(MARKER)) return source;
 
   const anchor = /predict\s*=\s*__cw231HomeHtml\s*;/;

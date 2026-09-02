@@ -13,7 +13,8 @@ const EXPECTED_HEALTH = Object.freeze({
   build: 'ciao-web-v23-2-bsd-test-20260902',
   matchesProvider: 'bsd-v2',
 });
-const RESET_BANNER_TEXT = 'Начало нового сезона!';
+const HOME_SEASON_LABEL = 'SERIE A 2026/27';
+const RESET_NOTICE_TEXT = 'Начало нового сезона!';
 const CURRENT_REGISTRY_MARKER = 'CURRENT_UEFA_QUALIFIER_ALIASES';
 const ITALIAN_PROFILE_NAMES = new Set([
   'Интер', 'Милан', 'Наполи', 'Рома', 'Ювентус', 'Фиорентина', 'Аталанта', 'Лацио',
@@ -484,7 +485,8 @@ async function probe() {
       const { response, text: html } = await fetchText(url);
       latestHtml = html;
       const markers = Object.fromEntries(EXPECTED.map(marker => [marker, html.includes(marker)]));
-      const homeResetBannerAbsent = !html.includes(RESET_BANNER_TEXT);
+      const homeSeasonLabelAbsent = !html.includes(HOME_SEASON_LABEL);
+      const homeResetNoticePresent = html.includes(RESET_NOTICE_TEXT);
       const homeMultiCompetition = html.includes('cw233-home-multicompetition');
       attempts.push({
         attempt: index + 1,
@@ -498,11 +500,17 @@ async function probe() {
         markers,
         profileMarker: html.includes('cw232-profile-tournament-enrichment'),
         unifiedV233Marker: html.includes('id="ciao-v233"'),
-        homeResetBannerAbsent,
+        homeSeasonLabelAbsent,
+        homeResetNoticePresent,
         homeMultiCompetition,
         bytes: Buffer.byteLength(html),
       });
-      if (response.ok && EXPECTED.every(marker => markers[marker]) && homeResetBannerAbsent) break;
+      if (
+        response.ok
+        && EXPECTED.every(marker => markers[marker])
+        && homeSeasonLabelAbsent
+        && homeResetNoticePresent
+      ) break;
     } catch (error) {
       attempts.push({ attempt: index + 1, startedAt, error: error instanceof Error ? error.message : String(error) });
     }
@@ -592,8 +600,11 @@ async function probe() {
   if (missingExpected.length) {
     throw new Error(`deployed TEST is missing v23.3 runtime markers: ${missingExpected.join(', ')}`);
   }
-  if (!report.latest?.homeResetBannerAbsent) {
-    throw new Error('deployed TEST still contains the Home reset banner');
+  if (!report.latest?.homeSeasonLabelAbsent) {
+    throw new Error('deployed TEST still contains the Home Serie A season label');
+  }
+  if (!report.latest?.homeResetNoticePresent) {
+    throw new Error('deployed TEST is missing the Home new-season notice');
   }
   if (!report.latest?.homeMultiCompetition) {
     throw new Error('deployed TEST is missing the multi-competition Home marker');

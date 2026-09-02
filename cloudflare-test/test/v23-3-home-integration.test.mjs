@@ -91,12 +91,14 @@ test('v23.3 Home runtime preserves successful cached feeds when one competition 
   assert.equal(Boolean(state.errors.ucl), true);
 });
 
-test('Home source patch removes reset notice and installs one non-blocking v23.3 Home wrapper', async () => {
+test('Home source patch removes only SERIE A 2026/27 and preserves the new-season notice', async () => {
   const { applyHomeV233SourcePatch } = await patchModule();
   assert.equal(typeof applyHomeV233SourcePatch, 'function');
 
+  const resetNotice = 'Начало нового сезона! Счёт обнулен, все начинают с нуля. Удачи!';
   const source = `
-    <div>Начало нового сезона! Счёт обнулен, все начинают с нуля. Удачи!</div>
+    <div class="season-label">SERIE A 2026/27</div>
+    <div class="season-notice">${resetNotice}</div>
     <script>
       function __cw231HomeHtml(){ return '<div><section class="cw231-today"><div>legacy</div></section></div>'; }
       predict = __cw231HomeHtml;
@@ -107,7 +109,8 @@ test('Home source patch removes reset notice and installs one non-blocking v23.3
   const second = applyHomeV233SourcePatch(first);
 
   assert.equal(second, first);
-  assert.doesNotMatch(first, /Начало нового сезона! Счёт обнулен, все начинают с нуля\. Удачи!/);
+  assert.doesNotMatch(first, /SERIE A 2026\/27/);
+  assert.match(first, new RegExp(resetNotice.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.equal((first.match(/cw233-home-multicompetition/g) || []).length, 1);
   assert.match(first, /CiaoV233Home\?\.ensure\?\.\(\)/);
   assert.match(first, /CiaoV233Home\?\.html\?\.\(\)/);

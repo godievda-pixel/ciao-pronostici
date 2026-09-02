@@ -66,6 +66,17 @@ test('deployment probe proves localization against the deployed TEST registry mo
   assert.match(source, /deployedRegistry/);
 });
 
+test('deployment probe removes only the Home SERIE A 2026/27 label and preserves the reset notice', async () => {
+  const source = await readFile(new URL('../scripts/probe-test-deployment.mjs', import.meta.url), 'utf8');
+
+  assert.match(source, /HOME_SEASON_LABEL\s*=\s*'SERIE A 2026\/27'/);
+  assert.match(source, /RESET_NOTICE_TEXT\s*=\s*'Начало нового сезона!'/);
+  assert.match(source, /homeSeasonLabelAbsent/);
+  assert.match(source, /homeResetNoticePresent/);
+  assert.doesNotMatch(source, /RESET_BANNER_TEXT/);
+  assert.doesNotMatch(source, /homeResetBannerAbsent/);
+});
+
 test('deployment probe explicitly verifies unified v23.3 Home and Tables runtime markers', async () => {
   const source = await readFile(new URL('../scripts/probe-test-deployment.mjs', import.meta.url), 'utf8');
 
