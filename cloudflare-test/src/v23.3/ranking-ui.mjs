@@ -10,10 +10,7 @@ export const RANKING_FILTERS = Object.freeze([
 ]);
 
 export function withRankingPositions(rows = []) {
-  return (Array.isArray(rows) ? rows : []).map((row, index) => Object.freeze({
-    position:index + 1,
-    ...row,
-  }));
+  return (Array.isArray(rows) ? rows : []).map((row, index) => Object.freeze({ position:index + 1, ...row }));
 }
 
 const OVERLAY_ID = 'ciao-v233-ranking-overlay';
@@ -52,6 +49,13 @@ function ensureOverlay() {
   return overlay;
 }
 
+function hideSiblingOverlays() {
+  for (const id of ['ciao-v233-predictions-overlay', 'ciao-v233-tables-overlay']) {
+    const overlay = document.getElementById(id);
+    if (overlay) overlay.hidden = true;
+  }
+}
+
 function render() {
   const overlay = document.getElementById(OVERLAY_ID);
   if (!overlay) return;
@@ -69,15 +73,14 @@ function render() {
 }
 
 async function load() {
+  hideSiblingOverlays();
   const overlay = ensureOverlay();
   overlay.hidden = false;
   overlay.innerHTML = '<div class="cw233-rank-empty">Загружаем рейтинг…</div>';
   try {
     client = client || createPredictionClient({ initData:initData() });
     const [ranking, current] = await Promise.all([
-      active === 'overall'
-        ? client.rankings({ scope:'overall' })
-        : client.rankings({ scope:'competition', competition:active }),
+      active === 'overall' ? client.rankings({ scope:'overall' }) : client.rankings({ scope:'competition', competition:active }),
       client.rankingMe(),
     ]);
     rows = Array.isArray(ranking) ? ranking : [];
@@ -117,9 +120,6 @@ export function installRankingUi() {
 }
 
 if (typeof document !== 'undefined') {
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => installRankingUi(), { once:true });
-  } else {
-    installRankingUi();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => installRankingUi(), { once:true });
+  else installRankingUi();
 }
