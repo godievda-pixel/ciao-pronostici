@@ -1,6 +1,7 @@
 import { createPredictionClient } from './prediction-client.mjs';
 
 export const USER_FEEDBACK_ROUND4_BUILD = '2026-09-02-r4';
+export const USER_FEEDBACK_ROUND6_BUILD = '2026-09-02-r6';
 
 export const PREDICTION_FILTERS = Object.freeze([
   { key:'all', label:'Все' },
@@ -15,6 +16,25 @@ export const PREDICTION_FILTERS = Object.freeze([
 const PREDICTION_COMPETITIONS = Object.freeze(
   PREDICTION_FILTERS.map(item => item.key).filter(key => !['all', 'unfilled'].includes(key)),
 );
+const UEFA_COMPETITIONS = new Set(['ucl','uel','uecl']);
+const COPPA_STAGE_ORDER = Object.freeze([
+  'Preliminary','Preliminary Round','Round of 64','Round of 32','Round of 16',
+  'Quarter-finals','Quarter Finals','Quarterfinals','Semi-finals','Semi Finals','Semifinals','Final',
+]);
+const COPPA_STAGE_LABELS = Object.freeze({
+  Preliminary:'Предварительный раунд',
+  'Preliminary Round':'Предварительный раунд',
+  'Round of 64':'1/32 финала',
+  'Round of 32':'1/16 финала',
+  'Round of 16':'1/8 финала',
+  'Quarter-finals':'1/4 финала',
+  'Quarter Finals':'1/4 финала',
+  Quarterfinals:'1/4 финала',
+  'Semi-finals':'1/2 финала',
+  'Semi Finals':'1/2 финала',
+  Semifinals:'1/2 финала',
+  Final:'Финал',
+});
 
 function text(value) { return String(value ?? '').trim(); }
 function time(match) {
@@ -31,6 +51,25 @@ function sortMatches(rows = []) {
   return [...rows].sort((a, b) => (
     time(a) - time(b) || text(a?.matchId).localeCompare(text(b?.matchId))
   ));
+}
+
+function numericRound(match) {
+  const direct = Number(match?.round);
+  if (Number.isFinite(direct) && direct > 0) return direct;
+  const source = text(match?.stage);
+  const parsed = source.match(/(?:round|matchday|тур)\s*[-–—:]?\s*(\d+)/i) || source.match(/\b(\d+)\b/);
+  const value = Number(parsed?.[1]);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function stageLabel(value) {
+  const raw = text(value) || 'Стадия';
+  return COPPA_STAGE_LABELS[raw] || raw;
+}
+
+function stageOrder(value) {
+  const index = COPPA_STAGE_ORDER.indexOf(text(value));
+  return index < 0 ? Number.MAX_SAFE_INTEGER : index;
 }
 
 export async function loadPredictionCompetitionsProgressively({
@@ -68,6 +107,12 @@ export async function loadPredictionCompetitionsProgressively({
   return snapshot();
 }
 
+export function predictionRowsForMode(matches = [], mode = 'make') {
+  const rows = Array.isArray(matches) ? matches : [];
+  if (mode === 'mine') return sortMatches(rows.filter(match => Boolean(match?.prediction)));
+  return sortMatches(rows.filter(match => match?.state === 'open'));
+}
+
 export function filterPredictionMatches(matches = [], filter = 'all') {
   const rows = Array.isArray(matches) ? matches : [];
   if (filter === 'all') return [...rows];
@@ -86,6 +131,54 @@ export function groupPredictionMatchesByDate(matches = []) {
     groups.get(key).push(match);
   }
   return [...groups].map(([key, rows]) => Object.freeze({ key, matches:Object.freeze(rows) }));
+}
+
+export function predictionNavigationGroups(matches = [], competition = '') {
+  const rows = sortMatches(Array.isArray(matches) ? matches : []);
+  const key = text(competition);
+  if (!UEFA_COMPETITIONS.has(key) && key !== 'coppa_italia') return Object.freeze([]);
+
+  const groups = new Map();
+  for (const match of rows) {
+    let groupKey;
+    let label;
+    let order;
+    if (UEFA_COMPETITIONS.has(key)) {
+      const round = numericRound(match);
+      if (round) {
+        groupKey = `round:${round}`;
+        label = `Тур ${round}`;
+        order = round;
+      } else {
+        const stage = text(match?.stage) || 'Этап';
+        groupKey = `stage:${stage}`;
+        label = stage;
+        order = Number.MAX_SAFE_INTEGER;
+      }
+    } else {
+      const stage = text(match?.stage) || 'Стадия';
+      groupKey = `stage:${stage}`;
+      label = stageLabel(stage);
+      order = stageOrder(stage);
+    }
+    if (!groups.has(groupKey)) groups.set(groupKey, { key:groupKey, label, order, matches:[] });
+    groups.get(groupKey).matches.push(match);
+  }
+
+  return Object.freeze([...groups.values()]
+    .sort((a, b) => a.order - b.order || time(a.matches[0]) - time(b.matches[0]) || a.key.localeCompare(b.key))
+    .map(group => Object.freeze({ key:group.key, label:group.label, matches:Object.freeze(sortMatches(group.matches)) })));
+}
+
+export function defaultPredictionNavigationKey(groups = [], now = new Date()) {
+  const rows = Array.isArray(groups) ? groups : [];
+  if (!rows.length) return '';
+  const nowMs = now instanceof Date ? now.getTime() : Date.parse(now);
+  const future = rows
+    .map(group => ({ group, first:Math.min(...group.matches.map(time)) }))
+    .filter(item => Number.isFinite(item.first) && item.first >= nowMs)
+    .sort((a,b) => a.first - b.first)[0];
+  return future?.group?.key || rows[rows.length - 1].key;
 }
 
 export function predictionCardState(match = {}) {
@@ -108,11 +201,11 @@ export function mergeAuthoritativePrediction(matches = [], prediction = {}) {
 }
 
 const drafts = new Map();
+const activeNavigation = new Map();
 let matches = [];
 let activeFilter = 'all';
 let activeMode = 'make';
 let client = null;
-let me = null;
 let pageActive = false;
 let loadingMatches = false;
 let loadingFailed = false;
@@ -163,10 +256,10 @@ function scoreFor(match) {
 }
 
 function heroHtml() {
-  const name = resolvePredictionDisplayName(me, telegramUser());
-  const username = text(me?.username || telegramUser()?.username).replace(/^@/, '');
-  const rank = Number(me?.position);
-  return `<div class="hero"><div class="hero-top"><div><h2>${esc(name)}</h2><p>${username ? `@${esc(username)}` : 'Прогнозы на все турниры'}</p></div><div><div class="rank">${rank > 0 ? `#${rank}` : '—'}</div><p>место</p></div></div></div>`;
+  const tgUser = telegramUser();
+  const name = resolvePredictionDisplayName(null, tgUser);
+  const username = text(tgUser?.username).replace(/^@/, '');
+  return `<div class="hero"><div class="hero-top"><div><h2>${esc(name)}</h2><p>${username ? `@${esc(username)}` : 'Прогнозы на все турниры'}</p></div></div></div>`;
 }
 
 function tabsHtml() {
@@ -186,20 +279,19 @@ function filtersHtml() {
 function makeMatchHtml(match) {
   const state = predictionCardState(match);
   const score = scoreFor(match);
-  const editable = match.state === 'open';
   const dirty = drafts.has(match.matchId);
-  return `<div class="match ${editable ? '' : 'closed'}" data-cw233-pred-card="${esc(match.matchId)}">
+  return `<div class="match" data-cw233-pred-card="${esc(match.matchId)}">
     <div class="match-head"><div class="teams">
       <div class="team">${teamLogo(match, 'home')}<span class="team-name">${esc(teamName(match, 'home'))}</span></div>
       <span class="dash">—</span>
       <div class="team away"><span class="team-name">${esc(teamName(match, 'away'))}</span>${teamLogo(match, 'away')}</div>
     </div></div>
-    ${editable ? `<div class="score">
+    <div class="score">
       <div class="score-side"><button type="button" data-cw233-delta="h:-1">−</button><div class="score-value" data-cw233-score="h">${score.h}</div><button type="button" data-cw233-delta="h:1">+</button></div>
       <span class="colon">:</span>
       <div class="score-side"><button type="button" data-cw233-delta="a:-1">−</button><div class="score-value" data-cw233-score="a">${score.a}</div><button type="button" data-cw233-delta="a:1">+</button></div>
-    </div>` : ''}
-    <div class="meta"><span>${esc(formatKickoff(match.kickoffAt))}</span><span data-cw233-state class="${dirty ? '' : state.kind === 'saved' ? 'saved' : state.kind === 'finished' ? 'result' : ''}">${dirty ? 'не сохранён' : esc(state.label)}</span></div>
+    </div>
+    <div class="meta"><span>${esc(formatKickoff(match.kickoffAt))}</span><span data-cw233-state class="${dirty ? '' : state.kind === 'saved' ? 'saved' : ''}">${dirty ? 'не сохранён' : esc(state.label)}</span></div>
   </div>`;
 }
 
@@ -222,11 +314,31 @@ function loadingBody() {
   return '<div class="cw233-prediction-loading" aria-label="Загрузка матчей"><span></span><span></span><span></span></div>';
 }
 
+function navigationHtml(groups, selectedKey) {
+  if (!groups.length) return '';
+  return `<div class="cw233-pred-nav" role="tablist" aria-label="Этапы турнира">${groups.map(group => (
+    `<button type="button" data-cw233-pred-nav="${esc(group.key)}" aria-selected="${group.key === selectedKey}">${esc(group.label)}</button>`
+  )).join('')}</div>`;
+}
+
 function makeBody(rows) {
   if (loadingMatches && !rows.length) return loadingBody();
   if (loadingFailed && !rows.length) return '<div class="empty">Не удалось загрузить матчи. Попробуй открыть раздел ещё раз.</div>';
+  if (!rows.length) return '<div class="empty">Нет матчей, на которые сейчас можно поставить прогноз</div>';
+
+  if (UEFA_COMPETITIONS.has(activeFilter) || activeFilter === 'coppa_italia') {
+    const groups = predictionNavigationGroups(rows, activeFilter);
+    let selectedKey = activeNavigation.get(activeFilter);
+    if (!groups.some(group => group.key === selectedKey)) {
+      selectedKey = defaultPredictionNavigationKey(groups, new Date());
+      if (selectedKey) activeNavigation.set(activeFilter, selectedKey);
+    }
+    const selected = groups.find(group => group.key === selectedKey) || groups[0];
+    if (!selected) return '<div class="empty">Нет матчей, на которые сейчас можно поставить прогноз</div>';
+    return `${navigationHtml(groups, selected.key)}<div class="section-title"><h3>${esc(selected.label)}</h3><span>${selected.matches.length} матч.</span></div><div class="matches">${selected.matches.map(makeMatchHtml).join('')}</div>`;
+  }
+
   const groups = groupPredictionMatchesByDate(rows);
-  if (!groups.length) return '<div class="empty">Нет матчей для этого фильтра</div>';
   return groups.map(group => `<div class="section-title"><h3>${esc(formatDay(group.key))}</h3><span>${group.matches.length} матч.</span></div><div class="matches">${group.matches.map(makeMatchHtml).join('')}</div>`).join('');
 }
 
@@ -241,9 +353,9 @@ function render() {
   if (!pageActive) return;
   const main = contentNode();
   if (!main) return;
-  const modeRows = activeMode === 'mine' ? matches.filter(match => Boolean(match?.prediction)) : matches;
+  const modeRows = predictionRowsForMode(matches, activeMode);
   const selected = filterPredictionMatches(modeRows, activeFilter);
-  main.innerHTML = `${heroHtml()}${tabsHtml()}${filtersHtml()}${activeMode === 'mine' ? mineBody(selected) : makeBody(selected)}${activeMode === 'make' ? '<div class="savebar"><button type="button" class="save" data-cw233-save-all>Сохранить прогнозы</button></div>' : ''}`;
+  main.innerHTML = `${heroHtml()}${tabsHtml()}${filtersHtml()}${activeMode === 'mine' ? mineBody(selected) : makeBody(selected)}${activeMode === 'make' && modeRows.length ? '<div class="savebar"><button type="button" class="save" data-cw233-save-all>Сохранить прогнозы</button></div>' : ''}`;
 }
 
 async function reloadMatches(generation = loadGeneration) {
@@ -252,7 +364,7 @@ async function reloadMatches(generation = loadGeneration) {
     onUpdate(state) {
       if (!pageActive || generation !== loadGeneration) return;
       matches = [...state.matches];
-      loadingMatches = state.pending > 0 && matches.length === 0;
+      loadingMatches = state.pending > 0 && predictionRowsForMode(matches, activeMode).length === 0;
       loadingFailed = false;
       render();
     },
@@ -274,13 +386,8 @@ async function open() {
   render();
   try {
     client = client || createPredictionClient({ initData:initData() });
-    void client.rankingMe().then(current => {
-      if (!pageActive || generation !== loadGeneration) return;
-      me = current && typeof current === 'object' ? current : null;
-      render();
-    }).catch(() => {});
     await reloadMatches(generation);
-  } catch (error) {
+  } catch {
     if (!pageActive || generation !== loadGeneration) return;
     loadingMatches = false;
     loadingFailed = true;
@@ -350,12 +457,18 @@ export function installPredictionsUi() {
       render();
       return;
     }
+    const group = event.target?.closest?.('[data-cw233-pred-nav]');
+    if (group && (UEFA_COMPETITIONS.has(activeFilter) || activeFilter === 'coppa_italia')) {
+      activeNavigation.set(activeFilter, group.dataset.cw233PredNav || '');
+      render();
+      return;
+    }
     const delta = event.target?.closest?.('[data-cw233-delta]');
     if (delta) {
       const card = delta.closest('[data-cw233-pred-card]');
       const id = card?.dataset?.cw233PredCard;
       const match = matches.find(item => item.matchId === id);
-      if (!match) return;
+      if (!match || match.state !== 'open') return;
       const [side, raw] = String(delta.dataset.cw233Delta || '').split(':');
       const next = { ...scoreFor(match) };
       next[side] = Math.max(0, Math.min(20, next[side] + Number(raw)));
