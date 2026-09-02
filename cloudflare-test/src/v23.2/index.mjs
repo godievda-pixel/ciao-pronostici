@@ -1,3 +1,4 @@
+import './profile-integration.mjs';
 import {
   COMPETITION_KEYS,
   COMPETITIONS,
