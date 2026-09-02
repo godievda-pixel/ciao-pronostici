@@ -38,6 +38,37 @@ test('v23.3 prediction contract probe is static and non-destructive by default',
   assert.equal(report.authenticatedSmoke.performed, false);
 });
 
+test('v23.3 API observer exposes an explicit static prediction capability summary', async () => {
+  const observer = await import('../scripts/inspect-api-contract.mjs');
+  assert.equal(typeof observer.predictionContractStaticSummary, 'function');
+
+  assert.deepEqual(
+    observer.predictionContractStaticSummary({
+      action: ['state', 'save_predictions', 'serie_a_table'],
+      competition_key: [],
+    }),
+    {
+      legacyStateAction: true,
+      legacySaveAction: true,
+      competitionKeyLiterals: [],
+      competitionAwareClientContractObserved: false,
+    },
+  );
+
+  assert.deepEqual(
+    observer.predictionContractStaticSummary({
+      action: ['state', 'save_predictions'],
+      competition_key: ['ucl'],
+    }),
+    {
+      legacyStateAction: true,
+      legacySaveAction: true,
+      competitionKeyLiterals: ['ucl'],
+      competitionAwareClientContractObserved: true,
+    },
+  );
+});
+
 test('Ciao TEST workflow records the v23.3 prediction contract without enabling writes', async () => {
   const workflow = await readFile(
     new URL('../../.github/workflows/ciao-test-check.yml', import.meta.url),
