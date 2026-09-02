@@ -96,6 +96,29 @@ test('PredictionLeague initializes TEST season metadata exactly once', async () 
   assert.equal(sql.calls.some(item => item.params.includes?.('2026-27')), true);
 });
 
+test('internal participant registration persists identity without requiring a prediction', async () => {
+  const sql = new FakeSql();
+  const league = new PredictionLeague(stateWith(sql), { CIAO_ENV:'test', PREDICTION_SEASON:'2026-27' });
+  const response = await league.fetch(new Request('https://do.internal/participant', {
+    method:'POST',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({
+      season:'2026-27',
+      participant:{ user_id:'telegram:42', display_name:'Daniil', username:'ciao42' },
+    }),
+  }));
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.deepEqual(body, {
+    ok:true,
+    participant:{ user_id:'telegram:42', display_name:'Daniil', username:'ciao42' },
+  });
+  assert.deepEqual(sql.participants.get('telegram:42'), {
+    user_id:'telegram:42', display_name:'Daniil', username:'ciao42',
+  });
+  assert.equal(sql.predictions.size, 0);
+});
+
 test('internal write is an upsert keyed by user and match while preserving prediction_id', async () => {
   const sql = new FakeSql();
   let uuidCalls = 0;
