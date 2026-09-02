@@ -89,6 +89,9 @@ async function probeLiveCompetition() {
         away: match?.awayTeam?.name || null,
       })),
       error: payload?.error || null,
+      upstreamStage: payload?.upstream_stage || null,
+      upstreamStatus: payload?.upstream_status ?? null,
+      upstreamCode: payload?.upstream_code || null,
     };
   } catch (error) {
     return {
@@ -96,6 +99,9 @@ async function probeLiveCompetition() {
       ok: false,
       matchCount: 0,
       error: error instanceof Error ? error.message : String(error),
+      upstreamStage: null,
+      upstreamStatus: null,
+      upstreamCode: null,
     };
   }
 }
@@ -209,7 +215,13 @@ async function probe() {
     throw new Error('deployed TEST does not contain tournament capture navigation fix');
   }
   if (health.bsdConfigured === true && (!liveUcl.ok || liveUcl.matchCount < 1)) {
-    throw new Error(`deployed TEST BSD UCL probe failed: status=${liveUcl.status} error=${liveUcl.error || 'none'} matches=${liveUcl.matchCount}`);
+    throw new Error(
+      `deployed TEST BSD UCL probe failed: status=${liveUcl.status}`
+      + ` stage=${liveUcl.upstreamStage || 'unknown'}`
+      + ` upstreamStatus=${liveUcl.upstreamStatus ?? 'unknown'}`
+      + ` code=${liveUcl.upstreamCode || 'unknown'}`
+      + ` error=${liveUcl.error || 'none'} matches=${liveUcl.matchCount}`,
+    );
   }
 }
 
