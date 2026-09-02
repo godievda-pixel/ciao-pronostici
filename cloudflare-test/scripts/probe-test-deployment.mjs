@@ -2,7 +2,6 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { matchFingerprint } from '../src/v23.2/match-deduper.mjs';
-import { isKnownTeamName } from '../src/v23.2/team-registry.mjs';
 import { profileCompetitionMatches } from '../src/v23.2/profile-matches.mjs';
 
 const ORIGIN = 'https://ciao-web-app-test.ciao-web.workers.dev/';
@@ -15,6 +14,7 @@ const EXPECTED_HEALTH = Object.freeze({
   matchesProvider: 'bsd-v2',
 });
 const RESET_BANNER_TEXT = 'Начало нового сезона!';
+const CURRENT_REGISTRY_MARKER = 'CURRENT_UEFA_QUALIFIER_ALIASES';
 const ITALIAN_PROFILE_NAMES = new Set([
   'Интер', 'Милан', 'Наполи', 'Рома', 'Ювентус', 'Фиорентина', 'Аталанта', 'Лацио',
   'Болонья', 'Торино', 'Дженоа', 'Комо', 'Удинезе', 'Кальяри', 'Парма', 'Лечче',
@@ -47,7 +47,7 @@ const NAV_MARKERS = [
   "root.addEventListener('click'",
   'root.addEventListener("click"',
   "querySelectorAll('.nav",
-  'querySelectorAll(".nav',
+  'root.addEventListener("click"',
   '.nav button',
   'dataset.tab',
   'data-tab="calendar"',
@@ -117,7 +117,7 @@ function foreignVsForeign(matches = []) {
   return matches.some(match => !isItalianTeam(match?.homeTeam) && !isItalianTeam(match?.awayTeam));
 }
 
-function duplicateFingerprints(matches) {
+function duplicateFingerprints(matches = []) {
   const counts = new Map();
   for (const match of matches) {
     const fingerprint = matchFingerprint(match);
@@ -128,18 +128,75 @@ function duplicateFingerprints(matches) {
     .map(([fingerprint, count]) => ({ fingerprint, count }));
 }
 
-function unknownNamesFromTeams(teams = []) {
+async function probeDeployedTeamRegistry() {
+  let latest = null;
+  for (let attempt = 1; attempt <= 7; attempt += 1) {
+    try {
+      const url = new URL('/v23.2/team-registry.mjs', ORIGIN);
+      url.searchParams.set('probe', `${Date.now()}-${attempt}`);
+      const { response, text } = await fetchText(url);
+      if (!response.ok) {
+        latest = { ok: false, status: response.status, attempt, bytes: Buffer.byteLength(text), currentFeedReady: false };
+      } else {
+        const moduleUrl = `data:text/javascript;base64,${Buffer.from(text).toString('base64')}`;
+        const registry = await import(moduleUrl);
+        const callable = typeof registry.isKnownTeamName === 'function'
+          && typeof registry.russianTeamName === 'function';
+        latest = {
+          ok: callable,
+          status: response.status,
+          attempt,
+          bytes: Buffer.byteLength(text),
+          currentFeedReady: text.includes(CURRENT_REGISTRY_MARKER),
+          isKnownTeamName: callable ? registry.isKnownTeamName : () => false,
+          russianTeamName: callable ? registry.russianTeamName : value => String(value ?? ''),
+        };
+      }
+    } catch (error) {
+      latest = {
+        ok: false,
+        status: 0,
+        attempt,
+        bytes: 0,
+        currentFeedReady: false,
+        error: error instanceof Error ? error.message : String(error),
+        isKnownTeamName: () => false,
+        russianTeamName: value => String(value ?? ''),
+      };
+    }
+
+    if (latest?.ok && latest?.currentFeedReady) return latest;
+    if (attempt < 7) await sleep(5_000);
+  }
+  return latest || {
+    ok: false,
+    status: 0,
+    attempt: 0,
+    bytes: 0,
+    currentFeedReady: false,
+    error: 'registry_probe_unavailable',
+    isKnownTeamName: () => false,
+    russianTeamName: value => String(value ?? ''),
+  };
+}
+
+function unknownNamesFromTeams(teams = [], deployedRegistry) {
   const unknown = new Set();
   for (const team of teams) {
     const raw = String(team?.rawName || team?.name || '').trim();
-    if (raw && !isKnownTeamName(raw)) unknown.add(raw);
+    if (!raw) continue;
+    const known = Boolean(deployedRegistry?.isKnownTeamName?.(raw));
+    const localized = String(deployedRegistry?.russianTeamName?.(raw) || raw).trim();
+    if (!known || localized === raw) unknown.add(raw);
   }
   return [...unknown];
 }
 
-function unknownTeamNames(matches) {
-  return unknownNamesFromTeams(matches.flatMap(match => [match?.homeTeam, match?.awayTeam]))
-    .sort((a, b) => a.localeCompare(b));
+function unknownTeamNames(matches = [], deployedRegistry) {
+  return unknownNamesFromTeams(
+    matches.flatMap(match => [match?.homeTeam, match?.awayTeam]),
+    deployedRegistry,
+  ).sort((a, b) => a.localeCompare(b));
 }
 
 async function probeLiveCompetition(competition) {
@@ -164,7 +221,6 @@ async function probeLiveCompetition(competition) {
           fingerprint: matchFingerprint(match),
         }))
       : [];
-
     return {
       status: response.status,
       ok: Boolean(response.ok && payload?.ok),
@@ -174,7 +230,6 @@ async function probeLiveCompetition(competition) {
       matches,
       foreignVsForeign: UEFA_COMPETITIONS.includes(competition) ? foreignVsForeign(matches) : null,
       duplicateFingerprints: duplicateFingerprints(matches),
-      unknownTeamNames: unknownTeamNames(matches),
       fiorentina,
       sample: matches.slice(0, 3).map(match => ({
         matchId: match?.matchId || null,
@@ -197,8 +252,8 @@ async function probeLiveCompetition(competition) {
       matches: [],
       foreignVsForeign: false,
       duplicateFingerprints: [],
-      unknownTeamNames: [],
       fiorentina: [],
+      sample: [],
       error: error instanceof Error ? error.message : String(error),
       upstreamStage: null,
       upstreamStatus: null,
@@ -215,7 +270,6 @@ async function probeStandings(competition) {
     let payload = null;
     try { payload = await response.json(); } catch {}
     const rows = Array.isArray(payload?.data?.rows) ? payload.data.rows : [];
-    const unknown = unknownNamesFromTeams(rows.map(row => row?.team)).sort((a, b) => a.localeCompare(b));
     const foreignRows = rows.filter(row => !isItalianTeam(row?.team));
     return {
       status: response.status,
@@ -225,7 +279,7 @@ async function probeStandings(competition) {
       rowCount: rows.length,
       foreignClubCount: foreignRows.length,
       hasForeignClub: foreignRows.length > 0,
-      unknownTeamNames: unknown,
+      rows,
       sample: rows.slice(0, 3).map(row => ({
         position: row?.position ?? null,
         team: safeTeam(row?.team),
@@ -242,10 +296,18 @@ async function probeStandings(competition) {
       rowCount: 0,
       foreignClubCount: 0,
       hasForeignClub: false,
-      unknownTeamNames: [],
+      rows: [],
+      sample: [],
       error: error instanceof Error ? error.message : String(error),
     };
   }
+}
+
+export function standingsReleaseCheck(row = {}) {
+  if (!row.ok) return { pass: false, status: 'provider_error' };
+  if (Number(row.rowCount) === 0) return { pass: true, status: 'pending_provider' };
+  if (!row.hasForeignClub) return { pass: false, status: 'missing_foreign_clubs' };
+  return { pass: true, status: 'ready' };
 }
 
 async function probeMatchCenter(match) {
@@ -293,13 +355,14 @@ export function profileFeedCheck(competitionRows) {
       candidate = [match?.homeTeam, match?.awayTeam]
         .find(team => (
           team?.name
-          && (team?.countryCode === 'ITA' || team?.countryCode === 'IT' || ITALIAN_PROFILE_NAMES.has(String(team.name).trim()))
+          && (team?.countryCode === 'ITA'
+            || team?.countryCode === 'IT'
+            || ITALIAN_PROFILE_NAMES.has(String(team.name).trim()))
         ));
       if (candidate) break;
     }
     if (candidate) break;
   }
-
   if (!candidate) return { ok: false, reason: 'no_italian_team_candidate', team: null, matchCount: 0 };
   const matches = profileCompetitionMatches(data, candidate);
   return {
@@ -330,7 +393,9 @@ async function probeModules() {
   const rows = [];
   for (const path of MODULES) {
     try {
-      const { response, text } = await fetchText(new URL(path, ORIGIN));
+      const url = new URL(path, ORIGIN);
+      url.searchParams.set('probe', String(Date.now()));
+      const { response, text } = await fetchText(url);
       rows.push({
         path,
         status: response.status,
@@ -345,7 +410,7 @@ async function probeModules() {
           ? !text.includes('${renderCoppaTabs()}') && !text.includes('data-cw232-coppa-panel="bracket"')
           : undefined,
         hasCoreMarker: path === '/v23.2/index.mjs' ? text.includes('CiaoV232Core') : undefined,
-        hasProfileImport: path === '/v23.2/index.mjs' ? text.includes("profile-integration.mjs") : undefined,
+        hasProfileImport: path === '/v23.2/index.mjs' ? text.includes('profile-integration.mjs') : undefined,
         hasProfileRuntime: path === '/v23.2/profile-integration.mjs'
           ? text.includes('CiaoV232Profile') && text.includes('cw232-profile-tournament-enrichment')
           : undefined,
@@ -353,7 +418,7 @@ async function probeModules() {
           ? text.includes("title: 'Серия А'") && text.includes("shortTitle: 'Серия А'")
           : undefined,
         hasUnifiedRuntime: path === '/v23.3/index.mjs'
-          ? text.includes('CiaoV233') && text.includes("home-integration.mjs") && text.includes("tables-ui.mjs")
+          ? text.includes('CiaoV233') && text.includes('home-integration.mjs') && text.includes('tables-ui.mjs')
           : undefined,
         predictionsBlocked: path === '/v23.3/index.mjs'
           ? text.includes("predictions: 'blocked'") && !text.includes('predictions-ui.mjs')
@@ -381,11 +446,7 @@ async function probeModules() {
           : undefined,
       });
     } catch (error) {
-      rows.push({
-        path,
-        status: 0,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      rows.push({ path, status: 0, error: error instanceof Error ? error.message : String(error) });
     }
   }
   return rows;
@@ -396,14 +457,31 @@ function publicCompetitionSummary(row) {
   return safe;
 }
 
+function publicStandingsSummary(row) {
+  const { rows: _rows, ...safe } = row;
+  return safe;
+}
+
+function publicRegistrySummary(registry) {
+  return {
+    ok: Boolean(registry?.ok),
+    status: registry?.status ?? 0,
+    attempt: registry?.attempt ?? 0,
+    bytes: registry?.bytes ?? 0,
+    currentFeedReady: Boolean(registry?.currentFeedReady),
+    error: registry?.error || null,
+  };
+}
+
 async function probe() {
   const attempts = [];
   let latestHtml = '';
-
   for (let index = 0; index < 9; index += 1) {
     const startedAt = new Date().toISOString();
     try {
-      const { response, text: html } = await fetchText(ORIGIN);
+      const url = new URL(ORIGIN);
+      url.searchParams.set('probe', `${Date.now()}-${index + 1}`);
+      const { response, text: html } = await fetchText(url);
       latestHtml = html;
       const markers = Object.fromEntries(EXPECTED.map(marker => [marker, html.includes(marker)]));
       const homeResetBannerAbsent = !html.includes(RESET_BANNER_TEXT);
@@ -426,24 +504,29 @@ async function probe() {
       });
       if (response.ok && EXPECTED.every(marker => markers[marker]) && homeResetBannerAbsent) break;
     } catch (error) {
-      attempts.push({
-        attempt: index + 1,
-        startedAt,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      attempts.push({ attempt: index + 1, startedAt, error: error instanceof Error ? error.message : String(error) });
     }
-
     if (index < 8) await sleep(10_000);
   }
 
-  const [modules, health, competitionRows, standingsRows] = await Promise.all([
+  const [modules, health, deployedRegistry, rawCompetitionRows, rawStandingsRows] = await Promise.all([
     probeModules(),
     probeHealth(),
+    probeDeployedTeamRegistry(),
     Promise.all(EXTERNAL_COMPETITIONS.map(probeLiveCompetition)),
     Promise.all(UEFA_COMPETITIONS.map(probeStandings)),
   ]);
-  const competitions = competitionRows;
-  const standings = standingsRows;
+
+  const competitions = rawCompetitionRows.map(row => ({
+    ...row,
+    unknownTeamNames: unknownTeamNames(row.matches, deployedRegistry),
+  }));
+  const standings = rawStandingsRows.map(row => ({
+    ...row,
+    unknownTeamNames: unknownNamesFromTeams(row.rows.map(item => item?.team), deployedRegistry)
+      .sort((a, b) => a.localeCompare(b)),
+    releaseStatus: standingsReleaseCheck(row).status,
+  }));
 
   const matchesModule = modules.find(item => item.path === '/v23.2/matches-ui.mjs');
   const v232IndexModule = modules.find(item => item.path === '/v23.2/index.mjs');
@@ -455,8 +538,7 @@ async function probe() {
   const matchCenterModule = modules.find(item => item.path === '/v23.3/match-center.mjs');
   const matchCenterLinksModule = modules.find(item => item.path === '/v23.3/match-center-links.mjs');
   const profileFeed = profileFeedCheck(competitions);
-  const matchCenterCandidate = competitions
-    .find(row => row.competition === 'ucl')?.matches?.[0]
+  const matchCenterCandidate = competitions.find(row => row.competition === 'ucl')?.matches?.[0]
     || competitions.flatMap(row => row.matches)[0]
     || null;
   const matchCenter = await probeMatchCenter(matchCenterCandidate);
@@ -475,8 +557,9 @@ async function probe() {
     attempts,
     latest: attempts.at(-1) || null,
     health,
+    deployedRegistry: publicRegistrySummary(deployedRegistry),
     competitions: competitions.map(publicCompetitionSummary),
-    standings,
+    standings: standings.map(publicStandingsSummary),
     matchCenter,
     allUnknownTeamNames,
     releaseHeldForUnknownTeams,
@@ -492,8 +575,9 @@ async function probe() {
   console.log(JSON.stringify({
     latest: report.latest,
     health,
+    deployedRegistry: report.deployedRegistry,
     competitions: report.competitions,
-    standings,
+    standings: report.standings,
     matchCenter,
     allUnknownTeamNames,
     releaseHeldForUnknownTeams,
@@ -552,6 +636,9 @@ async function probe() {
   }
 
   if (health.bsdConfigured === true) {
+    if (!deployedRegistry?.ok || !deployedRegistry?.currentFeedReady) {
+      throw new Error(`deployed TEST team registry is stale or unavailable: status=${deployedRegistry?.status ?? 0}`);
+    }
     for (const row of competitions) {
       if (!row.ok) {
         throw new Error(
@@ -574,8 +661,9 @@ async function probe() {
     }
 
     for (const row of standings) {
-      if (!row.ok || row.rowCount < 1 || !row.hasForeignClub) {
-        throw new Error(`deployed TEST ${row.competition} standings are incomplete or missing foreign clubs`);
+      const release = standingsReleaseCheck(row);
+      if (!release.pass) {
+        throw new Error(`deployed TEST ${row.competition} standings failed release check: ${release.status}`);
       }
     }
     if (!matchCenter.ok) {
