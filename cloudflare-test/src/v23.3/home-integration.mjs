@@ -5,6 +5,8 @@ import {
   loadAllCompetitionMatches,
   selectHomeMatches,
 } from './competition-data.mjs';
+import { installCanonicalMatchCenter } from './match-center.mjs';
+import { installCanonicalMatchLinks } from './match-center-links.mjs';
 
 const DEFAULT_TTL_MS = 60_000;
 
@@ -190,6 +192,11 @@ globalThis.CiaoV233Home = Object.freeze({
   html: runtime.html,
   state: runtime.state,
 });
+
+if (typeof globalThis.document !== 'undefined') {
+  installCanonicalMatchCenter(globalThis.document);
+  installCanonicalMatchLinks(globalThis.document);
+}
 
 try {
   if (typeof globalThis.dispatchEvent === 'function' && typeof globalThis.Event === 'function') {
