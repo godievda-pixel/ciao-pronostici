@@ -94,6 +94,13 @@ function buildUrl(path, params = {}) {
   return url;
 }
 
+function pageRows(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.results)) return payload.results;
+  if (Array.isArray(payload?.data)) return payload.data;
+  return [];
+}
+
 async function fetchAll(path, params, apiKey, fetchImpl, stage) {
   const rows = [];
   let offset = 0;
@@ -102,7 +109,7 @@ async function fetchAll(path, params, apiKey, fetchImpl, stage) {
   while (true) {
     const url = buildUrl(path, { ...params, limit, offset });
     const payload = await fetchJson(url, apiKey, fetchImpl, stage);
-    const page = Array.isArray(payload?.results) ? payload.results : [];
+    const page = pageRows(payload);
     rows.push(...page);
     const count = Number(payload?.count);
     if (page.length < limit || (Number.isFinite(count) && rows.length >= count)) break;
@@ -126,13 +133,55 @@ async function resolveLeague(competition, apiKey, fetchImpl) {
   return league;
 }
 
+function seasonCandidate(payload) {
+  const candidates = [
+    payload,
+    payload?.season,
+    payload?.current_season,
+    payload?.currentSeason,
+    payload?.data,
+    payload?.data?.season,
+    payload?.data?.current_season,
+    payload?.data?.currentSeason,
+  ];
+  return candidates.find(candidate => candidate && typeof candidate === 'object' && candidate.id) || null;
+}
+
+function chooseSeason(rows) {
+  if (!Array.isArray(rows) || !rows.length) return null;
+  const current = rows.find(row => row?.is_current === true || row?.current === true || row?.isCurrent === true);
+  if (current?.id) return current;
+
+  return [...rows]
+    .filter(row => row?.id)
+    .sort((a, b) => {
+      const yearA = Number(a?.year || 0);
+      const yearB = Number(b?.year || 0);
+      if (yearA !== yearB) return yearB - yearA;
+      return Number(b?.id || 0) - Number(a?.id || 0);
+    })[0] || null;
+}
+
 async function resolveSeason(leagueId, apiKey, fetchImpl) {
-  return fetchJson(
+  const payload = await fetchJson(
     buildUrl(`/leagues/${encodeURIComponent(leagueId)}/season/`),
     apiKey,
     fetchImpl,
     'season',
   );
+  const direct = seasonCandidate(payload);
+  if (direct?.id) return direct;
+
+  const seasons = await fetchAll(
+    `/leagues/${encodeURIComponent(leagueId)}/seasons/`,
+    {},
+    apiKey,
+    fetchImpl,
+    'season',
+  );
+  const fallback = chooseSeason(seasons);
+  if (!fallback?.id) throw new BsdUpstreamError('season', 200, 'season_not_found');
+  return fallback;
 }
 
 async function italianTeams(apiKey, fetchImpl) {
