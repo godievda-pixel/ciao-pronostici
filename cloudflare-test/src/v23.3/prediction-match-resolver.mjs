@@ -3,6 +3,9 @@ import { adaptSerieASchedule } from '../v23.2/serie-a-adapter.mjs';
 import { fetchBsdMatchSnapshot, fetchBsdMatches } from '../v23.2/bsd-provider.mjs';
 import { predictionDeadlineForKickoff } from './competition-data.mjs';
 
+const LEGACY_CORE_API = '/api/ciao-core-api-fast-v4';
+const LEGACY_SERIE_A_SCHEDULE = '/api/ciao-schedule-fast-v1';
+
 export class PredictionMatchError extends Error {
   constructor(code, status) {
     super(code);
@@ -88,20 +91,33 @@ function activeDateRange(now = new Date()) {
   return { from: dateText(from), to: dateText(to) };
 }
 
-async function loadSerieA({ request, env, adapt = adaptSerieASchedule }) {
-  const initData = text(request?.headers?.get?.('x-telegram-init-data'));
-  if (!env?.CIAO_WEB_API || typeof env.CIAO_WEB_API.fetch !== 'function') {
-    throw new PredictionMatchError('match_resolution_failed', 502);
+function stateSchedule(payload = {}) {
+  const roots = [payload, payload?.state, payload?.data, payload?.data?.state]
+    .filter(item => item && typeof item === 'object');
+  for (const root of roots) {
+    const round = root?.round && typeof root.round === 'object' ? root.round : null;
+    const matches = Array.isArray(round?.matches) ? round.matches : [];
+    const number = Number(root?.selected_round ?? round?.number ?? round?.round_number);
+    if (!matches.length || !Number.isFinite(number) || number <= 0) continue;
+    return {
+      current_round:number,
+      rounds:[{ number, matches }],
+    };
   }
+  return null;
+}
+
+async function fetchLegacySerieAJson({ request, env, path, body }) {
+  const initData = text(request?.headers?.get?.('x-telegram-init-data'));
   const upstream = await env.CIAO_WEB_API.fetch(new Request(
-    new URL('/api/ciao-schedule-fast-v1', request.url),
+    new URL(path, request.url),
     {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-telegram-init-data': initData,
+      method:'POST',
+      headers:{
+        'content-type':'application/json',
+        'x-telegram-init-data':initData,
       },
-      body: '{}',
+      body:JSON.stringify(body),
     },
   ));
   let payload;
@@ -113,7 +129,35 @@ async function loadSerieA({ request, env, adapt = adaptSerieASchedule }) {
   if (!upstream.ok || payload?.ok === false) {
     throw new PredictionMatchError('match_resolution_failed', 502);
   }
-  return adapt(payload);
+  return payload;
+}
+
+async function loadSerieA({ request, env, adapt = adaptSerieASchedule }) {
+  if (!env?.CIAO_WEB_API || typeof env.CIAO_WEB_API.fetch !== 'function') {
+    throw new PredictionMatchError('match_resolution_failed', 502);
+  }
+
+  try {
+    const statePayload = await fetchLegacySerieAJson({
+      request,
+      env,
+      path:LEGACY_CORE_API,
+      body:{ action:'state' },
+    });
+    const stableRound = stateSchedule(statePayload);
+    if (stableRound) {
+      const adapted = adapt(stableRound);
+      if (Array.isArray(adapted?.matches) && adapted.matches.length) return adapted;
+    }
+  } catch {}
+
+  const schedulePayload = await fetchLegacySerieAJson({
+    request,
+    env,
+    path:LEGACY_SERIE_A_SCHEDULE,
+    body:{},
+  });
+  return adapt(schedulePayload);
 }
 
 function assertActiveSeason(match, activeSeason) {
