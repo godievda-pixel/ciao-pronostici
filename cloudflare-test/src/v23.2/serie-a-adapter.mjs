@@ -8,6 +8,10 @@ function finiteRound(value) {
   return Number.isFinite(number) && number > 0 ? number : null;
 }
 
+function text(value) {
+  return String(value ?? '').trim();
+}
+
 function legacyStatus(raw) {
   const status = String(raw?.live_status ?? raw?.status ?? '').trim();
   const lower = status.toLowerCase();
@@ -18,11 +22,54 @@ function legacyStatus(raw) {
   return status || 'SCHEDULED';
 }
 
+function legacyTeam(raw = {}, side) {
+  const direct = raw?.[side];
+  const nested = raw?.[`${side}_team`] || raw?.[`${side}Team`];
+  const object = direct && typeof direct === 'object'
+    ? direct
+    : nested && typeof nested === 'object'
+      ? nested
+      : {};
+  const directName = typeof direct === 'string' ? direct : '';
+  const nestedName = typeof nested === 'string' ? nested : '';
+
+  return {
+    ...object,
+    id: object?.id
+      ?? object?.team_id
+      ?? raw?.[`${side}_id`]
+      ?? raw?.[`${side}_team_id`]
+      ?? '',
+    name: text(
+      object?.name
+      || object?.team_name
+      || directName
+      || nestedName
+      || raw?.[`${side}_name`]
+      || raw?.[`${side}_team_name`],
+    ),
+    logo: text(
+      object?.logo
+      || object?.logo_url
+      || object?.logoUrl
+      || object?.crest
+      || object?.crest_url
+      || object?.team_logo
+      || raw?.[`${side}_logo`]
+      || raw?.[`${side}_logo_url`]
+      || raw?.[`${side}_team_logo`]
+      || raw?.[`${side}_team_logo_url`],
+    ),
+  };
+}
+
 function adaptMatch(raw, round) {
   if (!raw || raw.id === null || raw.id === undefined || raw.id === '') return null;
 
   return normalizeMatch({
     ...raw,
+    home: legacyTeam(raw, 'home'),
+    away: legacyTeam(raw, 'away'),
     status: legacyStatus(raw),
     minute: raw.live_elapsed ?? raw.minute ?? null,
     round_number: round,
