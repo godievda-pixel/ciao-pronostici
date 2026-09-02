@@ -1,12 +1,13 @@
 import './home-integration.mjs';
 import './tables-ui.mjs';
+import './predictions-ui.mjs';
 
 export const CiaoV233 = Object.freeze({
   version: '23.3',
   home: 'enabled',
   tables: 'enabled',
   matchCenter: 'enabled',
-  predictions: 'blocked',
+  predictions: 'enabled',
 });
 
 globalThis.CiaoV233 = CiaoV233;
