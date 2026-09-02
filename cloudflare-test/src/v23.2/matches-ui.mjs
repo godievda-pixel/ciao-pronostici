@@ -173,10 +173,7 @@ function renderCoppaTabs() {
 export function renderCompetitionScreen(competition, data = {}) {
   const config = getCompetitionConfig(competition);
   const matches = sortChronologically(Array.isArray(data?.matches) ? data.matches : []);
-  const grouped = renderMatchGroups(matches, competition);
-  const body = competition === 'coppa_italia'
-    ? `${renderCoppaTabs()}<div class="cw232-coppa-panel" data-cw232-coppa-panel="matches">${grouped}</div><div class="cw232-coppa-panel" data-cw232-coppa-panel="bracket" hidden>${renderCoppaBracket(matches)}</div>`
-    : grouped;
+  const body = renderMatchGroups(matches, competition);
 
   return `<section class="cw232-competition" data-cw232-view="competition" data-cw232-competition="${esc(competition)}" data-cw232-theme="${esc(config.theme)}">
     <header class="cw232-competition__head">
