@@ -5,7 +5,7 @@ import { russianTeamName } from '../src/v23.2/team-registry.mjs';
 import { formatKickoff } from '../src/v23.2/matches-ui.mjs';
 
 test('v23.2 tournament titles are Russian', () => {
-  assert.equal(getCompetitionConfig('serie_a').title, 'Serie A');
+  assert.equal(getCompetitionConfig('serie_a').title, 'Серия А');
   assert.equal(getCompetitionConfig('coppa_italia').title, 'Кубок Италии');
   assert.equal(getCompetitionConfig('ucl').title, 'Лига Чемпионов');
   assert.equal(getCompetitionConfig('uel').title, 'Лига Европы');
