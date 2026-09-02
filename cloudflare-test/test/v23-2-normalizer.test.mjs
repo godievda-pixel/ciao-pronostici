@@ -66,7 +66,7 @@ test('preserves explicit source-match ids for knockout progression', () => {
   assert.equal(match.awaySourceMatchId, 'ucl:88');
 });
 
-test('includes all domestic matches and only Italian-club European matches', () => {
+test('includes domestic and complete UEFA competition feeds', () => {
   assert.equal(shouldIncludeMatch(normalizeMatch(raw, 'serie_a')), true);
   assert.equal(shouldIncludeMatch(normalizeMatch(raw, 'coppa_italia')), true);
   assert.equal(shouldIncludeMatch(normalizeMatch(raw, 'ucl')), true);
@@ -77,7 +77,7 @@ test('includes all domestic matches and only Italian-club European matches', () 
     home: { id: 30, name: 'Real Madrid', country: 'Spain' },
     away: { id: 40, name: 'Bayern', country: 'Germany' },
   }, 'ucl');
-  assert.equal(shouldIncludeMatch(foreign), false);
+  assert.equal(shouldIncludeMatch(foreign), true);
 });
 
 test('maps provider statuses into the exact finite status set', () => {

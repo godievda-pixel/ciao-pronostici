@@ -13,6 +13,8 @@ const STATUS_MAP = Object.freeze({
   SCHEDULED: 'scheduled',
   TIMED: 'scheduled',
   LIVE: 'live',
+  INPROGRESS: 'live',
+  IN_PROGRESS: 'live',
   '1H': 'live',
   HT: 'live',
   '2H': 'live',
@@ -22,10 +24,14 @@ const STATUS_MAP = Object.freeze({
   AET: 'finished',
   PEN: 'finished',
   FINISHED: 'finished',
+  ENDED: 'finished',
+  FULLTIME: 'finished',
+  FULL_TIME: 'finished',
   PST: 'postponed',
   POSTPONED: 'postponed',
   CANC: 'cancelled',
   CANCELLED: 'cancelled',
+  CANCELED: 'cancelled',
 });
 
 const COUNTRY_CODES = Object.freeze({
@@ -104,7 +110,6 @@ export function normalizeMatch(raw, competition) {
 }
 
 export function shouldIncludeMatch(match) {
-  const config = getCompetitionConfig(match.competition);
-  if (!config.european) return true;
-  return match.homeTeam.countryCode === 'ITA' || match.awayTeam.countryCode === 'ITA';
+  getCompetitionConfig(match.competition);
+  return true;
 }
