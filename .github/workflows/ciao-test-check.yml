@@ -45,6 +45,10 @@ jobs:
         if: github.event_name == 'push'
         run: node scripts/probe-prediction-contract.mjs
 
+      - name: Observe v23.3 reset contract
+        if: github.event_name == 'push'
+        run: node scripts/probe-reset-contract.mjs
+
       - name: Probe BSD provider contract
         if: github.event_name == 'push'
         run: node scripts/probe-bsd-provider.mjs
@@ -68,6 +72,15 @@ jobs:
         with:
           name: ciao-v23-3-prediction-contract
           path: cloudflare-test/artifacts/v23-3-prediction-contract.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload v23.3 reset contract observation
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ciao-v23-3-reset-contract
+          path: cloudflare-test/artifacts/v23-3-reset-contract.json
           if-no-files-found: error
           retention-days: 7
 
