@@ -9,6 +9,7 @@ import {
   createRankingSnapshot,
   resetPredictionDomain,
 } from './prediction-sql.mjs';
+import { scorePrediction } from './prediction-scorer.mjs';
 
 function json(payload, status = 200) {
   return Response.json(payload, { status });
@@ -76,11 +77,7 @@ export class PredictionLeague {
           const participant = upsertParticipant(this.sql, body.participant, nowIso());
           return body.predictions.map(item => upsertPrediction(
             this.sql,
-            {
-              ...item,
-              user_id: participant.user_id,
-              season: body.season,
-            },
+            { ...item, user_id: participant.user_id, season: body.season },
             nowIso(),
             this.randomUUID,
           ));
@@ -91,28 +88,18 @@ export class PredictionLeague {
       if (url.pathname === '/user' && request.method === 'GET') {
         const userId = url.searchParams.get('user_id') || '';
         const competition = url.searchParams.get('competition') || 'all';
-        return json({
-          ok: true,
-          predictions: listUserPredictions(this.sql, { userId, competition }),
-        });
+        return json({ ok: true, predictions: listUserPredictions(this.sql, { userId, competition }) });
       }
 
       if (url.pathname === '/rankings' && request.method === 'GET') {
         const scope = url.searchParams.get('scope') || 'overall';
         const competition = url.searchParams.get('competition') || undefined;
-        return json({
-          ok: true,
-          scope,
-          ranking: queryRanking(this.sql, { scope, competition }),
-        });
+        return json({ ok: true, scope, ranking: queryRanking(this.sql, { scope, competition }) });
       }
 
       if (url.pathname === '/rankings/me' && request.method === 'GET') {
         const userId = url.searchParams.get('user_id') || '';
-        return json({
-          ok: true,
-          ranking: queryRankingMe(this.sql, { userId }),
-        });
+        return json({ ok: true, ranking: queryRankingMe(this.sql, { userId }) });
       }
 
       if (url.pathname === '/snapshot' && request.method === 'POST') {
@@ -128,15 +115,12 @@ export class PredictionLeague {
 
       if (url.pathname === '/reconcile' && request.method === 'POST') {
         const body = await bodyOf(request);
-        const scorePrediction = this.env.PREDICTION_SCORE_PREDICTION;
-        if (typeof scorePrediction !== 'function') {
-          return json({ ok: false, error: 'scorer_not_ready' }, 503);
-        }
-        const affected = transaction(this.sql, () => reconcileMatchPredictions(this.sql, {
+        if (!body) return json({ ok: false, error: 'invalid_reconcile_payload' }, 400);
+        const result = transaction(this.sql, () => reconcileMatchPredictions(this.sql, {
           ...body,
           scorePrediction,
         }));
-        return json({ ok: true, affected });
+        return json({ ok: true, ...result });
       }
 
       if (url.pathname === '/reset' && request.method === 'POST') {
@@ -163,10 +147,7 @@ export class PredictionLeague {
 
       return json({ ok: false, error: 'not_found' }, 404);
     } catch (error) {
-      return json({
-        ok: false,
-        error: String(error?.message || error || 'prediction_storage_failed'),
-      }, 500);
+      return json({ ok: false, error: String(error?.message || error || 'prediction_storage_failed') }, 500);
     }
   }
 }
