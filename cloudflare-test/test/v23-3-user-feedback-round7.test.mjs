@@ -153,7 +153,8 @@ test('Home predict button is excluded from Match Center capture and routed to Pr
 test('prediction rerenders preserve horizontal tournament and round scroll positions', async () => {
   const source = await readFile(new URL('../src/v23.3/predictions-ui.mjs', import.meta.url), 'utf8');
   assert.match(source, /scrollLeft/);
-  assert.match(source, /cw233-pred-filters|cw233-pred-nav/);
+  assert.match(source, /cw233-pred-filters/);
+  assert.match(source, /cw233-pred-nav/);
 });
 
 test('ranking gives the whole top-three rows strong gold silver and bronze treatments', async () => {
@@ -163,18 +164,18 @@ test('ranking gives the whole top-three rows strong gold silver and bronze treat
   assert.match(source, /cw233-ranking-row[^\n]*is-podium-3/);
 });
 
-test('Serie A legacy calendar keeps a visible Back-to-tournaments bridge', async () => {
-  const source = await readFile(new URL('../src/v23.2/matches-ui.mjs', import.meta.url), 'utf8');
+test('Serie A legacy calendar keeps a visible Back-to-tournaments bridge without replacing the legacy calendar', async () => {
+  const source = await readFile(new URL('../src/v23.3/round7-regression-fixes.mjs', import.meta.url), 'utf8');
   assert.match(source, /cw232-serie-a-back/);
   assert.match(source, /Назад к турнирам/);
+  assert.match(source, /button\[data-tab=\\?"calendar\\?"\]/);
 });
 
-test('custom overlays paint through the bottom navigation seam instead of ending 78px early', async () => {
-  const matches = await readFile(new URL('../src/v23.2/matches-ui.mjs', import.meta.url), 'utf8');
-  const tables = await readFile(new URL('../src/v23.3/tables-ui.mjs', import.meta.url), 'utf8');
-  const matchCenter = await readFile(new URL('../src/v23.3/match-center.mjs', import.meta.url), 'utf8');
-  for (const source of [matches, tables, matchCenter]) {
-    assert.doesNotMatch(source, /inset:0 0 calc\(78px \+ env\(safe-area-inset-bottom/);
-    assert.match(source, /padding-bottom|padding:[^;]*calc\([^;]*78px/);
-  }
+test('round7 compatibility layer paints custom overlays through the bottom navigation seam', async () => {
+  const source = await readFile(new URL('../src/v23.3/round7-regression-fixes.mjs', import.meta.url), 'utf8');
+  assert.match(source, /ciao-v232-matches-overlay/);
+  assert.match(source, /ciao-v233-tables-overlay/);
+  assert.match(source, /ciao-v233-match-center-overlay/);
+  assert.match(source, /inset:0!important/);
+  assert.match(source, /padding-bottom:calc\(104px \+ env\(safe-area-inset-bottom/);
 });
