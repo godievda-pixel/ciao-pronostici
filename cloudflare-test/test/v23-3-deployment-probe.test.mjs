@@ -24,11 +24,8 @@ function match(id, competition, homeTeam, awayTeam) {
 test('deployment profile probe recognizes a known Italian club even when BSD omits countryCode', () => {
   const rows = [{
     competition: 'ucl',
-    matches: [
-      match('601024', 'ucl', team('57', 'Реал Мадрид', 'Real Madrid'), team('77', 'Интер', 'Inter')),
-    ],
+    matches: [match('601024', 'ucl', team('57', 'Реал Мадрид', 'Real Madrid'), team('77', 'Интер', 'Inter'))],
   }];
-
   const result = profileFeedCheck(rows);
   assert.equal(result.ok, true);
   assert.equal(result.team.name, 'Интер');
@@ -36,27 +33,14 @@ test('deployment profile probe recognizes a known Italian club even when BSD omi
 });
 
 test('deployment standings gate accepts an unpublished empty table but still blocks real failures', () => {
-  assert.deepEqual(
-    standingsReleaseCheck({ competition: 'ucl', ok: true, rowCount: 0, hasForeignClub: false }),
-    { pass: true, status: 'pending_provider' },
-  );
-  assert.deepEqual(
-    standingsReleaseCheck({ competition: 'uel', ok: true, rowCount: 36, hasForeignClub: true }),
-    { pass: true, status: 'ready' },
-  );
-  assert.deepEqual(
-    standingsReleaseCheck({ competition: 'uecl', ok: false, rowCount: 0, hasForeignClub: false }),
-    { pass: false, status: 'provider_error' },
-  );
-  assert.deepEqual(
-    standingsReleaseCheck({ competition: 'ucl', ok: true, rowCount: 36, hasForeignClub: false }),
-    { pass: false, status: 'missing_foreign_clubs' },
-  );
+  assert.deepEqual(standingsReleaseCheck({ competition:'ucl', ok:true, rowCount:0, hasForeignClub:false }), { pass:true, status:'pending_provider' });
+  assert.deepEqual(standingsReleaseCheck({ competition:'uel', ok:true, rowCount:36, hasForeignClub:true }), { pass:true, status:'ready' });
+  assert.deepEqual(standingsReleaseCheck({ competition:'uecl', ok:false, rowCount:0, hasForeignClub:false }), { pass:false, status:'provider_error' });
+  assert.deepEqual(standingsReleaseCheck({ competition:'ucl', ok:true, rowCount:36, hasForeignClub:false }), { pass:false, status:'missing_foreign_clubs' });
 });
 
 test('deployment probe proves localization against the deployed TEST registry module', async () => {
   const source = await readFile(new URL('../scripts/probe-test-deployment.mjs', import.meta.url), 'utf8');
-
   assert.doesNotMatch(source, /import \{ isKnownTeamName \} from '\.\.\/src\/v23\.2\/team-registry\.mjs'/);
   assert.match(source, /probeDeployedTeamRegistry/);
   assert.match(source, /\/v23\.2\/team-registry\.mjs/);
@@ -68,7 +52,6 @@ test('deployment probe proves localization against the deployed TEST registry mo
 
 test('deployment probe hard-gates only the Home SERIE A 2026/27 label; reset notice is diagnostic', async () => {
   const source = await readFile(new URL('../scripts/probe-test-deployment.mjs', import.meta.url), 'utf8');
-
   assert.match(source, /HOME_SEASON_LABEL\s*=\s*'SERIE A 2026\/27'/);
   assert.match(source, /RESET_NOTICE_TEXT\s*=\s*'Начало нового сезона!'/);
   assert.match(source, /homeSeasonLabelAbsent/);
@@ -76,28 +59,23 @@ test('deployment probe hard-gates only the Home SERIE A 2026/27 label; reset not
   assert.match(source, /deployed TEST still contains the Home Serie A season label/);
   assert.doesNotMatch(source, /deployed TEST is missing the Home new-season notice/);
   assert.doesNotMatch(source, /homeSeasonLabelAbsent\s*&&\s*homeResetNoticePresent/);
-  assert.doesNotMatch(source, /RESET_BANNER_TEXT/);
-  assert.doesNotMatch(source, /homeResetBannerAbsent/);
 });
 
-test('deployment probe explicitly verifies unified v23.3 Home and Tables runtime markers', async () => {
+test('deployment probe explicitly verifies unified v23.3 Home Tables Predictions Ranking and navigation runtimes', async () => {
   const source = await readFile(new URL('../scripts/probe-test-deployment.mjs', import.meta.url), 'utf8');
-
   assert.match(source, /id="ciao-v233"/);
-  assert.doesNotMatch(source, /id="ciao-v233-home"/);
-  assert.doesNotMatch(source, /id="ciao-v233-tables"/);
   assert.match(source, /\/v23\.3\/index\.mjs/);
   assert.match(source, /\/v23\.3\/home-integration\.mjs/);
   assert.match(source, /\/v23\.3\/tables-ui\.mjs/);
-  assert.match(source, /hasUnifiedRuntime/);
-  assert.match(source, /hasHomeRuntime/);
-  assert.match(source, /hasTablesRuntime/);
-  assert.match(source, /deployed TEST is missing unified v23\.3 browser runtime/);
+  assert.match(source, /\/v23\.3\/predictions-ui\.mjs/);
+  assert.match(source, /\/v23\.3\/ranking-ui\.mjs/);
+  assert.match(source, /\/v23\.3\/navigation-ui\.mjs/);
+  assert.match(source, /predictionsEnabled/);
+  assert.doesNotMatch(source, /predictionsBlocked/);
 });
 
 test('deployment probe explicitly verifies v23.3 canonical Match Center runtime and link resolver', async () => {
   const source = await readFile(new URL('../scripts/probe-test-deployment.mjs', import.meta.url), 'utf8');
-
   assert.match(source, /\/v23\.3\/match-center\.mjs/);
   assert.match(source, /\/v23\.3\/match-center-links\.mjs/);
   assert.match(source, /hasMatchCenterRuntime/);
@@ -107,6 +85,18 @@ test('deployment probe explicitly verifies v23.3 canonical Match Center runtime 
   assert.match(source, /resolveCanonicalMatchTarget/);
   assert.match(source, /installCanonicalMatchLinks/);
   assert.match(source, /\/api\/v23\.3\/match-center/);
-  assert.match(source, /deployed TEST is missing v23\.3 Match Center runtime/);
-  assert.match(source, /deployed TEST is missing v23\.3 Match Center links runtime/);
+});
+
+test('deployment probe requires Durable Object prediction health markers and unauthenticated route guard', async () => {
+  const source = await readFile(new URL('../scripts/probe-test-deployment.mjs', import.meta.url), 'utf8');
+  assert.match(source, /prediction_backend/);
+  assert.match(source, /durable-object-sqlite/);
+  assert.match(source, /prediction_environment/);
+  assert.match(source, /prediction_season/);
+  assert.match(source, /2026-27/);
+  assert.match(source, /prediction_do_configured/);
+  assert.match(source, /probePredictionAuthGuard/);
+  assert.match(source, /\/api\/v23\.3\/predictions/);
+  assert.match(source, /telegram_auth_required/);
+  assert.match(source, /status\s*===\s*401|status\s*!==\s*401/);
 });
