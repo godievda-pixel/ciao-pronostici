@@ -30,6 +30,8 @@ test('normalizes a match to the canonical v23.2 shape', () => {
   assert.equal(match.homeScore, null);
   assert.equal(match.awayScore, null);
   assert.equal(match.predictionDeadline, '2026-09-15T18:59:59Z');
+  assert.equal(match.homeSourceMatchId, '');
+  assert.equal(match.awaySourceMatchId, '');
   assert.deepEqual(Object.keys(match), [
     'matchId',
     'competition',
@@ -47,8 +49,21 @@ test('normalizes a match to the canonical v23.2 shape', () => {
     'leg',
     'venue',
     'predictionDeadline',
+    'homeSourceMatchId',
+    'awaySourceMatchId',
     'rawVersion',
   ]);
+});
+
+test('preserves explicit source-match ids for knockout progression', () => {
+  const match = normalizeMatch({
+    ...raw,
+    id: 103,
+    home_source_match_id: 77,
+    awaySourceMatchId: 'ucl:88',
+  }, 'ucl');
+  assert.equal(match.homeSourceMatchId, 'ucl:77');
+  assert.equal(match.awaySourceMatchId, 'ucl:88');
 });
 
 test('includes all domestic matches and only Italian-club European matches', () => {
