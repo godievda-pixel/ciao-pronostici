@@ -75,6 +75,7 @@ const STYLE_ID = 'ciao-v233-predictions-style';
 const drafts = new Map();
 let matches = [];
 let activeFilter = 'all';
+let activeMode = 'make';
 let client = null;
 
 function initData() {
@@ -124,12 +125,14 @@ function matchHtml(match) {
 function render() {
   const overlay = document.getElementById(OVERLAY_ID);
   if (!overlay) return;
-  const selected = filterPredictionMatches(matches, activeFilter);
+  const modeRows = activeMode === 'mine' ? matches.filter(match => Boolean(match?.prediction)) : matches;
+  const selected = filterPredictionMatches(modeRows, activeFilter);
   const groups = groupPredictionMatchesByDate(selected);
   overlay.innerHTML = `<section class="cw233-pred-shell">
     <header><span>Ciao, Web!</span><h2>Прогнозы</h2><p>Прогноз закрывается за 15 минут до начала матча</p></header>
+    <div class="cw233-pred-modes"><button data-cw233-mode="make" class="${activeMode === 'make' ? 'is-active' : ''}">Сделать прогноз</button><button data-cw233-mode="mine" class="${activeMode === 'mine' ? 'is-active' : ''}">Мои прогнозы</button></div>
     <div class="cw233-pred-filters">${PREDICTION_FILTERS.map(filter => `<button data-cw233-filter="${filter.key}" class="${filter.key === activeFilter ? 'is-active' : ''}">${filter.label}</button>`).join('')}</div>
-    <div class="cw233-pred-content">${groups.length ? groups.map(group => `<section class="cw233-pred-day"><h3>${new Intl.DateTimeFormat('ru-RU', { day:'numeric', month:'long' }).format(new Date(`${group.key}T12:00:00Z`))}</h3>${group.matches.map(matchHtml).join('')}</section>`).join('') : '<div class="cw233-pred-empty">Нет матчей для этого фильтра</div>'}</div>
+    <div class="cw233-pred-content">${groups.length ? groups.map(group => `<section class="cw233-pred-day"><h3>${new Intl.DateTimeFormat('ru-RU', { day:'numeric', month:'long' }).format(new Date(`${group.key}T12:00:00Z`))}</h3>${group.matches.map(matchHtml).join('')}</section>`).join('') : `<div class="cw233-pred-empty">${activeMode === 'mine' ? 'Сохранённых прогнозов пока нет' : 'Нет матчей для этого фильтра'}</div>`}</div>
   </section>`;
 }
 
@@ -139,7 +142,7 @@ function ensureStyles() {
   style.id = STYLE_ID;
   style.textContent = `
 #${OVERLAY_ID}{position:fixed;inset:0 0 calc(78px + env(safe-area-inset-bottom,0px)) 0;z-index:44;overflow:auto;background:#07101f;color:#fff;padding:calc(18px + env(safe-area-inset-top,0px)) 14px 30px;font-family:inherit;-webkit-overflow-scrolling:touch}
-#${OVERLAY_ID}[hidden]{display:none!important}#${OVERLAY_ID} *{box-sizing:border-box}.cw233-pred-shell{width:min(100%,760px);margin:auto}.cw233-pred-shell header span{font-size:10px;font-weight:900;letter-spacing:.15em;opacity:.55}.cw233-pred-shell h2{margin:7px 0 0;font-size:30px}.cw233-pred-shell header p{margin:6px 0 15px;color:#8592b3;font-size:11px}.cw233-pred-filters{display:flex;gap:7px;overflow:auto;padding-bottom:10px}.cw233-pred-filters button{flex:0 0 auto;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(255,255,255,.05);color:#aeb8d2;padding:10px 12px;font:800 11px/1 inherit}.cw233-pred-filters .is-active{background:#fff;color:#07101f}.cw233-pred-day h3{margin:15px 2px 8px;font-size:12px;color:#91a0c1}.cw233-pred-card{margin:0 0 9px;padding:13px;border:1px solid rgba(255,255,255,.09);border-radius:18px;background:rgba(255,255,255,.04)}.cw233-pred-meta{display:flex;justify-content:space-between;color:#7483a5;font-size:9px}.cw233-pred-teams{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;margin:12px 0;align-items:center}.cw233-pred-teams b:last-child{text-align:right}.cw233-pred-score{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center}.cw233-pred-score-side{display:grid;grid-template-columns:38px 1fr 38px;gap:6px;align-items:center}.cw233-pred-score button,.cw233-pred-save{border:0;border-radius:11px;background:rgba(49,80,255,.25);color:#fff;min-height:38px;font-weight:900}.cw233-pred-score strong{text-align:center;font-size:20px}.cw233-pred-colon{font-size:18px;color:#8292bd}.cw233-pred-state{margin-top:11px;color:#8796b8;font-size:10px;font-weight:800}.cw233-pred-state.saved{color:#72ddb0}.cw233-pred-state.finished{color:#f0d487}.cw233-pred-save{width:100%;margin-top:10px;background:linear-gradient(180deg,#3150ff,#091BBD)}.cw233-pred-error{min-height:0;margin-top:7px;color:#ff8799;font-size:9px}.cw233-pred-empty{padding:28px;text-align:center;color:#7e8cab}@media(max-width:390px){.cw233-pred-score-side{grid-template-columns:34px 1fr 34px}.cw233-pred-shell h2{font-size:27px}}
+#${OVERLAY_ID}[hidden]{display:none!important}#${OVERLAY_ID} *{box-sizing:border-box}.cw233-pred-shell{width:min(100%,760px);margin:auto}.cw233-pred-shell header span{font-size:10px;font-weight:900;letter-spacing:.15em;opacity:.55}.cw233-pred-shell h2{margin:7px 0 0;font-size:30px}.cw233-pred-shell header p{margin:6px 0 15px;color:#8592b3;font-size:11px}.cw233-pred-modes{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;padding:4px;border-radius:15px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)}.cw233-pred-modes button{min-height:40px;border:0;border-radius:11px;background:transparent;color:#8e9bb9;font:850 11px/1 inherit}.cw233-pred-modes .is-active{background:linear-gradient(180deg,rgba(49,80,255,.42),rgba(9,27,189,.34));color:#fff}.cw233-pred-filters{display:flex;gap:7px;overflow:auto;padding-bottom:10px}.cw233-pred-filters button{flex:0 0 auto;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(255,255,255,.05);color:#aeb8d2;padding:10px 12px;font:800 11px/1 inherit}.cw233-pred-filters .is-active{background:#fff;color:#07101f}.cw233-pred-day h3{margin:15px 2px 8px;font-size:12px;color:#91a0c1}.cw233-pred-card{margin:0 0 9px;padding:13px;border:1px solid rgba(255,255,255,.09);border-radius:18px;background:rgba(255,255,255,.04)}.cw233-pred-meta{display:flex;justify-content:space-between;color:#7483a5;font-size:9px}.cw233-pred-teams{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;margin:12px 0;align-items:center}.cw233-pred-teams b:last-child{text-align:right}.cw233-pred-score{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center}.cw233-pred-score-side{display:grid;grid-template-columns:38px 1fr 38px;gap:6px;align-items:center}.cw233-pred-score button,.cw233-pred-save{border:0;border-radius:11px;background:rgba(49,80,255,.25);color:#fff;min-height:38px;font-weight:900}.cw233-pred-score strong{text-align:center;font-size:20px}.cw233-pred-colon{font-size:18px;color:#8292bd}.cw233-pred-state{margin-top:11px;color:#8796b8;font-size:10px;font-weight:800}.cw233-pred-state.saved{color:#72ddb0}.cw233-pred-state.finished{color:#f0d487}.cw233-pred-save{width:100%;margin-top:10px;background:linear-gradient(180deg,#3150ff,#091BBD)}.cw233-pred-error{min-height:0;margin-top:7px;color:#ff8799;font-size:9px}.cw233-pred-empty{padding:28px;text-align:center;color:#7e8cab}@media(max-width:390px){.cw233-pred-score-side{grid-template-columns:34px 1fr 34px}.cw233-pred-shell h2{font-size:27px}}
 `;
   document.head.appendChild(style);
 }
@@ -207,7 +210,7 @@ export function installPredictionsUi() {
   ensureStyles();
   ensureOverlay();
   document.addEventListener('click', event => {
-    const nav = event.target?.closest?.('[data-tab="predict"]');
+    const nav = event.target?.closest?.('[data-tab="mine"]');
     if (nav) {
       event.preventDefault();
       event.stopImmediatePropagation();
@@ -216,6 +219,14 @@ export function installPredictionsUi() {
     }
     const other = event.target?.closest?.('.nav button[data-tab]');
     if (other) close();
+
+    const mode = event.target?.closest?.('[data-cw233-mode]');
+    if (mode) {
+      activeMode = mode.dataset.cw233Mode === 'mine' ? 'mine' : 'make';
+      if (activeMode === 'mine' && activeFilter === 'unfilled') activeFilter = 'all';
+      render();
+      return;
+    }
 
     const filter = event.target?.closest?.('[data-cw233-filter]');
     if (filter) {
