@@ -29,8 +29,11 @@ test('v23.3 deployment probe verifies unified runtime and every release surface'
   assert.match(source, /id="ciao-v233"/);
   assert.match(source, /\/v23\.3\/index\.mjs/);
   assert.match(source, /Серия А/);
+  assert.match(source, /SERIE A 2026\/27/);
   assert.match(source, /Начало нового сезона!/);
-  assert.match(source, /homeResetBannerAbsent/);
+  assert.match(source, /homeSeasonLabelAbsent/);
+  assert.match(source, /homeResetNoticePresent/);
+  assert.doesNotMatch(source, /homeResetBannerAbsent/);
   assert.match(source, /homeMultiCompetition/);
   assert.match(source, /hasTablesRuntime/);
   assert.match(source, /hasMatchCenterRuntime/);
