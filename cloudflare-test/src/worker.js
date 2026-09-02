@@ -1,7 +1,7 @@
 import { adaptSerieASchedule } from './v23.2/serie-a-adapter.mjs';
-import { fetchEspnMatches } from './v23.2/espn-provider.mjs';
+import { fetchBsdMatches } from './v23.2/bsd-provider.mjs';
 
-const TEST_BUILD = 'ciao-web-v23-1-github-test-20260901';
+const TEST_BUILD = 'ciao-web-v23-2-bsd-test-20260902';
 const V23_2_MATCHES = '/api/v23.2/matches';
 const LEGACY_SERIE_A_SCHEDULE = '/api/ciao-schedule-fast-v1';
 const EXTERNAL_COMPETITIONS = new Set(['coppa_italia', 'ucl', 'uel', 'uecl']);
@@ -64,19 +64,25 @@ async function handleSerieAMatches(request, env, initData) {
   });
 }
 
-async function handleExternalMatches(competition, url) {
+async function handleExternalMatches(competition, url, env) {
   const fallback = defaultDateRange();
   const from = String(url.searchParams.get('from') || fallback.from);
   const to = String(url.searchParams.get('to') || fallback.to);
+  const apiKey = String(env.BSD_API_KEY || '');
+
+  if (!apiKey) {
+    return errorJson(503, { error: 'bsd_api_key_missing', competition });
+  }
 
   try {
-    const matches = await fetchEspnMatches({ competition, from, to });
+    const matches = await fetchBsdMatches({ competition, from, to, apiKey });
     return Response.json({
       ok: true,
       data: {
         competition,
         from,
         to,
+        provider: 'bsd-v2',
         matches,
       },
     });
@@ -87,6 +93,7 @@ async function handleExternalMatches(competition, url) {
     }
     return errorJson(502, {
       error: 'competition_upstream_failed',
+      provider: 'bsd-v2',
       competition,
     });
   }
@@ -107,7 +114,7 @@ async function handleV23_2Matches(request, env, url) {
     return handleSerieAMatches(request, env, initData);
   }
   if (EXTERNAL_COMPETITIONS.has(competition)) {
-    return handleExternalMatches(competition, url);
+    return handleExternalMatches(competition, url, env);
   }
 
   return errorJson(501, {
@@ -126,6 +133,8 @@ export default {
         service: 'ciao-web-app-test',
         build: TEST_BUILD,
         api: 'ciao-web-api',
+        matches_provider: 'bsd-v2',
+        bsd_configured: Boolean(env.BSD_API_KEY),
       });
     }
 

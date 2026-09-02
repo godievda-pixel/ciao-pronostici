@@ -25,28 +25,19 @@ function schedulePayload() {
   };
 }
 
-function espnTeams(ids) {
+function bsdEvent(id, homeId, awayId) {
   return {
-    sports: [{ leagues: [{ teams: ids.map(id => ({ team: { id: String(id) } })) }] }],
-  };
-}
-
-function espnEvent(id, homeId, awayId) {
-  return {
-    id: String(id),
-    date: '2026-09-16T19:00:00Z',
-    season: { year: 2026, slug: 'league-phase' },
-    status: { type: { state: 'pre', completed: false, name: 'STATUS_SCHEDULED' } },
-    competitions: [{
-      id: String(id),
-      date: '2026-09-16T19:00:00Z',
-      altGameNote: 'UEFA Champions League, League Phase',
-      status: { type: { state: 'pre', completed: false, name: 'STATUS_SCHEDULED' } },
-      competitors: [
-        { id: String(homeId), homeAway: 'home', team: { id: String(homeId), displayName: `Team ${homeId}` } },
-        { id: String(awayId), homeAway: 'away', team: { id: String(awayId), displayName: `Team ${awayId}` } },
-      ],
-    }],
+    id,
+    league: { id: 7, name: 'Champions League' },
+    season: { id: 2607, name: 'Champions League 2026/27', year: 2026 },
+    home_team: { id: homeId, name: homeId === 110 ? 'Internazionale' : `Team ${homeId}`, country_code: homeId === 110 ? 'IT' : 'GB' },
+    away_team: { id: awayId, name: `Team ${awayId}`, country_code: 'GB' },
+    event_date: '2026-09-16T19:00:00+00:00',
+    status: 'upcoming',
+    home_score: null,
+    away_score: null,
+    round_number: 1,
+    round_name: 'League Phase',
   };
 }
 
@@ -108,25 +99,41 @@ test('v23.2 matches route rejects missing Telegram auth before calling upstream'
   assert.equal(upstreamCalls, 0);
 });
 
-test('v23.2 UEFA route uses ESPN bridge and returns only matches with Italian clubs', async () => {
+test('v23.2 UEFA route uses BSD v2 with server token and returns only Italian-club matches', async () => {
   const previousFetch = globalThis.fetch;
-  const urls = [];
-  globalThis.fetch = async url => {
+  const requests = [];
+  globalThis.fetch = async (url, options = {}) => {
     const value = String(url);
-    urls.push(value);
-    if (value.includes('/ita.1/teams')) return Response.json(espnTeams([110]));
-    if (value.includes('/ita.2/teams')) return Response.json(espnTeams([103]));
-    if (value.includes('/uefa.champions/scoreboard')) {
-      return Response.json({
-        leagues: [{ name: 'UEFA Champions League' }],
-        events: [espnEvent(1001, 110, 359), espnEvent(1002, 86, 132)],
-      });
+    requests.push({ url: value, authorization: new Headers(options.headers).get('authorization') });
+
+    if (value.includes('/api/v2/leagues/?')) {
+      return Response.json({ count: 4, next: null, results: [
+        { id: 7, name: 'Champions League', country: 'Europe' },
+        { id: 8, name: 'Europa League', country: 'Europe' },
+        { id: 9, name: 'Conference League', country: 'Europe' },
+        { id: 10, name: 'Coppa Italia', country: 'Italy' },
+      ] });
+    }
+    if (value.includes('/api/v2/leagues/7/season/')) {
+      return Response.json({ id: 2607, name: 'Champions League 2026/27', year: 2026, is_current: true });
+    }
+    if (value.includes('/api/v2/teams/?')) {
+      return Response.json({ count: 1, next: null, results: [
+        { id: 110, name: 'Internazionale', country_code: 'IT' },
+      ] });
+    }
+    if (value.includes('/api/v2/events/?')) {
+      return Response.json({ count: 2, next: null, results: [
+        bsdEvent(1001, 110, 359),
+        bsdEvent(1002, 86, 132),
+      ] });
     }
     throw new Error(`unexpected URL ${value}`);
   };
 
   try {
     const env = {
+      BSD_API_KEY: 'bsd-test-key',
       CIAO_WEB_API: { fetch: async () => { throw new Error('legacy API must not be called'); } },
       ASSETS: { fetch: async () => new Response('asset') },
     };
@@ -144,9 +151,12 @@ test('v23.2 UEFA route uses ESPN bridge and returns only matches with Italian cl
     assert.equal(body.data.matches.length, 1);
     assert.equal(body.data.matches[0].matchId, 'ucl:1001');
     assert.equal(body.data.matches[0].homeTeam.countryCode, 'ITA');
-    assert.equal(urls.some(url => url.includes('/uefa.champions/scoreboard?dates=20260901-20261031')), true);
-    assert.equal(urls.some(url => url.includes('/ita.1/teams')), true);
-    assert.equal(urls.some(url => url.includes('/ita.2/teams')), true);
+    assert.equal(requests.every(item => item.authorization === 'Token bsd-test-key'), true);
+    assert.equal(requests.some(item => item.url.includes('sports.bzzoiro.com/api/v2/leagues/')), true);
+    assert.equal(requests.some(item => item.url.includes('/api/v2/leagues/7/season/')), true);
+    assert.equal(requests.some(item => item.url.includes('/api/v2/teams/?') && item.url.includes('country_code=IT')), true);
+    assert.equal(requests.some(item => item.url.includes('/api/v2/events/?') && item.url.includes('league_id=7') && item.url.includes('season_id=2607')), true);
+    assert.equal(requests.some(item => item.url.includes('espn')), false);
   } finally {
     globalThis.fetch = previousFetch;
   }
@@ -154,6 +164,7 @@ test('v23.2 UEFA route uses ESPN bridge and returns only matches with Italian cl
 
 test('v23.2 external competition route rejects invalid date range cleanly', async () => {
   const env = {
+    BSD_API_KEY: 'bsd-test-key',
     CIAO_WEB_API: { fetch: async () => Response.json(schedulePayload()) },
     ASSETS: { fetch: async () => new Response('asset') },
   };

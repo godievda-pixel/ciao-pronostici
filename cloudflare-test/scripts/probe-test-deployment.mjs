@@ -42,6 +42,24 @@ async function fetchText(url) {
   return { response, text: await response.text() };
 }
 
+async function probeHealth() {
+  try {
+    const { response, text } = await fetchText(new globalThis.URL('/healthz', ORIGIN));
+    let json = null;
+    try { json = JSON.parse(text); } catch {}
+    return {
+      status: response.status,
+      ok: Boolean(response.ok && json?.ok),
+      service: json?.service || null,
+      build: json?.build || null,
+      matchesProvider: json?.matches_provider || null,
+      bsdConfigured: typeof json?.bsd_configured === 'boolean' ? json.bsd_configured : null,
+    };
+  } catch (error) {
+    return { status: 0, ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 function snippets(text, markers) {
   return markers.map(marker => {
     const index = text.indexOf(marker);
@@ -69,6 +87,9 @@ async function probeModules() {
         contentSecurityPolicy: response.headers.get('content-security-policy'),
         bytes: Buffer.byteLength(text),
         hasInstallMatchesUi: path.endsWith('/matches-ui.mjs') ? text.includes('installMatchesUi') : undefined,
+        hasTournamentCapture: path.endsWith('/matches-ui.mjs')
+          ? text.includes('event.stopPropagation?.();') && text.includes('controller.openCompetition(card.dataset.cw232Competition)')
+          : undefined,
         hasCoreMarker: path.endsWith('/index.mjs') ? text.includes('CiaoV232Core') : undefined,
       });
     } catch (error) {
@@ -116,13 +137,15 @@ async function probe() {
     if (index < 8) await sleep(10_000);
   }
 
-  const modules = await probeModules();
+  const [modules, health] = await Promise.all([probeModules(), probeHealth()]);
+  const matchesModule = modules.find(item => item.path.endsWith('/matches-ui.mjs'));
   const report = {
     url: ORIGIN,
     expected: EXPECTED,
     observedAt: new Date().toISOString(),
     attempts,
     latest: attempts.at(-1) || null,
+    health,
     modules,
     navigation: snippets(latestHtml, NAV_MARKERS),
   };
@@ -131,9 +154,14 @@ async function probe() {
   await writeFile('artifacts/test-deployment-probe.json', JSON.stringify(report, null, 2));
   console.log(JSON.stringify({
     latest: report.latest,
+    health,
     modules,
     navigation: report.navigation.map(item => ({ marker: item.marker, found: item.found, index: item.index })),
   }));
+
+  if (!matchesModule?.hasTournamentCapture) {
+    throw new Error('deployed TEST does not contain tournament capture navigation fix');
+  }
 }
 
 probe().catch(error => {
