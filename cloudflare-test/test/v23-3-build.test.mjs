@@ -14,6 +14,7 @@ test('build copies v23.3 browser modules required by multi-competition UI', asyn
   assert.equal(files.includes('competition-data.mjs'), true);
   assert.equal(files.includes('data-client.mjs'), true);
   assert.equal(files.includes('home-integration.mjs'), true);
+  assert.equal(files.includes('tables-ui.mjs'), true);
 
   const competitionData = await readFile(
     new URL('../dist/v23.3/competition-data.mjs', import.meta.url),
@@ -27,12 +28,19 @@ test('build copies v23.3 browser modules required by multi-competition UI', asyn
     new URL('../dist/v23.3/home-integration.mjs', import.meta.url),
     'utf8',
   );
+  const tablesRuntime = await readFile(
+    new URL('../dist/v23.3/tables-ui.mjs', import.meta.url),
+    'utf8',
+  );
 
   assert.match(competitionData, /predictionDeadlineForKickoff/);
   assert.match(dataClient, /loadCompetitionStandings/);
   assert.match(dataClient, /loadMatchCenterSnapshot/);
   assert.match(homeRuntime, /CiaoV233Home/);
   assert.match(homeRuntime, /Кальчо сегодня/);
+  assert.match(tablesRuntime, /installTablesUi/);
+  assert.match(tablesRuntime, /TABLE_COMPETITIONS/);
+  assert.match(tablesRuntime, /coppa_italia/);
 });
 
 test('v23.3 build injects the Home module exactly once', async () => {
@@ -46,6 +54,19 @@ test('v23.3 build injects the Home module exactly once', async () => {
   assert.equal(twice, once);
   assert.equal((once.match(/id="ciao-v233-home"/g) || []).length, 1);
   assert.match(once, /src="\/v23\.3\/home-integration\.mjs"/);
+});
+
+test('v23.3 build injects the Tables module exactly once', async () => {
+  const { injectV233TablesEntry } = await buildModule();
+  assert.equal(typeof injectV233TablesEntry, 'function');
+
+  const base = '<html><head></head><body><main>app</main></body></html>';
+  const once = injectV233TablesEntry(base);
+  const twice = injectV233TablesEntry(once);
+
+  assert.equal(twice, once);
+  assert.equal((once.match(/id="ciao-v233-tables"/g) || []).length, 1);
+  assert.match(once, /src="\/v23\.3\/tables-ui\.mjs"/);
 });
 
 test('v23.3 build applies the stable Home patch and refuses a missing anchor', async () => {

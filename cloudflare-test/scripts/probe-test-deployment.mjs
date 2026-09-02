@@ -16,6 +16,8 @@ const ITALIAN_PROFILE_NAMES = new Set([
 const EXPECTED = [
   'id="ciao-v232-core"',
   'id="ciao-v232-matches-ui"',
+  'id="ciao-v233-home"',
+  'id="ciao-v233-tables"',
   'cw231-favorite-normalized-link',
 ];
 const MODULES = [
@@ -28,6 +30,8 @@ const MODULES = [
   '/v23.2/profile-matches.mjs',
   '/v23.2/profile-integration.mjs',
   '/v23.2/coppa-bracket.mjs',
+  '/v23.3/home-integration.mjs',
+  '/v23.3/tables-ui.mjs',
 ];
 const NAV_MARKERS = [
   "root.addEventListener('click'",
@@ -234,13 +238,19 @@ async function probeModules() {
         hasTournamentCapture: path.endsWith('/matches-ui.mjs')
           ? text.includes('event.stopPropagation?.();') && text.includes('controller.openCompetition(card.dataset.cw232Competition)')
           : undefined,
-        hasCoppaBracket: path.endsWith('/matches-ui.mjs')
-          ? text.includes('Сетка Плей-офф') && text.includes('cw232-bracket-viewport')
+        hasCoppaScheduleOnly: path.endsWith('/matches-ui.mjs')
+          ? !text.includes('${renderCoppaTabs()}') && !text.includes('data-cw232-coppa-panel="bracket"')
           : undefined,
         hasCoreMarker: path.endsWith('/index.mjs') ? text.includes('CiaoV232Core') : undefined,
         hasProfileImport: path.endsWith('/index.mjs') ? text.includes("profile-integration.mjs") : undefined,
         hasProfileRuntime: path.endsWith('/profile-integration.mjs')
           ? text.includes('CiaoV232Profile') && text.includes('cw232-profile-tournament-enrichment')
+          : undefined,
+        hasHomeRuntime: path.endsWith('/home-integration.mjs')
+          ? text.includes('CiaoV233Home') && text.includes('Кальчо сегодня')
+          : undefined,
+        hasTablesRuntime: path.endsWith('/tables-ui.mjs')
+          ? text.includes('installTablesUi') && text.includes('ciao-v233-tables-overlay') && text.includes('coppa_italia')
           : undefined,
       });
     } catch (error) {
@@ -280,6 +290,8 @@ async function probe() {
         etag: response.headers.get('etag'),
         markers,
         profileMarker: html.includes('cw232-profile-tournament-enrichment'),
+        homeMarker: html.includes('id="ciao-v233-home"'),
+        tablesMarker: html.includes('id="ciao-v233-tables"'),
         bytes: Buffer.byteLength(html),
       });
       if (response.ok && EXPECTED.every(marker => markers[marker])) break;
@@ -302,6 +314,8 @@ async function probe() {
   const matchesModule = modules.find(item => item.path.endsWith('/matches-ui.mjs'));
   const indexModule = modules.find(item => item.path.endsWith('/index.mjs'));
   const profileModule = modules.find(item => item.path.endsWith('/profile-integration.mjs'));
+  const homeModule = modules.find(item => item.path.endsWith('/home-integration.mjs'));
+  const tablesModule = modules.find(item => item.path.endsWith('/tables-ui.mjs'));
   const profileFeed = profileFeedCheck(competitions);
   const allUnknownTeamNames = [...new Set(competitions.flatMap(row => row.unknownTeamNames))]
     .sort((a, b) => a.localeCompare(b));
@@ -331,8 +345,21 @@ async function probe() {
     navigation: report.navigation.map(item => ({ marker: item.marker, found: item.found, index: item.index })),
   }));
 
+  const missingExpected = EXPECTED.filter(marker => !report.latest?.markers?.[marker]);
+  if (missingExpected.length) {
+    throw new Error(`deployed TEST is missing v23.3 Tables runtime markers: ${missingExpected.join(', ')}`);
+  }
   if (!matchesModule?.hasTournamentCapture) {
     throw new Error('deployed TEST does not contain tournament capture navigation fix');
+  }
+  if (!matchesModule?.hasCoppaScheduleOnly) {
+    throw new Error('deployed TEST Matches still contains the Coppa bracket panel');
+  }
+  if (!homeModule?.hasHomeRuntime) {
+    throw new Error('deployed TEST is missing v23.3 Home runtime');
+  }
+  if (!tablesModule?.hasTablesRuntime) {
+    throw new Error('deployed TEST is missing v23.3 Tables runtime');
   }
   if (health.bsdConfigured === true) {
     for (const row of competitions) {
@@ -356,9 +383,7 @@ async function probe() {
     if (!profileFeed.ok) throw new Error(`deployed TEST profile tournament feed unavailable: ${profileFeed.reason || 'no_matches'}`);
   }
 
-  // These requirements become meaningful as soon as the corresponding build is deployed.
   if (report.latest?.profileMarker) {
-    if (!matchesModule?.hasCoppaBracket) throw new Error('deployed TEST profile build is missing Coppa bracket UI');
     if (!indexModule?.hasProfileImport || !profileModule?.hasProfileRuntime) {
       throw new Error('deployed TEST profile build is missing profile tournament runtime');
     }

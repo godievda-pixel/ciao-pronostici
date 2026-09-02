@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { profileFeedCheck } from '../scripts/probe-test-deployment.mjs';
 
 function team(id, name, rawName, countryCode = '') {
@@ -29,4 +30,16 @@ test('deployment profile probe recognizes a known Italian club even when BSD omi
   assert.equal(result.ok, true);
   assert.equal(result.team.name, 'Интер');
   assert.deepEqual(result.sampleMatchIds, ['ucl:601024']);
+});
+
+test('deployment probe explicitly verifies v23.3 Home and Tables runtime markers', async () => {
+  const source = await readFile(new URL('../scripts/probe-test-deployment.mjs', import.meta.url), 'utf8');
+
+  assert.match(source, /id="ciao-v233-home"/);
+  assert.match(source, /id="ciao-v233-tables"/);
+  assert.match(source, /\/v23\.3\/home-integration\.mjs/);
+  assert.match(source, /\/v23\.3\/tables-ui\.mjs/);
+  assert.match(source, /hasHomeRuntime/);
+  assert.match(source, /hasTablesRuntime/);
+  assert.match(source, /deployed TEST is missing v23\.3 Tables runtime/);
 });
