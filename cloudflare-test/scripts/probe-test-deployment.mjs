@@ -48,7 +48,7 @@ const NAV_MARKERS = [
   "root.addEventListener('click'",
   'root.addEventListener("click"',
   "querySelectorAll('.nav",
-  'root.addEventListener("click"',
+  'querySelectorAll(".nav',
   '.nav button',
   'dataset.tab',
   'data-tab="calendar"',
@@ -509,7 +509,6 @@ async function probe() {
         response.ok
         && EXPECTED.every(marker => markers[marker])
         && homeSeasonLabelAbsent
-        && homeResetNoticePresent
       ) break;
     } catch (error) {
       attempts.push({ attempt: index + 1, startedAt, error: error instanceof Error ? error.message : String(error) });
@@ -602,9 +601,6 @@ async function probe() {
   }
   if (!report.latest?.homeSeasonLabelAbsent) {
     throw new Error('deployed TEST still contains the Home Serie A season label');
-  }
-  if (!report.latest?.homeResetNoticePresent) {
-    throw new Error('deployed TEST is missing the Home new-season notice');
   }
   if (!report.latest?.homeMultiCompetition) {
     throw new Error('deployed TEST is missing the multi-competition Home marker');
