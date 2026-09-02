@@ -90,6 +90,19 @@ test('rankings reconcile finished matches before ranking read', async()=>{
   assert.equal(rows[0].points,5);
 });
 
+test('rankingMe returns the current user ranking object after reconciliation', async()=>{
+  const ns=namespace(async req=>{
+    const path=new URL(req.url).pathname;
+    if(path==='/rankings/me') return Response.json({ok:true,ranking:{position:3,user_id:'telegram:42',points:11}});
+    throw new Error(path);
+  });
+  const service=createPredictionService({request,env:baseEnv(ns),deps:{
+    resolveAuthenticatedUser:async()=>authUser(),
+    listCanonicalPredictionMatches:async()=>({matches:[],errors:{}}),
+  }});
+  assert.deepEqual(await service.rankingMe(), {position:3,user_id:'telegram:42',points:11});
+});
+
 test('Durable Object failures map to prediction_backend_unavailable', async()=>{
   const ns=namespace(async()=>new Response('nope',{status:500}));
   const service=createPredictionService({request,env:baseEnv(ns),deps:{resolveAuthenticatedUser:async()=>authUser()}});
