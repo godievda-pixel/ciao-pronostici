@@ -21,13 +21,14 @@ test('predictions attach to legacy mine tab and never hijack Home predict tab', 
   assert.doesNotMatch(source, /data-tab="predict"/);
 });
 
-test('prediction and ranking overlays explicitly close sibling v23.3 overlays before opening', async () => {
+test('prediction and ranking pages reuse stable content instead of sibling fixed overlays', async () => {
   const predictionSource = await readFile(new URL('../src/v23.3/predictions-ui.mjs', import.meta.url), 'utf8');
   const rankingSource = await readFile(new URL('../src/v23.3/ranking-ui.mjs', import.meta.url), 'utf8');
-  assert.match(predictionSource, /ciao-v233-ranking-overlay/);
-  assert.match(predictionSource, /ciao-v233-tables-overlay/);
-  assert.match(rankingSource, /ciao-v233-predictions-overlay/);
-  assert.match(rankingSource, /ciao-v233-tables-overlay/);
+  assert.match(predictionSource, /#ciao-miniapp-root \.content/);
+  assert.match(rankingSource, /#ciao-miniapp-root \.content/);
+  assert.doesNotMatch(predictionSource, /ciao-v233-predictions-overlay|ciao-v233-ranking-overlay/);
+  assert.doesNotMatch(rankingSource, /ciao-v233-predictions-overlay|ciao-v233-ranking-overlay/);
+  assert.doesNotMatch(`${predictionSource}\n${rankingSource}`, /stopImmediatePropagation/);
 });
 
 test('ranking filters expose overall plus all five competitions', () => {
