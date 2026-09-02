@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { profileFeedCheck } from '../scripts/probe-test-deployment.mjs';
+import {
+  profileFeedCheck,
+  standingsReleaseCheck,
+} from '../scripts/probe-test-deployment.mjs';
 
 function team(id, name, rawName, countryCode = '') {
   return { id, name, rawName, countryCode };
@@ -30,6 +33,37 @@ test('deployment profile probe recognizes a known Italian club even when BSD omi
   assert.equal(result.ok, true);
   assert.equal(result.team.name, 'Интер');
   assert.deepEqual(result.sampleMatchIds, ['ucl:601024']);
+});
+
+test('deployment standings gate accepts an unpublished empty table but still blocks real failures', () => {
+  assert.deepEqual(
+    standingsReleaseCheck({ competition: 'ucl', ok: true, rowCount: 0, hasForeignClub: false }),
+    { pass: true, status: 'pending_provider' },
+  );
+  assert.deepEqual(
+    standingsReleaseCheck({ competition: 'uel', ok: true, rowCount: 36, hasForeignClub: true }),
+    { pass: true, status: 'ready' },
+  );
+  assert.deepEqual(
+    standingsReleaseCheck({ competition: 'uecl', ok: false, rowCount: 0, hasForeignClub: false }),
+    { pass: false, status: 'provider_error' },
+  );
+  assert.deepEqual(
+    standingsReleaseCheck({ competition: 'ucl', ok: true, rowCount: 36, hasForeignClub: false }),
+    { pass: false, status: 'missing_foreign_clubs' },
+  );
+});
+
+test('deployment probe proves localization against the deployed TEST registry module', async () => {
+  const source = await readFile(new URL('../scripts/probe-test-deployment.mjs', import.meta.url), 'utf8');
+
+  assert.doesNotMatch(source, /import \{ isKnownTeamName \} from '\.\.\/src\/v23\.2\/team-registry\.mjs'/);
+  assert.match(source, /probeDeployedTeamRegistry/);
+  assert.match(source, /\/v23\.2\/team-registry\.mjs/);
+  assert.match(source, /data:text\/javascript;base64/);
+  assert.match(source, /registry\.isKnownTeamName/);
+  assert.match(source, /registry\.russianTeamName/);
+  assert.match(source, /deployedRegistry/);
 });
 
 test('deployment probe explicitly verifies unified v23.3 Home and Tables runtime markers', async () => {
