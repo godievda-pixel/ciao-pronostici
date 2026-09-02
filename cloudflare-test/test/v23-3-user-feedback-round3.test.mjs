@@ -192,3 +192,5 @@ test('Serie A Matches restores the previous stable legacy calendar instead of th
   assert.equal(hidden, 1);
   assert.deepEqual(loaded, []);
 });
+
+// CI-only delayed live probe trigger; no runtime behavior changes.
