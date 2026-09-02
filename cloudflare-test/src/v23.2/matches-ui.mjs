@@ -1,6 +1,7 @@
 import { COMPETITION_KEYS, getCompetitionConfig } from './competition-config.mjs';
 import { loadCompetitionMatches } from './data-client.mjs';
 import { groupForCompetition, sortChronologically } from './tournament-engine.mjs';
+import { buildCoppaBracket } from './coppa-bracket.mjs';
 
 const OVERLAY_ID = 'ciao-v232-matches-overlay';
 const STYLE_ID = 'ciao-v232-matches-style';
@@ -123,17 +124,61 @@ function groupTitle(group) {
   return value || 'Матчи';
 }
 
-export function renderCompetitionScreen(competition, data = {}) {
-  const config = getCompetitionConfig(competition);
-  const matches = sortChronologically(Array.isArray(data?.matches) ? data.matches : []);
+function renderMatchGroups(matches, competition) {
   const groups = groupForCompetition(matches, competition);
-
-  const body = groups.length
+  return groups.length
     ? groups.map(group => `<section class="cw232-stage" data-cw232-stage="${esc(group.key)}">
         <div class="cw232-stage__title"><h3>${esc(groupTitle(group))}</h3><span>${group.matches.length}</span></div>
         <div class="cw232-match-list">${group.matches.map(matchCard).join('')}</div>
       </section>`).join('')
     : '<div class="cw232-matches-empty">Матчей в выбранном сезоне пока нет</div>';
+}
+
+function bracketMatchStatus(match) {
+  if (match?.score) return match.score;
+  if (match?.status === 'postponed') return 'Матч перенесён';
+  if (match?.status === 'cancelled') return 'Матч отменён';
+  return formatKickoff(match?.kickoffAt);
+}
+
+function renderCoppaBracket(matches) {
+  const bracket = buildCoppaBracket(matches);
+  if (!bracket.rounds.length) {
+    return '<div class="cw232-matches-empty">Сетка появится после формирования 1/8 финала</div>';
+  }
+
+  return `<div class="cw232-bracket-viewport">
+    <div class="cw232-bracket">
+      ${bracket.rounds.map(round => `<section class="cw232-bracket-round" data-cw232-bracket-round="${esc(round.key)}">
+        <div class="cw232-bracket-round__title">${esc(round.title)}</div>
+        <div class="cw232-bracket-round__matches">
+          ${round.matches.map(match => `<article class="cw232-bracket-match" data-cw232-match="${esc(match.id)}">
+            <div class="cw232-bracket-team">${esc(match.homeLabel)}</div>
+            <div class="cw232-bracket-team">${esc(match.awayLabel)}</div>
+            <div class="cw232-bracket-meta">${esc(bracketMatchStatus(match))}</div>
+          </article>`).join('')}
+        </div>
+      </section>`).join('')}
+    </div>
+  </div>`;
+}
+
+function renderCoppaTabs() {
+  return `<div class="cw232-coppa-tabs" role="tablist" aria-label="Раздел Кубка Италии">
+    <button type="button" class="cw232-coppa-tab is-active" data-cw232-action="coppa-view" data-cw232-coppa-view="matches" aria-selected="true">Матчи</button>
+    <button type="button" class="cw232-coppa-tab" data-cw232-action="coppa-view" data-cw232-coppa-view="bracket" aria-selected="false">Сетка Плей-офф</button>
+  </div>`;
+}
+
+export function renderCompetitionScreen(competition, data = {}) {
+  const config = getCompetitionConfig(competition);
+  const matches = sortChronologically(Array.isArray(data?.matches) ? data.matches : []);
+  const body = renderMatchGroups(matches, competition);
+  const competitionBody = competition === 'coppa_italia'
+    ? `${renderCoppaTabs()}
+      <div class="cw232-coppa-panel" data-cw232-coppa-panel="matches">${body}</div>
+      <div class="cw232-coppa-panel" data-cw232-coppa-panel="bracket" hidden>${renderCoppaBracket(matches)}</div>`
+    : body;
 
   return `<section class="cw232-competition" data-cw232-view="competition" data-cw232-competition="${esc(competition)}" data-cw232-theme="${esc(config.theme)}">
     <header class="cw232-competition__head">
@@ -144,7 +189,7 @@ export function renderCompetitionScreen(competition, data = {}) {
         <p>${competition === 'serie_a' || competition === 'coppa_italia' ? 'Италия' : 'Итальянские клубы'}</p>
       </div>
     </header>
-    ${body}
+    ${competitionBody}
   </section>`;
 }
 
@@ -243,8 +288,10 @@ const MATCHES_CSS = `
 .cw232-tournament-card[data-cw232-theme='serie-a']{background:radial-gradient(circle at 90% 0%,rgba(76,155,255,.45),transparent 40%),linear-gradient(135deg,#064ecf,#052963)}.cw232-tournament-card[data-cw232-theme='coppa']{background:linear-gradient(120deg,rgba(0,146,70,.28),transparent 28%),linear-gradient(240deg,rgba(206,43,55,.34),transparent 30%),#11151d}.cw232-tournament-card[data-cw232-theme='champions']{background:radial-gradient(circle at 82% 12%,rgba(104,127,255,.5),transparent 25%),linear-gradient(145deg,#111a55,#05091e 70%)}.cw232-tournament-card[data-cw232-theme='europa']{background:radial-gradient(circle at 90% 10%,rgba(255,118,0,.5),transparent 32%),linear-gradient(145deg,#2b1606,#0d0d0f 72%)}.cw232-tournament-card[data-cw232-theme='conference']{background:radial-gradient(circle at 88% 10%,rgba(54,211,123,.42),transparent 32%),linear-gradient(145deg,#08291a,#07130e 72%)}
 .cw232-competition__head{display:flex;gap:14px;align-items:center;padding:7px 0 20px}.cw232-back{flex:0 0 44px;width:44px;height:44px;border:1px solid rgba(255,255,255,.14);border-radius:15px;background:rgba(255,255,255,.07);color:#fff;font:700 21px/1 inherit}.cw232-stage{margin:0 0 22px}.cw232-stage__title{display:flex;justify-content:space-between;align-items:center;margin:0 2px 9px}.cw232-stage__title h3{margin:0;font-size:13px;letter-spacing:.02em}.cw232-stage__title span{font-size:11px;opacity:.5}.cw232-match-list{display:grid;gap:9px}.cw232-match-card{border:1px solid rgba(255,255,255,.1);border-radius:19px;background:rgba(255,255,255,.065);padding:14px 12px;backdrop-filter:blur(12px)}.cw232-match-card__teams{display:grid;grid-template-columns:minmax(0,1fr) 78px minmax(0,1fr);align-items:center;gap:8px}.cw232-match-team{display:flex;min-width:0;align-items:center;gap:8px}.cw232-match-team--away{flex-direction:row-reverse;text-align:right}.cw232-match-team strong{font-size:12px;line-height:1.2;overflow-wrap:anywhere}.cw232-team-logo{width:34px;height:34px;object-fit:contain;flex:0 0 34px}.cw232-team-logo--empty{border-radius:50%;background:rgba(255,255,255,.08)}.cw232-match-card__center{text-align:center;min-width:0}.cw232-match-card__score{display:block;font-size:17px;font-weight:850;letter-spacing:-.02em}.cw232-match-card__center small{display:block;margin-top:3px;font-size:9px;line-height:1.2;color:rgba(255,255,255,.55)}
 .cw232-competition[data-cw232-theme='champions'] .cw232-match-card{background:linear-gradient(135deg,rgba(38,50,126,.42),rgba(10,13,37,.76))}.cw232-competition[data-cw232-theme='europa'] .cw232-match-card{background:linear-gradient(135deg,rgba(116,53,4,.35),rgba(16,14,13,.78))}.cw232-competition[data-cw232-theme='conference'] .cw232-match-card{background:linear-gradient(135deg,rgba(13,89,50,.34),rgba(8,21,15,.78))}.cw232-competition[data-cw232-theme='coppa'] .cw232-match-card{background:linear-gradient(135deg,rgba(22,59,42,.24),rgba(73,22,28,.23)),rgba(255,255,255,.045)}
+.cw232-coppa-tabs{display:flex;gap:6px;padding:4px;margin:0 0 18px;border:1px solid rgba(255,255,255,.1);border-radius:16px;background:rgba(255,255,255,.045)}.cw232-coppa-tab{flex:1;min-height:42px;border:0;border-radius:12px;background:transparent;color:rgba(255,255,255,.62);font:800 12px/1.15 inherit;padding:10px}.cw232-coppa-tab.is-active{background:linear-gradient(135deg,rgba(0,146,70,.35),rgba(206,43,55,.28));color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}.cw232-coppa-panel[hidden]{display:none!important}
+.cw232-bracket-viewport{width:100%;max-width:100%;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;padding:2px 0 12px}.cw232-bracket{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(220px,260px);gap:16px;min-width:max-content;align-items:start}.cw232-bracket-round{min-width:0}.cw232-bracket-round__title{position:sticky;left:0;margin:0 0 9px;font-size:12px;font-weight:850;letter-spacing:.04em;color:rgba(255,255,255,.72)}.cw232-bracket-round__matches{display:grid;gap:12px}.cw232-bracket-match{border:1px solid rgba(255,255,255,.11);border-radius:17px;background:linear-gradient(135deg,rgba(22,59,42,.22),rgba(73,22,28,.2)),rgba(255,255,255,.05);padding:12px}.cw232-bracket-team{min-height:34px;display:flex;align-items:center;padding:7px 9px;border-radius:10px;background:rgba(255,255,255,.055);font-size:11px;font-weight:750;line-height:1.2}.cw232-bracket-team+.cw232-bracket-team{margin-top:5px}.cw232-bracket-meta{margin-top:8px;font-size:9px;color:rgba(255,255,255,.52);text-align:center}
 .cw232-loading-card{height:95px;border-radius:19px;background:linear-gradient(90deg,rgba(255,255,255,.04),rgba(255,255,255,.1),rgba(255,255,255,.04));background-size:220% 100%;animation:cw232pulse 1.25s linear infinite;margin:0 0 9px}.cw232-matches-empty{padding:26px 18px;border:1px solid rgba(255,255,255,.09);border-radius:19px;color:rgba(255,255,255,.62);text-align:center}.cw232-retry{width:100%;border:0;border-radius:16px;padding:14px 16px;background:#fff;color:#07101f;font:800 13px/1 inherit}@keyframes cw232pulse{to{background-position:-220% 0}}
-@media(max-width:390px){#${OVERLAY_ID}{padding-left:12px;padding-right:12px}.cw232-match-card__teams{grid-template-columns:minmax(0,1fr) 66px minmax(0,1fr)}.cw232-team-logo{width:30px;height:30px;flex-basis:30px}.cw232-match-team strong{font-size:11px}.cw232-matches-head h2,.cw232-competition__head h2{font-size:27px}}
+@media(max-width:390px){#${OVERLAY_ID}{padding-left:12px;padding-right:12px}.cw232-match-card__teams{grid-template-columns:minmax(0,1fr) 66px minmax(0,1fr)}.cw232-team-logo{width:30px;height:30px;flex-basis:30px}.cw232-match-team strong{font-size:11px}.cw232-matches-head h2,.cw232-competition__head h2{font-size:27px}.cw232-coppa-tab{font-size:11px}}
 `;
 
 function ensureStyles(documentRef) {
@@ -266,6 +313,18 @@ function ensureOverlay(documentRef) {
   const mount = documentRef.getElementById('ciao-miniapp-root') || documentRef.body;
   mount?.appendChild?.(overlay);
   return overlay;
+}
+
+function switchCoppaView(overlay, view) {
+  if (!overlay?.querySelectorAll || !['matches', 'bracket'].includes(view)) return;
+  for (const tab of overlay.querySelectorAll('[data-cw232-coppa-view]')) {
+    const active = tab.dataset?.cw232CoppaView === view;
+    tab.classList?.toggle?.('is-active', active);
+    tab.setAttribute?.('aria-selected', active ? 'true' : 'false');
+  }
+  for (const panel of overlay.querySelectorAll('[data-cw232-coppa-panel]')) {
+    panel.hidden = panel.dataset?.cw232CoppaPanel !== view;
+  }
 }
 
 export function installMatchesUi(
@@ -328,6 +387,12 @@ export function installMatchesUi(
       event.stopPropagation?.();
       const competition = action.dataset?.cw232Competition;
       if (competition) void controller.openCompetition(competition);
+      return;
+    }
+    if (action?.dataset?.cw232Action === 'coppa-view') {
+      event.preventDefault?.();
+      event.stopPropagation?.();
+      switchCoppaView(overlay, action.dataset?.cw232CoppaView || 'matches');
       return;
     }
 
