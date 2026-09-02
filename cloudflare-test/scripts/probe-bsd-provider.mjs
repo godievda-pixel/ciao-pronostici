@@ -13,9 +13,6 @@ const fetchImpl = async (url, options = {}) => {
   if (value.includes('/api/v2/leagues/7/season/')) {
     return Response.json({ id: 2607, name: 'Champions League 2026/27', year: 2026, is_current: true });
   }
-  if (value.includes('/api/v2/teams/?')) {
-    return Response.json({ count: 1, next: null, results: [{ id: 110, name: 'Internazionale', country_code: 'IT' }] });
-  }
   if (value.includes('/api/v2/events/?')) {
     return Response.json({ count: 2, next: null, results: [
       {
@@ -30,9 +27,11 @@ const fetchImpl = async (url, options = {}) => {
       },
       {
         id: 1002,
+        league: { id: 7, name: 'Champions League' },
+        season: { id: 2607, name: 'Champions League 2026/27', year: 2026 },
         home_team: { id: 86, name: 'Barcelona', country_code: 'ES' },
-        away_team: { id: 132, name: 'Bayern', country_code: 'DE' },
-        event_date: '2026-09-16T19:00:00+00:00',
+        away_team: { id: 132, name: 'Bayern Munich', country_code: 'DE' },
+        event_date: '2026-09-16T20:00:00+00:00',
         status: 'upcoming',
         round_name: 'League Phase',
       },
@@ -49,8 +48,11 @@ const matches = await fetchBsdMatches({
   fetchImpl,
 });
 
-if (matches.length !== 1 || matches[0].matchId !== 'ucl:1001') {
-  throw new Error('BSD provider did not keep exactly the Italian-club UCL match');
+if (matches.length !== 2 || matches[0].matchId !== 'ucl:1001' || matches[1].matchId !== 'ucl:1002') {
+  throw new Error('BSD provider did not keep the complete UCL competition feed');
+}
+if (requests.some(item => item.url.includes('/teams/'))) {
+  throw new Error('BSD provider unexpectedly requested an Italian-team filter');
 }
 if (!requests.length || requests.some(item => item.authorization !== 'Token probe-token')) {
   throw new Error('BSD provider did not authenticate every request');
@@ -66,7 +68,8 @@ const report = {
   requestCount: requests.length,
   requestPaths: requests.map(item => new URL(item.url).pathname),
   authScheme: 'Token',
-  sampleMatch: matches[0],
+  fullCompetitionFeed: true,
+  sampleMatches: matches.slice(0, 2),
 };
 
 await mkdir('artifacts', { recursive: true });
