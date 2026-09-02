@@ -40,10 +40,7 @@ test('Coppa bracket normalizes and orders knockout stages', () => {
 
 test('Coppa bracket shows winner-of placeholder only for an explicit source tie', () => {
   const source = match('100', 'Round of 16', team('10', 'Милан'), team('11', 'Лацио'));
-  const quarter = match('200', 'Quarter-finals', team('12', 'Интер'), team('', ''), {
-    awaySourceMatchId: source.matchId,
-  });
-
+  const quarter = match('200', 'Quarter-finals', team('12', 'Интер'), team('', ''), { awaySourceMatchId: source.matchId });
   const bracket = buildCoppaBracket([source, quarter]);
   const next = bracket.rounds.find(round => round.key === 'quarterfinal').matches[0];
   assert.equal(next.homeLabel, 'Интер');
@@ -57,13 +54,15 @@ test('Coppa bracket never guesses an unresolved opponent', () => {
   assert.equal(next.awayLabel, 'Соперник определяется');
 });
 
-test('Coppa screen keeps only the schedule after bracket moves to Tables', () => {
+test('Coppa screen keeps only the clickable stage schedule after bracket moves to Tables', () => {
   const html = renderCompetitionScreen('coppa_italia', {
     competition: 'coppa_italia',
     matches: [match('100', 'Round of 16', team('10', 'Милан'), team('11', 'Лацио'))],
   });
 
-  assert.match(html, /data-cw232-stage="Round of 16"/);
+  assert.match(html, /data-cw232-group-key="stage:Round of 16"/);
+  assert.match(html, /data-cw232-group-panel="stage:Round of 16"/);
+  assert.match(html, />1\/8 финала</);
   assert.match(html, /Милан/);
   assert.match(html, /Лацио/);
   assert.doesNotMatch(html, /data-cw232-coppa-view="bracket"/);
