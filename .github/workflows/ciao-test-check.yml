@@ -21,6 +21,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check deployment secret availability
+        if: github.event_name == 'push'
+        shell: bash
+        env:
+          BSD_API_KEY: ${{ secrets.BSD_API_KEY }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -n "$BSD_API_KEY" ]; then echo 'BSD_API_KEY_PRESENT=true'; else echo 'BSD_API_KEY_PRESENT=false'; fi
+          if [ -n "$CLOUDFLARE_API_TOKEN" ]; then echo 'CLOUDFLARE_API_TOKEN_PRESENT=true'; else echo 'CLOUDFLARE_API_TOKEN_PRESENT=false'; fi
+          if [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then echo 'CLOUDFLARE_ACCOUNT_ID_PRESENT=true'; else echo 'CLOUDFLARE_ACCOUNT_ID_PRESENT=false'; fi
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
