@@ -1,7 +1,7 @@
 import { createPredictionClient } from './prediction-client.mjs';
 
 export const PREDICTION_FILTERS = Object.freeze([
-  { key:'all', label:'Все доступные' },
+  { key:'all', label:'Все' },
   { key:'serie_a', label:'Серия А' },
   { key:'coppa_italia', label:'Кубок Италии' },
   { key:'ucl', label:'ЛЧ' },
@@ -49,37 +49,52 @@ export function predictionCardState(match = {}) {
     const hasScore = Number.isInteger(Number(match?.homeScore)) && Number.isInteger(Number(match?.awayScore));
     const result = hasScore ? `${Number(match.homeScore)}:${Number(match.awayScore)}` : '—';
     const points = prediction?.points == null ? '' : ` · +${Number(prediction.points)}`;
-    return Object.freeze({ kind:'finished', label:`Итог: ${result}${points}` });
+    return Object.freeze({ kind:'finished', label:`Итог ${result}${points}` });
   }
   if (prediction) {
-    return Object.freeze({ kind:'saved', label:`Твой прогноз: ${Number(prediction.predicted_home)}:${Number(prediction.predicted_away)} ✓` });
+    return Object.freeze({ kind:'saved', label:`сохранён · ${Number(prediction.predicted_home)}:${Number(prediction.predicted_away)}` });
   }
-  if (match?.state === 'locked') return Object.freeze({ kind:'locked', label:'Прогноз закрыт' });
-  return Object.freeze({ kind:'open', label:'Прогноз открыт' });
+  if (match?.state === 'locked') return Object.freeze({ kind:'locked', label:'🔒 закрыт' });
+  return Object.freeze({ kind:'open', label:'не сохранён' });
 }
 
 export function mergeAuthoritativePrediction(matches = [], prediction = {}) {
   return matches.map(match => match?.matchId === prediction?.match_id ? { ...match, prediction } : match);
 }
 
-const OVERLAY_ID = 'ciao-v233-predictions-overlay';
-const STYLE_ID = 'ciao-v233-predictions-style';
 const drafts = new Map();
 let matches = [];
 let activeFilter = 'all';
 let activeMode = 'make';
 let client = null;
+let me = null;
+let pageActive = false;
 
 function initData() { return text(globalThis.Telegram?.WebApp?.initData); }
+function contentNode() { return document.querySelector('#ciao-miniapp-root .content'); }
 
 function formatKickoff(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Время уточняется';
-  return new Intl.DateTimeFormat('ru-RU', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }).format(date).replace(',', ' ·');
+  return new Intl.DateTimeFormat('ru-RU', {
+    day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit',
+  }).format(date).replace(',', ' ·');
 }
 
-function teamName(match, side) {
-  return text(match?.[`${side}Team`]?.name || match?.[side]?.name) || '—';
+function formatDay(key) {
+  const date = new Date(`${key}T12:00:00Z`);
+  if (Number.isNaN(date.getTime())) return key;
+  return new Intl.DateTimeFormat('ru-RU', { day:'numeric', month:'long', weekday:'short' }).format(date);
+}
+
+function team(match, side) { return match?.[`${side}Team`] || match?.[side] || {}; }
+function teamName(match, side) { return text(team(match, side)?.name) || '—'; }
+function teamLogo(match, side) {
+  const item = team(match, side);
+  const src = text(item?.crestUrl || item?.logo_url || item?.logoUrl);
+  return src
+    ? `<img class="logo" src="${esc(src)}" alt="" loading="eager" decoding="sync">`
+    : '<span class="logo" aria-hidden="true"></span>';
 }
 
 function scoreFor(match) {
@@ -89,125 +104,152 @@ function scoreFor(match) {
   return { h:Number(prediction?.predicted_home ?? 0), a:Number(prediction?.predicted_away ?? 0) };
 }
 
-function matchHtml(match) {
+function heroHtml() {
+  const name = text(me?.display_name) || 'Ciao, Web!';
+  const username = text(me?.username);
+  const rank = Number(me?.position);
+  return `<div class="hero"><div class="hero-top"><div><h2>${esc(name)}</h2><p>${username ? `@${esc(username)}` : 'Прогнозы на все турниры'}</p></div><div><div class="rank">${rank > 0 ? `#${rank}` : '—'}</div><p>место</p></div></div></div>`;
+}
+
+function tabsHtml() {
+  return `<div class="cw231-prediction-tabs" role="tablist" aria-label="Прогнозы">
+    <button type="button" data-cw233-mode="make" aria-selected="${activeMode === 'make'}">Сделать прогноз</button>
+    <button type="button" data-cw233-mode="mine" aria-selected="${activeMode === 'mine'}">Мои прогнозы</button>
+  </div>`;
+}
+
+function filtersHtml() {
+  const allowed = activeMode === 'mine' ? PREDICTION_FILTERS.filter(item => item.key !== 'unfilled') : PREDICTION_FILTERS;
+  return `<div class="cw231-filters" role="tablist" aria-label="Турниры">${allowed.map(filter => (
+    `<button type="button" data-cw233-filter="${filter.key}" aria-selected="${filter.key === activeFilter}">${filter.label}</button>`
+  )).join('')}</div>`;
+}
+
+function makeMatchHtml(match) {
   const state = predictionCardState(match);
   const score = scoreFor(match);
   const editable = match.state === 'open';
-  return `<article class="cw233-pred-card" data-cw233-pred-card="${esc(match.matchId)}">
-    <div class="cw233-pred-meta"><span>${esc(match.competition)}</span><time>${esc(formatKickoff(match.kickoffAt))}</time></div>
-    <div class="cw233-pred-teams"><b>${esc(teamName(match, 'home'))}</b><span>—</span><b>${esc(teamName(match, 'away'))}</b></div>
-    ${editable ? `<div class="cw233-pred-score">
-      <div class="cw233-pred-score-side"><button data-cw233-delta="h:-1">−</button><strong data-cw233-score="h">${score.h}</strong><button data-cw233-delta="h:1">+</button></div>
-      <span class="cw233-pred-colon">:</span>
-      <div class="cw233-pred-score-side"><button data-cw233-delta="a:-1">−</button><strong data-cw233-score="a">${score.a}</strong><button data-cw233-delta="a:1">+</button></div>
+  const dirty = drafts.has(match.matchId);
+  return `<div class="match ${editable ? '' : 'closed'}" data-cw233-pred-card="${esc(match.matchId)}">
+    <div class="match-head"><div class="teams">
+      <div class="team">${teamLogo(match, 'home')}<span class="team-name">${esc(teamName(match, 'home'))}</span></div>
+      <span class="dash">—</span>
+      <div class="team away"><span class="team-name">${esc(teamName(match, 'away'))}</span>${teamLogo(match, 'away')}</div>
+    </div></div>
+    ${editable ? `<div class="score">
+      <div class="score-side"><button type="button" data-cw233-delta="h:-1">−</button><div class="score-value" data-cw233-score="h">${score.h}</div><button type="button" data-cw233-delta="h:1">+</button></div>
+      <span class="colon">:</span>
+      <div class="score-side"><button type="button" data-cw233-delta="a:-1">−</button><div class="score-value" data-cw233-score="a">${score.a}</div><button type="button" data-cw233-delta="a:1">+</button></div>
     </div>` : ''}
-    <div class="cw233-pred-state ${state.kind}" data-cw233-state>${esc(state.label)}</div>
-    ${editable ? '<button class="cw233-pred-save" data-cw233-save>Сохранить прогноз</button>' : ''}
-    <div class="cw233-pred-error" data-cw233-error></div>
-  </article>`;
+    <div class="meta"><span>${esc(formatKickoff(match.kickoffAt))}</span><span data-cw233-state class="${dirty ? '' : state.kind === 'saved' ? 'saved' : state.kind === 'finished' ? 'result' : ''}">${dirty ? 'не сохранён' : esc(state.label)}</span></div>
+  </div>`;
+}
+
+function mineMatchHtml(match) {
+  const prediction = match?.prediction;
+  const points = prediction?.points == null ? '' : ` · +${Number(prediction.points)}`;
+  const finalScore = match?.state === 'finished' && Number.isInteger(Number(match?.homeScore)) && Number.isInteger(Number(match?.awayScore))
+    ? `ИТОГ · ${Number(match.homeScore)}:${Number(match.awayScore)}` : '';
+  return `<div class="mine-match" data-cw233-pred-card="${esc(match.matchId)}">
+    <div class="mine-main"><div class="mine-pair">
+      <div class="mine-team">${teamLogo(match, 'home')}<span>${esc(teamName(match, 'home'))}</span></div>
+      <span class="mine-dash">—</span>
+      <div class="mine-team away"><span>${esc(teamName(match, 'away'))}</span>${teamLogo(match, 'away')}</div>
+    </div><div class="mine-meta"><span>${esc(formatKickoff(match.kickoffAt))}</span><span class="mine-live">${esc(finalScore)}</span></div></div>
+    <div class="mine-prediction ${prediction?.points != null ? 'has-points' : ''}">${prediction ? `${Number(prediction.predicted_home)}:${Number(prediction.predicted_away)}${points}` : '—'}</div>
+  </div>`;
+}
+
+function makeBody(rows) {
+  const groups = groupPredictionMatchesByDate(rows);
+  if (!groups.length) return '<div class="empty">Нет матчей для этого фильтра</div>';
+  return groups.map(group => `<div class="section-title"><h3>${esc(formatDay(group.key))}</h3><span>${group.matches.length} матч.</span></div><div class="matches">${group.matches.map(makeMatchHtml).join('')}</div>`).join('');
+}
+
+function mineBody(rows) {
+  if (!rows.length) return '<div class="empty">Сохранённых прогнозов пока нет</div>';
+  return `<div class="section-title"><h3>Мои прогнозы</h3><span>${rows.length}</span></div><div class="card mine-card">${rows.map(mineMatchHtml).join('')}</div>`;
 }
 
 function render() {
-  const overlay = document.getElementById(OVERLAY_ID);
-  if (!overlay) return;
+  if (!pageActive) return;
+  const main = contentNode();
+  if (!main) return;
   const modeRows = activeMode === 'mine' ? matches.filter(match => Boolean(match?.prediction)) : matches;
   const selected = filterPredictionMatches(modeRows, activeFilter);
-  const groups = groupPredictionMatchesByDate(selected);
-  overlay.innerHTML = `<section class="cw233-pred-shell">
-    <header><span>Ciao, Web!</span><h2>Прогнозы</h2><p>Прогноз закрывается за 15 минут до начала матча</p></header>
-    <div class="cw233-pred-modes"><button data-cw233-mode="make" class="${activeMode === 'make' ? 'is-active' : ''}">Сделать прогноз</button><button data-cw233-mode="mine" class="${activeMode === 'mine' ? 'is-active' : ''}">Мои прогнозы</button></div>
-    <div class="cw233-pred-filters">${PREDICTION_FILTERS.map(filter => `<button data-cw233-filter="${filter.key}" class="${filter.key === activeFilter ? 'is-active' : ''}">${filter.label}</button>`).join('')}</div>
-    <div class="cw233-pred-content">${groups.length ? groups.map(group => `<section class="cw233-pred-day"><h3>${new Intl.DateTimeFormat('ru-RU', { day:'numeric', month:'long' }).format(new Date(`${group.key}T12:00:00Z`))}</h3>${group.matches.map(matchHtml).join('')}</section>`).join('') : `<div class="cw233-pred-empty">${activeMode === 'mine' ? 'Сохранённых прогнозов пока нет' : 'Нет матчей для этого фильтра'}</div>`}</div>
-  </section>`;
+  main.innerHTML = `${heroHtml()}${tabsHtml()}${filtersHtml()}${activeMode === 'mine' ? mineBody(selected) : makeBody(selected)}${activeMode === 'make' ? '<div class="savebar"><button type="button" class="save" data-cw233-save-all>Сохранить прогнозы</button></div>' : ''}`;
 }
 
-function ensureStyles() {
-  if (document.getElementById(STYLE_ID)) return;
-  const style = document.createElement('style');
-  style.id = STYLE_ID;
-  style.textContent = `
-#${OVERLAY_ID}{position:fixed;inset:0 0 calc(78px + env(safe-area-inset-bottom,0px)) 0;z-index:44;overflow:auto;background:#07101f;color:#fff;padding:calc(18px + env(safe-area-inset-top,0px)) 14px 30px;font-family:inherit;-webkit-overflow-scrolling:touch}
-#${OVERLAY_ID}[hidden]{display:none!important}#${OVERLAY_ID} *{box-sizing:border-box}.cw233-pred-shell{width:min(100%,760px);margin:auto}.cw233-pred-shell header span{font-size:10px;font-weight:900;letter-spacing:.15em;opacity:.55}.cw233-pred-shell h2{margin:7px 0 0;font-size:30px}.cw233-pred-shell header p{margin:6px 0 15px;color:#8592b3;font-size:11px}.cw233-pred-modes{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;padding:4px;border-radius:15px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)}.cw233-pred-modes button{min-height:40px;border:0;border-radius:11px;background:transparent;color:#8e9bb9;font:850 11px/1 inherit}.cw233-pred-modes .is-active{background:linear-gradient(180deg,rgba(49,80,255,.42),rgba(9,27,189,.34));color:#fff}.cw233-pred-filters{display:flex;gap:7px;overflow:auto;padding-bottom:10px}.cw233-pred-filters button{flex:0 0 auto;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(255,255,255,.05);color:#aeb8d2;padding:10px 12px;font:800 11px/1 inherit}.cw233-pred-filters .is-active{background:#fff;color:#07101f}.cw233-pred-day h3{margin:15px 2px 8px;font-size:12px;color:#91a0c1}.cw233-pred-card{margin:0 0 9px;padding:13px;border:1px solid rgba(255,255,255,.09);border-radius:18px;background:rgba(255,255,255,.04)}.cw233-pred-meta{display:flex;justify-content:space-between;color:#7483a5;font-size:9px}.cw233-pred-teams{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;margin:12px 0;align-items:center}.cw233-pred-teams b:last-child{text-align:right}.cw233-pred-score{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center}.cw233-pred-score-side{display:grid;grid-template-columns:38px 1fr 38px;gap:6px;align-items:center}.cw233-pred-score button,.cw233-pred-save{border:0;border-radius:11px;background:rgba(49,80,255,.25);color:#fff;min-height:38px;font-weight:900}.cw233-pred-score strong{text-align:center;font-size:20px}.cw233-pred-colon{font-size:18px;color:#8292bd}.cw233-pred-state{margin-top:11px;color:#8796b8;font-size:10px;font-weight:800}.cw233-pred-state.saved{color:#72ddb0}.cw233-pred-state.finished{color:#f0d487}.cw233-pred-save{width:100%;margin-top:10px;background:linear-gradient(180deg,#3150ff,#091BBD)}.cw233-pred-error{min-height:0;margin-top:7px;color:#ff8799;font-size:9px}.cw233-pred-empty{padding:28px;text-align:center;color:#7e8cab}@media(max-width:390px){.cw233-pred-score-side{grid-template-columns:34px 1fr 34px}.cw233-pred-shell h2{font-size:27px}}
-`;
-  document.head.appendChild(style);
-}
-
-function ensureOverlay() {
-  let overlay = document.getElementById(OVERLAY_ID);
-  if (overlay) return overlay;
-  overlay = document.createElement('div');
-  overlay.id = OVERLAY_ID;
-  overlay.hidden = true;
-  (document.getElementById('ciao-miniapp-root') || document.body).appendChild(overlay);
-  return overlay;
-}
-
-function hideSiblingOverlays() {
-  for (const id of ['ciao-v233-ranking-overlay', 'ciao-v233-tables-overlay']) {
-    const overlay = document.getElementById(id);
-    if (overlay) overlay.hidden = true;
-  }
+function loading() {
+  const main = contentNode();
+  if (main) main.innerHTML = '<div class="empty">Загружаем прогнозы…</div>';
 }
 
 async function open() {
-  hideSiblingOverlays();
-  ensureStyles();
-  const overlay = ensureOverlay();
-  overlay.hidden = false;
-  overlay.innerHTML = '<div class="cw233-pred-empty">Загружаем прогнозы…</div>';
+  pageActive = true;
+  loading();
   try {
     client = client || createPredictionClient({ initData:initData() });
-    const data = await client.available('all');
+    const [data, current] = await Promise.all([client.available('all'), client.rankingMe().catch(() => null)]);
+    if (!pageActive) return;
     matches = Array.isArray(data?.matches) ? data.matches : [];
+    me = current && typeof current === 'object' ? current : null;
     render();
   } catch (error) {
-    overlay.innerHTML = `<div class="cw233-pred-empty">${esc(error?.code || 'Не удалось загрузить прогнозы')}</div>`;
+    const main = contentNode();
+    if (pageActive && main) main.innerHTML = `<div class="empty">${esc(error?.code || 'Не удалось загрузить прогнозы')}</div>`;
   }
 }
 
-function close() {
-  const overlay = document.getElementById(OVERLAY_ID);
-  if (overlay) overlay.hidden = true;
-}
+function close() { pageActive = false; }
 
-async function saveCard(card, match) {
-  const score = scoreFor(match);
-  const errorEl = card.querySelector('[data-cw233-error]');
+async function saveDrafts() {
+  if (!drafts.size) {
+    globalThis.Telegram?.WebApp?.showAlert?.('Измени хотя бы один прогноз');
+    return;
+  }
+  const grouped = new Map();
+  for (const [matchId, score] of drafts) {
+    const match = matches.find(item => item.matchId === matchId);
+    if (!match || match.state !== 'open') continue;
+    if (!grouped.has(match.competition)) grouped.set(match.competition, []);
+    grouped.get(match.competition).push({ match_id:matchId, home_score:score.h, away_score:score.a });
+  }
   try {
-    const rows = await client.save({ competition_key:match.competition, predictions:[{ match_id:match.matchId, home_score:score.h, away_score:score.a }] });
-    const row = Array.isArray(rows) ? rows.find(item => item.match_id === match.matchId) : null;
-    if (row) {
-      matches = mergeAuthoritativePrediction(matches, row);
-      drafts.delete(match.matchId);
-      render();
+    for (const [competition, predictions] of grouped) {
+      const saved = await client.save({ competition_key:competition, predictions });
+      for (const row of Array.isArray(saved) ? saved : []) {
+        matches = mergeAuthoritativePrediction(matches, row);
+        drafts.delete(row.match_id);
+      }
     }
+    render();
   } catch (error) {
-    if (errorEl) errorEl.textContent = error?.code === 'prediction_locked' ? 'Прогноз уже закрыт' : String(error?.code || 'Ошибка сохранения');
     if (error?.code === 'prediction_locked') {
       try {
         const data = await client.available('all');
         matches = Array.isArray(data?.matches) ? data.matches : matches;
-        render();
       } catch {}
+      render();
     }
+    globalThis.Telegram?.WebApp?.showAlert?.(error?.code === 'prediction_locked' ? 'Дедлайн этого прогноза уже наступил' : 'Не удалось сохранить прогноз');
   }
 }
 
 export function installPredictionsUi() {
   if (typeof document === 'undefined') return null;
-  ensureStyles();
-  ensureOverlay();
   document.addEventListener('click', event => {
-    const nav = event.target?.closest?.('[data-tab="mine"]');
-    if (nav) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
+    const nav = event.target?.closest?.('.nav button[data-tab]');
+    if (nav?.dataset?.tab === 'mine') {
       void open();
       return;
     }
-    const other = event.target?.closest?.('.nav button[data-tab]');
-    if (other) close();
+    if (nav) {
+      close();
+      return;
+    }
 
+    if (!pageActive) return;
     const mode = event.target?.closest?.('[data-cw233-mode]');
     if (mode) {
       activeMode = mode.dataset.cw233Mode === 'mine' ? 'mine' : 'make';
@@ -215,36 +257,27 @@ export function installPredictionsUi() {
       render();
       return;
     }
-
     const filter = event.target?.closest?.('[data-cw233-filter]');
     if (filter) {
       activeFilter = filter.dataset.cw233Filter || 'all';
       render();
       return;
     }
-
     const delta = event.target?.closest?.('[data-cw233-delta]');
     if (delta) {
       const card = delta.closest('[data-cw233-pred-card]');
       const id = card?.dataset?.cw233PredCard;
       const match = matches.find(item => item.matchId === id);
       if (!match) return;
-      const [side, raw] = delta.dataset.cw233Delta.split(':');
+      const [side, raw] = String(delta.dataset.cw233Delta || '').split(':');
       const next = { ...scoreFor(match) };
       next[side] = Math.max(0, Math.min(20, next[side] + Number(raw)));
       drafts.set(id, next);
-      card.querySelector(`[data-cw233-score="${side}"]`).textContent = String(next[side]);
-      card.querySelector('[data-cw233-state]').textContent = 'Не сохранено';
+      render();
       return;
     }
-
-    const save = event.target?.closest?.('[data-cw233-save]');
-    if (save) {
-      const card = save.closest('[data-cw233-pred-card]');
-      const match = matches.find(item => item.matchId === card?.dataset?.cw233PredCard);
-      if (match) void saveCard(card, match);
-    }
-  }, true);
+    if (event.target?.closest?.('[data-cw233-save-all]')) void saveDrafts();
+  });
   return Object.freeze({ open, close });
 }
 
