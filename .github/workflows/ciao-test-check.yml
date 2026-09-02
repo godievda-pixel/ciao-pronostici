@@ -37,17 +37,17 @@ jobs:
       - name: Build TEST artifact
         run: npm run build
 
+      - name: Validate TEST Worker bundle
+        run: npx wrangler deploy --dry-run
+
       - name: Observe v23.1 API contract
-        if: github.event_name == 'push'
         run: npm run inspect:api-contract
 
       - name: Observe v23.3 prediction contract
-        if: github.event_name == 'push'
-        run: node scripts/probe-prediction-contract.mjs
+        run: npm run probe:predictions
 
       - name: Observe v23.3 reset contract
-        if: github.event_name == 'push'
-        run: node scripts/probe-reset-contract.mjs
+        run: npm run probe:reset
 
       - name: Probe BSD provider contract
         run: node scripts/probe-bsd-provider.mjs
@@ -99,4 +99,13 @@ jobs:
           name: ciao-v23-3-test-deployment
           path: cloudflare-test/artifacts/test-deployment-probe.json
           if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload authenticated prediction smoke when supplied manually
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ciao-v23-3-prediction-authenticated-smoke
+          path: cloudflare-test/artifacts/v23-3-prediction-authenticated-smoke.json
+          if-no-files-found: ignore
           retention-days: 7
