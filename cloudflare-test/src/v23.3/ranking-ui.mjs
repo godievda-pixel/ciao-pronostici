@@ -2,6 +2,7 @@ import { createPredictionClient } from './prediction-client.mjs';
 
 export const USER_FEEDBACK_ROUND3_BUILD = '2026-09-02-r3';
 export const USER_FEEDBACK_ROUND4_BUILD = '2026-09-02-r4';
+export const USER_FEEDBACK_ROUND5_BUILD = '2026-09-02-r5';
 
 export const RANKING_FILTERS = Object.freeze([
   {key:'overall',label:'Общий'},
@@ -46,6 +47,8 @@ let rows = [];
 let me = null;
 let pageActive = false;
 
+const RANKING_STYLE_ID = 'cw233-ranking-round5-style';
+
 function text(value) { return String(value ?? '').trim(); }
 function esc(value) {
   return String(value ?? '').replace(/[&<>"']/g, c => ({
@@ -55,6 +58,41 @@ function esc(value) {
 function initData() { return text(globalThis.Telegram?.WebApp?.initData); }
 function telegramUser() { return globalThis.Telegram?.WebApp?.initDataUnsafe?.user || null; }
 function contentNode() { return document.querySelector('#ciao-miniapp-root .content'); }
+
+function ensureRankingPremiumStyle() {
+  if (typeof document === 'undefined' || document.getElementById(RANKING_STYLE_ID)) return;
+  const style = document.createElement('style');
+  style.id = RANKING_STYLE_ID;
+  style.textContent = `
+    .cw233-ranking-page .cw233-ranking-list{display:grid!important;gap:8px!important;padding:0!important}
+    .cw233-ranking-page .cw233-ranking-row{
+      display:grid!important;
+      grid-template-columns:34px 36px minmax(0,1fr) 58px!important;
+      column-gap:10px!important;
+      align-items:center!important;
+      min-height:62px!important;
+      width:100%!important;
+      padding:10px 11px!important;
+      box-sizing:border-box!important;
+    }
+    .cw233-ranking-page .cw233-ranking-position{display:grid!important;place-items:center!important;width:34px!important;height:34px!important;min-width:34px!important}
+    .cw233-ranking-page .cw233-ranking-position-value{display:block!important;width:100%!important;text-align:center!important;font-size:11px!important;font-weight:950!important;line-height:1!important;font-variant-numeric:tabular-nums!important}
+    .cw233-ranking-page .cw233-ranking-person{display:grid!important;align-content:center!important;gap:3px!important;min-width:0!important;overflow:hidden!important}
+    .cw233-ranking-page .cw233-ranking-name{display:block!important;min-width:0!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;font-size:12px!important;font-weight:900!important;line-height:1.2!important;letter-spacing:-.01em!important;color:#fff!important}
+    .cw233-ranking-page .cw233-ranking-username{display:block!important;min-width:0!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;font-size:9px!important;line-height:1.15!important;color:var(--muted)!important}
+    .cw233-ranking-page .cw233-ranking-points{display:grid!important;grid-template-rows:auto auto!important;justify-items:end!important;align-content:center!important;gap:2px!important;width:58px!important;min-width:58px!important;line-height:1!important;text-align:right!important}
+    .cw233-ranking-page .cw233-ranking-points-value{display:block!important;font-size:17px!important;font-weight:950!important;line-height:1!important;color:#fff!important;font-variant-numeric:tabular-nums!important}
+    .cw233-ranking-page .cw233-ranking-points-unit{display:block!important;max-width:58px!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;font-size:7px!important;font-weight:850!important;line-height:1!important;letter-spacing:.02em!important;text-transform:uppercase!important;color:var(--muted)!important}
+    @media(max-width:390px){
+      .cw233-ranking-page .cw233-ranking-row{grid-template-columns:32px 34px minmax(0,1fr) 54px!important;column-gap:8px!important;padding-left:9px!important;padding-right:9px!important}
+      .cw233-ranking-page .cw233-ranking-position{width:32px!important;height:32px!important;min-width:32px!important}
+      .cw233-ranking-page .cw233-ranking-points{width:54px!important;min-width:54px!important}
+      .cw233-ranking-page .cw233-ranking-name{font-size:11px!important}
+      .cw233-ranking-page .cw233-ranking-points-value{font-size:16px!important}
+    }
+  `;
+  document.head.appendChild(style);
+}
 
 export function resolveRankingDisplayName(current, tgUser) {
   const serverName = text(current?.display_name || current?.name);
@@ -124,11 +162,11 @@ function rankingHtml() {
       const username = text(row.username).replace(/^@/, '');
       const positionLabel = row.position === 1 ? '1' : row.position === 2 ? '2' : row.position === 3 ? '3' : row.position;
       const points = Number(row.points) || 0;
-      return `<div class="list-row cw233-ranking-row${isMe ? ' is-me' : ''}">
-        <div class="cw233-ranking-position${podiumClass(row.position)}"><div class="pos">${positionLabel}</div></div>
+      return `<div class="cw233-ranking-row${isMe ? ' is-me' : ''}">
+        <div class="cw233-ranking-position${podiumClass(row.position)}"><span class="cw233-ranking-position-value">${positionLabel}</span></div>
         <div class="cw233-ranking-avatar">${esc(initials(name))}</div>
-        <div class="cw233-ranking-person"><div class="person">${esc(name)}</div>${username ? `<span class="cw233-ranking-username">@${esc(username)}</span>` : ''}</div>
-        <div class="cw233-ranking-points"><div class="pts">${points}</div><span>${esc(rankingPointsUnit(points))}</span></div>
+        <div class="cw233-ranking-person"><div class="cw233-ranking-name">${esc(name)}</div>${username ? `<span class="cw233-ranking-username">@${esc(username)}</span>` : ''}</div>
+        <div class="cw233-ranking-points"><strong class="cw233-ranking-points-value">${points}</strong><span class="cw233-ranking-points-unit">${esc(rankingPointsUnit(points))}</span></div>
       </div>`;
     }).join('')}</div></div>
   </div>`;
@@ -182,6 +220,7 @@ function close() { pageActive = false; }
 
 export function installRankingUi() {
   if (typeof document === 'undefined') return null;
+  ensureRankingPremiumStyle();
   document.addEventListener('click', event => {
     const nav = event.target?.closest?.('.nav button[data-tab]');
     if (nav?.dataset?.tab === 'table') {
