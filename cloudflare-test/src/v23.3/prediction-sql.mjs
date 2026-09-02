@@ -1,4 +1,4 @@
-import { getCompetitionConfig } from '../v23.2/competition-config.mjs';
+import { COMPETITION_KEYS, getCompetitionConfig } from '../v23.2/competition-config.mjs';
 
 export const PREDICTION_SCHEMA_VERSION = '1';
 
@@ -47,9 +47,7 @@ CREATE TABLE IF NOT EXISTS ranking_snapshots (
 );
 `;
 
-function text(value) {
-  return String(value ?? '').trim();
-}
+function text(value) { return String(value ?? '').trim(); }
 
 function assertTestIdentity({ environment, season } = {}) {
   const env = text(environment).toLowerCase();
@@ -74,7 +72,6 @@ export function rankingScope({ scope, competition } = {}) {
 export function initializePredictionSchema(sql, identity = {}) {
   if (!sql || typeof sql.exec !== 'function') throw new Error('Prediction SQL executor is required');
   const { environment, season } = assertTestIdentity(identity);
-
   sql.exec(PREDICTION_SCHEMA_SQL);
   sql.exec('INSERT OR REPLACE INTO schema_meta (key, value) VALUES (?, ?)', 'schema_version', PREDICTION_SCHEMA_VERSION);
   sql.exec('INSERT OR REPLACE INTO schema_meta (key, value) VALUES (?, ?)', 'environment', environment);
@@ -109,15 +106,11 @@ export function normalizePredictionRow(row = {}) {
   });
 }
 
-function first(cursor) {
-  return rows(cursor)[0] || null;
-}
-
+function first(cursor) { return rows(cursor)[0] || null; }
 function affected(cursor) {
   const value = Number(cursor?.rowsWritten ?? cursor?.changes ?? 0);
   return Number.isInteger(value) && value >= 0 ? value : 0;
 }
-
 function integerScore(value) {
   const number = Number(value);
   if (!Number.isInteger(number) || number < 0 || number > 20) throw new Error('Invalid prediction score');
@@ -176,7 +169,6 @@ export function upsertPrediction(sql, prediction = {}, nowIso, randomUUID = () =
       predictionId, userId, matchId, competition, season, home, away, nowIso, nowIso, lockedAt,
     );
   }
-
   const stored = first(sql.exec('SELECT * FROM predictions WHERE prediction_id = ? LIMIT 1', predictionId));
   if (!stored) throw new Error('Prediction persistence failed');
   return normalizePredictionRow(stored);
@@ -187,17 +179,12 @@ export function listUserPredictions(sql, { userId, competition } = {}) {
   if (!id) throw new Error('Prediction user id is required');
   if (competition && competition !== 'all') {
     getCompetitionConfig(competition);
-    return rows(sql.exec(
-      'SELECT * FROM predictions WHERE user_id = ? AND competition = ? ORDER BY submitted_at, match_id',
-      id, competition,
-    )).map(normalizePredictionRow);
+    return rows(sql.exec('SELECT * FROM predictions WHERE user_id = ? AND competition = ? ORDER BY submitted_at, match_id', id, competition)).map(normalizePredictionRow);
   }
   return rows(sql.exec('SELECT * FROM predictions WHERE user_id = ? ORDER BY submitted_at, match_id', id)).map(normalizePredictionRow);
 }
 
-export function reconcileMatchPredictions(sql, {
-  matchId, finalHome, finalAway, resultFingerprint, scoredAt, scorePrediction,
-} = {}) {
+export function reconcileMatchPredictions(sql, { matchId, finalHome, finalAway, resultFingerprint, scoredAt, scorePrediction } = {}) {
   if (typeof scorePrediction !== 'function') throw new Error('scorePrediction is required');
   const id = text(matchId);
   const fingerprint = text(resultFingerprint);
@@ -208,16 +195,8 @@ export function reconcileMatchPredictions(sql, {
   let affectedCount = 0;
   let skipped = 0;
   for (const row of rows(sql.exec('SELECT * FROM predictions WHERE match_id = ?', id))) {
-    if (String(row.result_fingerprint || '') === fingerprint) {
-      skipped += 1;
-      continue;
-    }
-    const scored = scorePrediction({
-      predictedHome: Number(row.predicted_home),
-      predictedAway: Number(row.predicted_away),
-      finalHome: finalH,
-      finalAway: finalA,
-    });
+    if (String(row.result_fingerprint || '') === fingerprint) { skipped += 1; continue; }
+    const scored = scorePrediction({ predictedHome:Number(row.predicted_home), predictedAway:Number(row.predicted_away), finalHome:finalH, finalAway:finalA });
     sql.exec(
       `UPDATE predictions SET points = ?, result_type = ?, final_home = ?, final_away = ?,
        result_fingerprint = ?, scored_at = ? WHERE prediction_id = ?`,
@@ -241,11 +220,7 @@ function normalizeRankingRow(row = {}) {
 }
 
 function rankingSort(a, b) {
-  return b.points - a.points
-    || b.exact_scores - a.exact_scores
-    || b.correct_outcomes - a.correct_outcomes
-    || a.scored_predictions - b.scored_predictions
-    || a.user_id.localeCompare(b.user_id);
+  return b.points - a.points || b.exact_scores - a.exact_scores || b.correct_outcomes - a.correct_outcomes || a.scored_predictions - b.scored_predictions || a.user_id.localeCompare(b.user_id);
 }
 
 export function queryRanking(sql, { scope = 'overall', competition } = {}) {
@@ -270,34 +245,29 @@ export function queryRanking(sql, { scope = 'overall', competition } = {}) {
 export function queryRankingMe(sql, { userId } = {}) {
   const id = text(userId);
   if (!id) throw new Error('Prediction user id is required');
-  const overall = queryRanking(sql, { scope: 'overall' });
+  const overall = queryRanking(sql, { scope:'overall' });
   const index = overall.findIndex(row => row.user_id === id);
-  return index < 0 ? null : Object.freeze({ position: index + 1, ...overall[index] });
+  if (index < 0) return null;
+  const competitionPoints = Object.fromEntries(COMPETITION_KEYS.map(competition => {
+    const row = queryRanking(sql, { scope:'competition', competition }).find(item => item.user_id === id);
+    return [competition, row?.points ?? 0];
+  }));
+  return Object.freeze({ position:index + 1, ...overall[index], competition_points:Object.freeze(competitionPoints) });
 }
 
 export function createRankingSnapshot(sql, { scope, periodKey, payload, nowIso, randomUUID = () => crypto.randomUUID() } = {}) {
-  const canonical = rankingScope(scope?.startsWith?.('competition:')
-    ? { scope: 'competition', competition: scope.slice('competition:'.length) }
-    : { scope: scope || 'overall' });
+  const canonical = rankingScope(scope?.startsWith?.('competition:') ? { scope:'competition', competition:scope.slice('competition:'.length) } : { scope:scope || 'overall' });
   const key = text(periodKey);
   if (!key) throw new Error('Ranking snapshot period is required');
   const snapshotId = String(randomUUID());
-  sql.exec(
-    `INSERT OR IGNORE INTO ranking_snapshots (snapshot_id, scope, period_key, created_at, payload_json)
-     VALUES (?, ?, ?, ?, ?)`,
-    snapshotId, canonical, key, nowIso, JSON.stringify(payload ?? null),
-  );
-  return Object.freeze({ snapshot_id: snapshotId, scope: canonical, period_key: key, created_at: nowIso });
+  sql.exec(`INSERT OR IGNORE INTO ranking_snapshots (snapshot_id, scope, period_key, created_at, payload_json) VALUES (?, ?, ?, ?, ?)`, snapshotId, canonical, key, nowIso, JSON.stringify(payload ?? null));
+  return Object.freeze({ snapshot_id:snapshotId, scope:canonical, period_key:key, created_at:nowIso });
 }
 
 export function resetPredictionDomain(sql) {
   const predictions = affected(sql.exec('DELETE FROM predictions'));
   const ranking = affected(sql.exec('DELETE FROM ranking_snapshots'));
   affected(sql.exec('DELETE FROM participants'));
-  const caches = affected(sql.exec(
-    `UPDATE schema_meta
-     SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT)
-     WHERE key = 'prediction_cache_generation'`,
-  ));
-  return Object.freeze({ predictions, points: predictions, ranking, caches });
+  const caches = affected(sql.exec(`UPDATE schema_meta SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) WHERE key = 'prediction_cache_generation'`));
+  return Object.freeze({ predictions, points:predictions, ranking, caches });
 }
