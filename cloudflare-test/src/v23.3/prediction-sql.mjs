@@ -257,7 +257,7 @@ export function queryRanking(sql, { scope = 'overall', competition } = {}) {
        MAX(u.username) AS username,
        COALESCE(SUM(p.points), 0) AS points,
        SUM(CASE WHEN p.result_type = 'exact' THEN 1 ELSE 0 END) AS exact_scores,
-       SUM(CASE WHEN p.result_type IN ('exact','outcome') THEN 1 ELSE 0 END) AS correct_outcomes,
+       SUM(CASE WHEN p.result_type IN ('exact','goal_difference','outcome') THEN 1 ELSE 0 END) AS correct_outcomes,
        SUM(CASE WHEN p.points IS NOT NULL THEN 1 ELSE 0 END) AS scored_predictions
      FROM predictions p LEFT JOIN participants u ON u.user_id = p.user_id
      WHERE 1=1 ${competitionFilter}
