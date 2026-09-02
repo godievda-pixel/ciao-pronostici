@@ -15,6 +15,8 @@ test('build copies v23.3 browser modules required by multi-competition UI', asyn
   assert.equal(files.includes('data-client.mjs'), true);
   assert.equal(files.includes('home-integration.mjs'), true);
   assert.equal(files.includes('tables-ui.mjs'), true);
+  assert.equal(files.includes('match-center.mjs'), true);
+  assert.equal(files.includes('match-center-links.mjs'), true);
 
   const competitionData = await readFile(
     new URL('../dist/v23.3/competition-data.mjs', import.meta.url),
@@ -32,15 +34,29 @@ test('build copies v23.3 browser modules required by multi-competition UI', asyn
     new URL('../dist/v23.3/tables-ui.mjs', import.meta.url),
     'utf8',
   );
+  const matchCenterRuntime = await readFile(
+    new URL('../dist/v23.3/match-center.mjs', import.meta.url),
+    'utf8',
+  );
+  const matchCenterLinksRuntime = await readFile(
+    new URL('../dist/v23.3/match-center-links.mjs', import.meta.url),
+    'utf8',
+  );
 
   assert.match(competitionData, /predictionDeadlineForKickoff/);
   assert.match(dataClient, /loadCompetitionStandings/);
   assert.match(dataClient, /loadMatchCenterSnapshot/);
   assert.match(homeRuntime, /CiaoV233Home/);
   assert.match(homeRuntime, /Кальчо сегодня/);
+  assert.match(homeRuntime, /installCanonicalMatchCenter/);
+  assert.match(homeRuntime, /installCanonicalMatchLinks/);
   assert.match(tablesRuntime, /installTablesUi/);
   assert.match(tablesRuntime, /TABLE_COMPETITIONS/);
   assert.match(tablesRuntime, /coppa_italia/);
+  assert.match(matchCenterRuntime, /createMatchCenterController/);
+  assert.match(matchCenterRuntime, /openCanonicalMatchCenter/);
+  assert.match(matchCenterLinksRuntime, /resolveCanonicalMatchTarget/);
+  assert.match(matchCenterLinksRuntime, /installCanonicalMatchLinks/);
 });
 
 test('v23.3 build injects the Home module exactly once', async () => {
