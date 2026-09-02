@@ -81,7 +81,7 @@ PREDICTION_LEAGUE
 
 The class uses SQLite-backed Durable Object storage.
 
-### 4.2 Object partitioning
+### 4.2 Object partitioning and active season
 
 Use one logical object per environment and season.
 
@@ -97,7 +97,17 @@ Example TEST object:
 prediction-league:test:2026-27
 ```
 
-The season is resolved from canonical match metadata rather than accepted from the client.
+The active prediction season is a server-side TEST configuration value:
+
+```text
+PREDICTION_SEASON=2026-27
+```
+
+The browser never supplies or selects the storage season.
+
+For every write, the canonical match resolver also returns the match season. The write is accepted only when the canonical match season equals `PREDICTION_SEASON`; otherwise it fails with `409 season_mismatch`. This prevents a stale or malformed match from being written into the active-season object.
+
+Read, ranking, and TEST-reset routes always address the object derived from the configured active season.
 
 TEST and future Production must use separate Worker/Durable Object namespaces. A future Production binding is created only during a separately approved cutover. Production must never point at the TEST namespace.
 
@@ -112,11 +122,12 @@ Responsibilities:
 1. Require Telegram init data on prediction routes.
 2. Resolve an authenticated stable user identity through the existing `ciao-web-api` authentication authority.
 3. Resolve the canonical match by `competition + match_id`.
-4. Derive season, kickoff, prediction deadline, and match status from server-side match data.
-5. Reject malformed or mismatched requests before storage.
-6. Route the operation to the correct season Durable Object.
-7. Return normalized prediction/ranking responses to the frontend.
-8. Keep all TEST reset guards outside and inside the Durable Object boundary.
+4. Derive canonical season, kickoff, prediction deadline, and match status from server-side match data.
+5. Verify canonical season equals the configured active prediction season.
+6. Reject malformed or mismatched requests before storage.
+7. Route the operation to the active-season Durable Object.
+8. Return normalized prediction/ranking responses to the frontend.
+9. Keep all TEST reset guards outside and inside the Durable Object boundary.
 
 ### 5.2 `ciao-web-api`
 
@@ -151,7 +162,8 @@ The Durable Object owns:
 - scoring state;
 - participant display snapshots needed by prediction rankings;
 - ranking snapshots when created;
-- schema version metadata.
+- schema version metadata;
+- reset/cache-generation metadata for the prediction domain.
 
 It does not fetch third-party football data directly and does not validate Telegram init data itself.
 
@@ -176,7 +188,7 @@ username
 updated_at
 ```
 
-Only fields already supplied by the authenticated identity layer are used. Missing username is allowed.
+Only fields already supplied by the authenticated identity layer are used. Missing username is allowed. If the authenticated identity has no usable display name, the normalized display name is `Участник` rather than accepting arbitrary client text.
 
 ### 6.2 Match identity
 
@@ -205,7 +217,9 @@ Unique key:
 (user_id, match_id)
 ```
 
-Submitting again before the deadline updates that record rather than creating a duplicate.
+`prediction_id` is generated server-side on first insert with `crypto.randomUUID()` and is preserved on later edits.
+
+Submitting again before the deadline updates the existing record rather than creating a duplicate.
 
 ## 7. SQLite schema
 
@@ -218,7 +232,14 @@ key TEXT PRIMARY KEY
 value TEXT NOT NULL
 ```
 
-Required keys include `schema_version`, `environment`, and `season`.
+Required keys include:
+
+```text
+schema_version
+environment
+season
+prediction_cache_generation
+```
 
 ### 7.2 `participants`
 
@@ -279,6 +300,13 @@ payload_json TEXT NOT NULL
 UNIQUE(scope, period_key)
 ```
 
+Scope values are exactly:
+
+```text
+overall
+competition:<competition_key>
+```
+
 Snapshots exist only for ranking movement/history. The live ranking itself is derived from prediction rows and is not maintained as a separate mutable total.
 
 ## 8. Prediction deadline and locking
@@ -294,8 +322,9 @@ A submission is accepted only when all conditions are true:
 1. authenticated user identity is valid;
 2. canonical match exists;
 3. match competition matches the requested competition;
-4. canonical match status is not `live` or `finished`;
-5. server time is strictly earlier than the canonical deadline.
+4. canonical match season equals `PREDICTION_SEASON`;
+5. canonical match status is not `live` or `finished`;
+6. server time is strictly earlier than the canonical deadline.
 
 Boundary behavior is exact:
 
@@ -347,16 +376,16 @@ request
 → normalize request contract
 → resolve each canonical match
 → derive season/deadline/status
-→ group writes by season object
+→ verify season equals PREDICTION_SEASON
 → Durable Object transaction
 → upsert participant snapshot
 → insert/update prediction rows
 → return normalized saved rows
 ```
 
-A batch is atomic per season object. If any requested prediction in the batch fails validation, no row from that batch is written.
+Because all writes target the configured active-season object, a request batch is one Durable Object transaction. If any requested prediction in the batch fails validation, no row from that batch is written.
 
-The response returns the authoritative stored values, including `updated_at` and `locked_at`.
+The response returns the authoritative stored values, including `prediction_id`, `updated_at`, and `locked_at`.
 
 ## 10. Read paths
 
@@ -366,7 +395,7 @@ The response returns the authoritative stored values, including `updated_at` and
 GET /api/v23.3/predictions?competition=<key|all>
 ```
 
-Returns only the authenticated user's prediction rows for the active season.
+Returns only the authenticated user's prediction rows from `PREDICTION_SEASON`.
 
 ### 10.2 Available predictions
 
@@ -374,7 +403,7 @@ Returns only the authenticated user's prediction rows for the active season.
 GET /api/v23.3/predictions/available?competition=<key|all>
 ```
 
-Availability is calculated from canonical match data and joined with the authenticated user's stored predictions.
+Availability is calculated from canonical match data for `PREDICTION_SEASON` and joined with the authenticated user's stored predictions.
 
 The Durable Object is not the schedule source.
 
@@ -384,9 +413,11 @@ The Durable Object is not the schedule source.
 GET /api/v23.3/rankings?scope=<overall|competition>&competition=<key>
 ```
 
+For `scope=competition`, `competition` is required and must be one of the five supported keys.
+
 Competition scope aggregates only scored predictions for that competition.
 
-Overall scope aggregates all five competitions with equal weight.
+Overall scope aggregates all five competitions with equal weight and ignores the optional `competition` query field if it is supplied.
 
 ### 10.4 Current-user ranking summary
 
@@ -394,7 +425,7 @@ Overall scope aggregates all five competitions with equal weight.
 GET /api/v23.3/rankings/me
 ```
 
-Returns position, total points, scored prediction count, exact-score count, correct-outcome count, and per-competition point split.
+Returns position, total points, scored prediction count, exact-score count, correct-outcome count, and per-competition point split for the configured active season.
 
 ## 11. Scoring
 
@@ -437,7 +468,7 @@ This protects against duplicate reconciliation requests and allows an upstream c
 
 The first release uses request-driven reconciliation rather than introducing another scheduled service.
 
-Before returning ranking/result-dependent views, `ciao-web-app-test` resolves recently finished relevant matches and asks the season Durable Object to reconcile any unscored or changed result fingerprints.
+Before returning ranking/result-dependent views, `ciao-web-app-test` resolves recently finished relevant matches from the configured active season and asks the season Durable Object to reconcile any unscored or changed result fingerprints.
 
 A later Cron/Alarm optimization is allowed but is not required for initial acceptance.
 
@@ -462,7 +493,7 @@ Tie ordering for the first release is deterministic:
 
 Only users with at least one submitted prediction in the requested ranking scope appear.
 
-Ranking movement uses `ranking_snapshots` and follows the previously approved v23.2 period definitions. Snapshot generation can occur when a completed period is first observed; duplicate period snapshots are prevented by the unique `(scope, period_key)` constraint.
+Ranking movement uses `ranking_snapshots` and follows the previously approved v23.2 period definitions. Snapshot generation occurs when a completed period is first observed; duplicate period snapshots are prevented by the unique `(scope, period_key)` constraint.
 
 ## 13. TEST reset
 
@@ -474,23 +505,37 @@ Route:
 POST /api/v23.3/test/predictions/reset
 ```
 
+Reset always targets the active `PREDICTION_SEASON`; the client cannot choose an arbitrary season or object ID.
+
 Execution requires all of the following:
 
 1. request host exactly matches `ciao-web-app-test.ciao-web.workers.dev`;
 2. configured environment is exactly `test`;
 3. `TEST_RESET_TOKEN` is configured server-side;
-4. request supplies the matching reset token;
-5. target Durable Object name starts with `prediction-league:test:`.
+4. request header `x-ciao-test-reset-token` exactly matches the configured token;
+5. derived Durable Object name starts with `prediction-league:test:`;
+6. derived season equals `PREDICTION_SEASON`.
 
 If any guard fails, the reset is rejected without mutation.
 
-Reset clears only TEST prediction-domain tables for the selected TEST season:
+The reset transaction:
 
-- `predictions`;
-- `participants`;
-- `ranking_snapshots`.
+- deletes all rows from `predictions` for the target TEST season object;
+- deletes `ranking_snapshots`;
+- deletes participant snapshots after prediction deletion;
+- increments `prediction_cache_generation` so any prediction-domain in-memory/read cache is invalidated;
+- preserves `schema_meta` environment/season/schema-version keys.
 
-It does not touch football schedules, BSD data, `ciao-web-api`, Telegram authorization, Static Assets, or any Production data.
+The reset response continues to use the existing reset-contract stage names:
+
+```text
+predictions → prediction rows deleted
+points      → scored prediction rows invalidated by the same prediction deletion
+ranking     → ranking snapshots deleted
+caches      → prediction_cache_generation incremented
+```
+
+The operation does not touch football schedules, BSD data, `ciao-web-api`, Telegram authorization, Static Assets, or any Production data.
 
 No Production reset endpoint is enabled in this phase.
 
@@ -553,7 +598,8 @@ Only TEST configuration is changed in this phase.
 
 - `PREDICTION_LEAGUE` Durable Object binding;
 - a Durable Object migration declaring `PredictionLeague` as a new SQLite class;
-- an explicit TEST environment marker used by reset guards.
+- `APP_ENV=test`;
+- `PREDICTION_SEASON=2026-27` for the new season.
 
 The existing bindings remain:
 
@@ -600,7 +646,7 @@ Cover:
 - score bounds `0–20`;
 - canonical match ID/competition mismatch;
 - exact deadline boundary;
-- season resolution;
+- active-season mismatch;
 - object-name derivation;
 - scoring parity with legacy Serie A fixtures;
 - deterministic ranking tie ordering;
@@ -621,7 +667,7 @@ Cover:
 - transaction rollback for invalid batch;
 - idempotent result reconciliation;
 - ranking SQL aggregation;
-- TEST reset clearing only the target season object.
+- TEST reset clearing only the target active-season object and incrementing cache generation.
 
 ### 19.3 Worker API tests
 
@@ -629,7 +675,9 @@ Cover:
 
 - unauthenticated routes return `401`;
 - client-supplied user identity is ignored;
+- client cannot choose the storage season;
 - canonical match metadata is required;
+- active-season mismatch is rejected;
 - closed prediction is rejected server-side;
 - correct season Durable Object is selected;
 - storage failures do not fall back to the legacy save endpoint;
@@ -664,10 +712,10 @@ Before any TEST cutover:
 
 ### Phase A — backend construction
 
-1. Add Durable Object binding and SQLite migration to TEST configuration.
+1. Add Durable Object binding, active-season configuration, and SQLite migration to TEST configuration.
 2. Implement the Durable Object schema/repository.
 3. Implement authenticated identity adapter.
-4. Implement canonical match/deadline resolution.
+4. Implement canonical match/deadline/season resolution.
 5. Implement prediction write/read endpoints.
 6. Implement scoring reconciliation and rankings.
 7. Implement guarded TEST reset.
@@ -702,7 +750,7 @@ A later Production cutover requires a new explicit approval and a separate migra
 - production-season start/reset decision;
 - rollback plan;
 - production smoke;
-- final DNS/route or frontend cutover.
+- final frontend/route cutover.
 
 ## 21. Acceptance criteria
 
@@ -717,7 +765,7 @@ The design is complete when the implementation can demonstrate all of the follow
 7. Scoring matches the current Serie A scoring formula.
 8. Competition rankings and overall ranking derive from the same stored prediction rows.
 9. Overall ranking gives equal weight to all five competitions.
-10. TEST reset clears only the selected TEST season prediction store.
+10. TEST reset clears only the configured TEST active-season prediction store and invalidates prediction-domain caches.
 11. Production reset remains impossible from the TEST tooling.
 12. Production `ciao-web-app` remains untouched until a separate explicit approval.
 13. Prediction persistence uses neither Supabase nor browser `localStorage`/IndexedDB.
