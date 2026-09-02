@@ -40,10 +40,7 @@ export function groupPredictionMatchesByDate(matches = []) {
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(match);
   }
-  return [...groups].map(([key, rows]) => Object.freeze({
-    key,
-    matches:Object.freeze(rows),
-  }));
+  return [...groups].map(([key, rows]) => Object.freeze({ key, matches:Object.freeze(rows) }));
 }
 
 export function predictionCardState(match = {}) {
@@ -55,19 +52,14 @@ export function predictionCardState(match = {}) {
     return Object.freeze({ kind:'finished', label:`Итог: ${result}${points}` });
   }
   if (prediction) {
-    return Object.freeze({
-      kind:'saved',
-      label:`Твой прогноз: ${Number(prediction.predicted_home)}:${Number(prediction.predicted_away)} ✓`,
-    });
+    return Object.freeze({ kind:'saved', label:`Твой прогноз: ${Number(prediction.predicted_home)}:${Number(prediction.predicted_away)} ✓` });
   }
   if (match?.state === 'locked') return Object.freeze({ kind:'locked', label:'Прогноз закрыт' });
   return Object.freeze({ kind:'open', label:'Прогноз открыт' });
 }
 
 export function mergeAuthoritativePrediction(matches = [], prediction = {}) {
-  return matches.map(match => (
-    match?.matchId === prediction?.match_id ? { ...match, prediction } : match
-  ));
+  return matches.map(match => match?.matchId === prediction?.match_id ? { ...match, prediction } : match);
 }
 
 const OVERLAY_ID = 'ciao-v233-predictions-overlay';
@@ -78,16 +70,12 @@ let activeFilter = 'all';
 let activeMode = 'make';
 let client = null;
 
-function initData() {
-  return text(globalThis.Telegram?.WebApp?.initData);
-}
+function initData() { return text(globalThis.Telegram?.WebApp?.initData); }
 
 function formatKickoff(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Время уточняется';
-  return new Intl.DateTimeFormat('ru-RU', {
-    day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit',
-  }).format(date).replace(',', ' ·');
+  return new Intl.DateTimeFormat('ru-RU', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }).format(date).replace(',', ' ·');
 }
 
 function teamName(match, side) {
@@ -98,10 +86,7 @@ function scoreFor(match) {
   const draft = drafts.get(match.matchId);
   if (draft) return draft;
   const prediction = match.prediction;
-  return {
-    h:Number(prediction?.predicted_home ?? 0),
-    a:Number(prediction?.predicted_away ?? 0),
-  };
+  return { h:Number(prediction?.predicted_home ?? 0), a:Number(prediction?.predicted_away ?? 0) };
 }
 
 function matchHtml(match) {
@@ -157,7 +142,15 @@ function ensureOverlay() {
   return overlay;
 }
 
+function hideSiblingOverlays() {
+  for (const id of ['ciao-v233-ranking-overlay', 'ciao-v233-tables-overlay']) {
+    const overlay = document.getElementById(id);
+    if (overlay) overlay.hidden = true;
+  }
+}
+
 async function open() {
+  hideSiblingOverlays();
   ensureStyles();
   const overlay = ensureOverlay();
   overlay.hidden = false;
@@ -181,10 +174,7 @@ async function saveCard(card, match) {
   const score = scoreFor(match);
   const errorEl = card.querySelector('[data-cw233-error]');
   try {
-    const rows = await client.save({
-      competition_key:match.competition,
-      predictions:[{ match_id:match.matchId, home_score:score.h, away_score:score.a }],
-    });
+    const rows = await client.save({ competition_key:match.competition, predictions:[{ match_id:match.matchId, home_score:score.h, away_score:score.a }] });
     const row = Array.isArray(rows) ? rows.find(item => item.match_id === match.matchId) : null;
     if (row) {
       matches = mergeAuthoritativePrediction(matches, row);
@@ -192,9 +182,7 @@ async function saveCard(card, match) {
       render();
     }
   } catch (error) {
-    if (errorEl) errorEl.textContent = error?.code === 'prediction_locked'
-      ? 'Прогноз уже закрыт'
-      : String(error?.code || 'Ошибка сохранения');
+    if (errorEl) errorEl.textContent = error?.code === 'prediction_locked' ? 'Прогноз уже закрыт' : String(error?.code || 'Ошибка сохранения');
     if (error?.code === 'prediction_locked') {
       try {
         const data = await client.available('all');
@@ -214,7 +202,7 @@ export function installPredictionsUi() {
     if (nav) {
       event.preventDefault();
       event.stopImmediatePropagation();
-      open();
+      void open();
       return;
     }
     const other = event.target?.closest?.('.nav button[data-tab]');
@@ -254,16 +242,13 @@ export function installPredictionsUi() {
     if (save) {
       const card = save.closest('[data-cw233-pred-card]');
       const match = matches.find(item => item.matchId === card?.dataset?.cw233PredCard);
-      if (match) saveCard(card, match);
+      if (match) void saveCard(card, match);
     }
   }, true);
   return Object.freeze({ open, close });
 }
 
 if (typeof document !== 'undefined') {
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => installPredictionsUi(), { once:true });
-  } else {
-    installPredictionsUi();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => installPredictionsUi(), { once:true });
+  else installPredictionsUi();
 }
