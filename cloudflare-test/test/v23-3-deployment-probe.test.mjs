@@ -60,6 +60,12 @@ test('deployment probe hard-gates only the Home SERIE A 2026/27 label; reset not
   assert.doesNotMatch(source, /deployed TEST is missing the Home new-season notice/);
 });
 
+test('deployment probe requires the exact round4 TEST build marker', async () => {
+  const source = await readFile(deploymentProbeUrl, 'utf8');
+  assert.match(source, /build:'ciao-web-v23-3-user-feedback-r4-20260902'/);
+  assert.doesNotMatch(source, /build:'ciao-web-v23-3-prediction-do-test-20260902'/);
+});
+
 test('deployment probe verifies unified v23.3 Home Tables Predictions Ranking premium polish and navigation runtimes', async () => {
   const source = await readFile(deploymentProbeUrl, 'utf8');
   assert.match(source, /id="ciao-v233"/);
