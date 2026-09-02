@@ -11,6 +11,12 @@ async function matchCenterModule() {
   return mod;
 }
 
+async function matchLinksModule() {
+  const mod = await import('../src/v23.3/match-center-links.mjs').catch(() => null);
+  assert.ok(mod, 'v23.3 canonical Match Center links module must exist');
+  return mod;
+}
+
 function team(id, name) {
   return {
     id: String(id),
@@ -209,7 +215,7 @@ test('v23.3 Match Center keeps the last good live snapshot after a transient ref
   controller.close();
 });
 
-test('canonical match center identity is present on Home, tournament schedule and club profile cards', () => {
+test('canonical match center identity is present in Home, tournament schedule and club profile DOM context', () => {
   const row = match('scheduled');
   const home = renderHomeTodaySection([row], {
     now: new Date('2026-09-16T10:00:00Z'),
@@ -218,10 +224,46 @@ test('canonical match center identity is present on Home, tournament schedule an
   const schedule = renderCompetitionScreen('ucl', { matches: [row] });
   const profile = renderProfileTournamentSection([row]);
 
-  for (const [label, html] of [['Home', home], ['schedule', schedule], ['profile', profile]]) {
-    assert.match(html, /data-cw233-competition="ucl"/, `${label} must expose competition`);
-    assert.match(html, /data-cw233-match="ucl:1001"/, `${label} must expose canonical match id`);
-  }
+  assert.match(home, /data-cw233-competition="ucl"/);
+  assert.match(home, /data-cw233-match="ucl:1001"/);
+  assert.match(schedule, /data-cw232-competition="ucl"/);
+  assert.match(schedule, /data-cw232-match="ucl:1001"/);
+  assert.match(profile, /data-cw232-competition="ucl"/);
+  assert.match(profile, /data-cw232-profile-match="ucl:1001"/);
+});
+
+test('canonical match links resolve external schedule and profile cards to competition plus canonical match id', async () => {
+  const { resolveCanonicalMatchTarget } = await matchLinksModule();
+
+  const scheduleScreen = { dataset: { cw232Competition: 'ucl' } };
+  const scheduleCard = {
+    dataset: { cw232Match: 'ucl:1001' },
+    closest(selector) {
+      return selector === '[data-cw232-competition]' ? scheduleScreen : null;
+    },
+  };
+  const scheduleTarget = {
+    closest(selector) {
+      return selector === '[data-cw232-match]' ? scheduleCard : null;
+    },
+  };
+  assert.deepEqual(resolveCanonicalMatchTarget(scheduleTarget), {
+    competition: 'ucl',
+    matchId: 'ucl:1001',
+  });
+
+  const profileCard = {
+    dataset: { cw232Competition: 'uel', cw232ProfileMatch: 'uel:2002' },
+  };
+  const profileTarget = {
+    closest(selector) {
+      return selector === '[data-cw232-profile-match][data-cw232-competition]' ? profileCard : null;
+    },
+  };
+  assert.deepEqual(resolveCanonicalMatchTarget(profileTarget), {
+    competition: 'uel',
+    matchId: 'uel:2002',
+  });
 });
 
 test('Serie A canonical Match Center delegates to the existing stable openMatchCenter bridge', () => {
