@@ -1,4 +1,5 @@
 import { normalizeMatch, shouldIncludeMatch } from './match-normalizer.mjs';
+import { localizeTeam } from './team-registry.mjs';
 
 function text(value) {
   return String(value ?? '').trim();
@@ -69,6 +70,14 @@ function venueFrom(event) {
   return text(venue || event?.venue_name);
 }
 
+function localizeMatchTeams(match) {
+  return Object.freeze({
+    ...match,
+    homeTeam: localizeTeam(match.homeTeam),
+    awayTeam: localizeTeam(match.awayTeam),
+  });
+}
+
 export function adaptBsdEvents(payload, competition, options = {}) {
   const italianTeamIds = options.italianTeamIds instanceof Set
     ? options.italianTeamIds
@@ -96,7 +105,7 @@ export function adaptBsdEvents(payload, competition, options = {}) {
         venue: venueFrom(event),
         rawVersion: 'bsd-football-v2',
       };
-      const match = normalizeMatch(raw, competition);
+      const match = localizeMatchTeams(normalizeMatch(raw, competition));
       if (shouldIncludeMatch(match)) matches.push(match);
     } catch {
       // A malformed BSD row must not break the whole tournament calendar.
