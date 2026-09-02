@@ -22,13 +22,22 @@ test('Predictions reuse the stable premium app components instead of a fixed ove
   ]) assert.match(s, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 });
 
-test('Ranking reuses the stable premium card/list system instead of a fixed overlay', async () => {
+test('Ranking keeps the stable premium card system while isolating row typography from legacy classes', async () => {
   const s = await source('ranking-ui.mjs');
   assert.doesNotMatch(s, /position:\s*fixed/i);
   assert.doesNotMatch(s, /ciao-v233-ranking-overlay/);
-  for (const marker of ['cw231-filters','section-title','class="card"','list-row','class="pos"','class="person"','class="pts"']) {
-    assert.match(s, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-  }
+  for (const marker of [
+    'cw231-filters',
+    'section-title',
+    'class="card"',
+    'cw233-ranking-row',
+    'cw233-ranking-position-value',
+    'cw233-ranking-name',
+    'cw233-ranking-points-value',
+    'cw233-ranking-points-unit',
+  ]) assert.match(s, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.doesNotMatch(s, /class="list-row cw233-ranking-row/);
+  assert.doesNotMatch(s, /class="pos"|class="person"|class="pts"/);
 });
 
 test('Home multi-competition renderer keeps v23.1 premium Today markup and card classes', async () => {
