@@ -61,6 +61,12 @@ export function normalizeTeam(raw = {}) {
   });
 }
 
+function sourceMatchId(value, competition) {
+  const id = text(value);
+  if (!id) return '';
+  return id.includes(':') ? id : `${competition}:${id}`;
+}
+
 export function normalizeMatch(raw, competition) {
   getCompetitionConfig(competition);
 
@@ -91,6 +97,8 @@ export function normalizeMatch(raw, competition) {
     leg: raw.leg ?? null,
     venue: text(raw.venue),
     predictionDeadline,
+    homeSourceMatchId: sourceMatchId(raw.homeSourceMatchId || raw.home_source_match_id, competition),
+    awaySourceMatchId: sourceMatchId(raw.awaySourceMatchId || raw.away_source_match_id, competition),
     rawVersion: text(raw.rawVersion || raw.version),
   });
 }
