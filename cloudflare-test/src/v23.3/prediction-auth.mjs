@@ -49,9 +49,11 @@ function stableUserId(user = {}) {
 }
 
 function participantRoster(payload = {}, currentUser = null) {
-  const byId = new Map();
+  const standings = extractStandings(payload);
+  if (!standings.length) return Object.freeze([]);
 
-  for (const row of extractStandings(payload)) {
+  const byId = new Map();
+  for (const row of standings) {
     if (!row || typeof row !== 'object') continue;
     const source = row.user && typeof row.user === 'object'
       ? { ...row, ...row.user }
