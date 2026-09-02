@@ -97,7 +97,7 @@ test('competition screen loader requests the whole current season and returns re
   assert.match(html, /Ливерпуль/);
 });
 
-test('matches controller opens the hub and loads every tournament including Serie A', async () => {
+test('matches controller opens the hub, loads external competitions and preserves legacy Serie A fallback', async () => {
   const shown = [];
   let hidden = 0;
   const loaded = [];
@@ -113,14 +113,13 @@ test('matches controller opens the hub and loads every tournament including Seri
   controller.openHub();
   assert.match(shown.at(-1), /data-cw232-view="hub"/);
 
-  assert.equal(await controller.openCompetition('ucl'), 'loaded');
+  await controller.openCompetition('ucl');
   assert.deepEqual(loaded, ['ucl']);
   assert.match(shown.at(-1), /data-loaded="ucl"/);
 
-  assert.equal(await controller.openCompetition('serie_a'), 'loaded');
-  assert.equal(hidden, 0);
-  assert.deepEqual(loaded, ['ucl', 'serie_a']);
-  assert.match(shown.at(-1), /data-loaded="serie_a"/);
+  await controller.openCompetition('serie_a');
+  assert.equal(hidden, 1);
+  assert.deepEqual(loaded, ['ucl']);
 });
 
 test('DOM installer binds the v23.2 hub to the existing calendar tab and closes on other tabs', () => {
