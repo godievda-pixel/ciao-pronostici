@@ -23,6 +23,14 @@ const REQUEST_LITERAL_KEYS = Object.freeze([
   'tournament',
   'tournament_id',
 ]);
+const CLUB_SOURCE_MARKERS = new Set([
+  '/api/ciao-club-calendar-fast-v1',
+  '__cw9Post(__CW208_CLUB_CALENDAR',
+  '__cw16MatchesHtml=function',
+  'const rows=all.filter',
+  '__cw209CalendarHtml',
+  '__cw9CalendarCard',
+]);
 
 export function safeCalls(calls) {
   return calls.filter(call =>
@@ -119,12 +127,17 @@ export async function main() {
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(result, null, 2)}\n`, 'utf8');
 
+  const clubSourceHints = result.sourceHints
+    .filter(item => CLUB_SOURCE_MARKERS.has(item.marker))
+    .map(item => ({ marker: item.marker, index: item.index, snippet: item.snippet }));
+
   console.log(JSON.stringify({
     ok: true,
     discovered: result.calls.length,
     routeLiterals: result.routeLiterals,
     requestLiterals: result.requestLiterals,
     sourceHints: result.sourceHints.length,
+    clubSourceHints,
     safeGetRoutes: result.safeGetRoutes,
     probed: result.probes.length,
     output: outputPath,
