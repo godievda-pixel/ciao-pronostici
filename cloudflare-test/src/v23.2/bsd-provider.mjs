@@ -1,4 +1,5 @@
 import { adaptBsdEvents } from './bsd-adapter.mjs';
+import { dedupeMatches } from './match-deduper.mjs';
 
 const BSD_BASE = 'https://sports.bzzoiro.com/api/v2';
 const MAX_RANGE_DAYS = 370;
@@ -216,7 +217,7 @@ export async function fetchBsdMatches({
       : Promise.resolve(new Set()),
   ]);
 
-  return adaptBsdEvents({ results: events }, competition, { italianTeamIds });
+  return dedupeMatches(adaptBsdEvents({ results: events }, competition, { italianTeamIds }));
 }
 
 export { BSD_BASE };
