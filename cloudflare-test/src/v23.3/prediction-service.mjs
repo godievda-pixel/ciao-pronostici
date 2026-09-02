@@ -192,7 +192,7 @@ export function createPredictionService({ request, env, now = new Date(), deps =
       await reconcileFinishedMatches(stub);
       const params = new URLSearchParams({ user_id: authenticated.userId });
       const payload = await internalJson(stub, `/rankings/me?${params}`);
-      return Array.isArray(payload.ranking) ? payload.ranking : [];
+      return payload.ranking && typeof payload.ranking === 'object' ? payload.ranking : null;
     } catch (error) { throw mapError(error); }
   }
 
