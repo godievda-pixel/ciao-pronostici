@@ -11,7 +11,7 @@ import { createPredictionService } from './v23.3/prediction-service.mjs';
 import { assertSafeResetTarget } from './v23.3/reset-contract.mjs';
 import { predictionObjectName } from './v23.3/prediction-sql.mjs';
 
-const TEST_BUILD = 'ciao-web-v23-3-prediction-do-test-20260902';
+const TEST_BUILD = 'ciao-web-v23-3-user-feedback-r4-20260902';
 const V23_2_MATCHES = '/api/v23.2/matches';
 const V23_3_STANDINGS = '/api/v23.3/standings';
 const V23_3_MATCH_CENTER = '/api/v23.3/match-center';
@@ -102,6 +102,40 @@ function normalizeLegacySerieAStandings(payload) {
       goalDifference: numberOrNull(row?.goalDifference ?? row?.goal_difference ?? row?.goal_diff ?? row?.gd),
       points: numberOrNull(row?.points ?? row?.pts),
     })),
+  };
+}
+
+function normalizedTeamName(value) {
+  return String(value ?? '').trim().toLocaleLowerCase('ru-RU').replace(/\s+/g, ' ');
+}
+
+function serieACrestLookup(schedule) {
+  const byId = new Map();
+  const byName = new Map();
+  for (const match of Array.isArray(schedule?.matches) ? schedule.matches : []) {
+    for (const team of [match?.homeTeam, match?.awayTeam]) {
+      const crestUrl = String(team?.crestUrl || '').trim();
+      if (!crestUrl) continue;
+      const id = String(team?.id || '').trim();
+      const name = normalizedTeamName(team?.name || team?.rawName);
+      if (id) byId.set(id, crestUrl);
+      if (name) byName.set(name, crestUrl);
+    }
+  }
+  return { byId, byName };
+}
+
+function enrichSerieAStandingsCrests(standings, schedule) {
+  const lookup = serieACrestLookup(schedule);
+  return {
+    ...standings,
+    rows:(Array.isArray(standings?.rows) ? standings.rows : []).map(row => {
+      if (String(row?.team?.crestUrl || '').trim()) return row;
+      const id = String(row?.team?.id || '').trim();
+      const name = normalizedTeamName(row?.team?.name || row?.team?.rawName);
+      const crestUrl = (id && lookup.byId.get(id)) || (name && lookup.byName.get(name)) || '';
+      return crestUrl ? { ...row, team:{ ...row.team, crestUrl } } : row;
+    }),
   };
 }
 
@@ -315,6 +349,28 @@ async function handleV23_2Matches(request, env, url) {
   });
 }
 
+async function fetchSerieAScheduleForCrests(request, env, initData) {
+  try {
+    const response = await env.CIAO_WEB_API.fetch(new Request(
+      new URL(LEGACY_SERIE_A_SCHEDULE, request.url),
+      {
+        method:'POST',
+        headers:{
+          'content-type':'application/json',
+          'x-telegram-init-data':initData,
+        },
+        body:'{}',
+      },
+    ));
+    if (!response.ok) return null;
+    const payload = await response.json();
+    if (!payload?.ok) return null;
+    return adaptSerieASchedule(payload);
+  } catch {
+    return null;
+  }
+}
+
 async function handleSerieAStandings(request, env, initData) {
   const upstreamRequest = new Request(
     new URL(LEGACY_CORE_API, request.url),
@@ -328,6 +384,7 @@ async function handleSerieAStandings(request, env, initData) {
     },
   );
 
+  const schedulePromise = fetchSerieAScheduleForCrests(request, env, initData);
   const upstream = await env.CIAO_WEB_API.fetch(upstreamRequest);
   let payload;
   try {
@@ -342,9 +399,11 @@ async function handleSerieAStandings(request, env, initData) {
     });
   }
 
+  const standings = normalizeLegacySerieAStandings(payload);
+  const schedule = await schedulePromise;
   return Response.json({
     ok: true,
-    data: normalizeLegacySerieAStandings(payload),
+    data: schedule ? enrichSerieAStandingsCrests(standings, schedule) : standings,
   });
 }
 
