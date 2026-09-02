@@ -7,11 +7,19 @@ import {
   fetchBsdMatches,
   fetchBsdStandings,
 } from './v23.2/bsd-provider.mjs';
+import { createPredictionService } from './v23.3/prediction-service.mjs';
+import { assertSafeResetTarget } from './v23.3/reset-contract.mjs';
+import { predictionObjectName } from './v23.3/prediction-sql.mjs';
 
-const TEST_BUILD = 'ciao-web-v23-2-bsd-test-20260902';
+const TEST_BUILD = 'ciao-web-v23-3-prediction-do-test-20260902';
 const V23_2_MATCHES = '/api/v23.2/matches';
 const V23_3_STANDINGS = '/api/v23.3/standings';
 const V23_3_MATCH_CENTER = '/api/v23.3/match-center';
+const V23_3_PREDICTIONS = '/api/v23.3/predictions';
+const V23_3_PREDICTIONS_AVAILABLE = '/api/v23.3/predictions/available';
+const V23_3_RANKINGS = '/api/v23.3/rankings';
+const V23_3_RANKINGS_ME = '/api/v23.3/rankings/me';
+const V23_3_TEST_RESET = '/api/v23.3/test/predictions/reset';
 const LEGACY_SERIE_A_SCHEDULE = '/api/ciao-schedule-fast-v1';
 const LEGACY_CORE_API = '/api/ciao-core-api-fast-v4';
 const EXTERNAL_COMPETITIONS = new Set(['coppa_italia', 'ucl', 'uel', 'uecl']);
@@ -104,6 +112,116 @@ function bsdFailure(error, competition, fallbackError) {
     upstream_stage: upstream?.stage || 'unknown',
     upstream_status: upstream?.status ?? null,
     upstream_code: upstream?.code || 'unknown_error',
+  });
+}
+
+async function predictionResponse(action) {
+  try {
+    const data = await action();
+    return Response.json({ ok: true, data });
+  } catch (error) {
+    const status = Number(error?.status) || 500;
+    const code = String(error?.code || 'prediction_storage_failed');
+    return errorJson(status, { error: code });
+  }
+}
+
+async function readJson(request) {
+  try {
+    return await request.json();
+  } catch {
+    return null;
+  }
+}
+
+async function handlePredictions(request, env, url) {
+  const service = createPredictionService({ request, env, now: new Date() });
+  if (request.method === 'GET') {
+    const competition = String(url.searchParams.get('competition') || 'all');
+    return predictionResponse(() => service.list(competition));
+  }
+  if (request.method === 'POST') {
+    const body = await readJson(request);
+    if (!body) return errorJson(400, { error: 'invalid_prediction_request' });
+    return predictionResponse(() => service.save({
+      competitionKey: body.competitionKey ?? body.competition_key,
+      predictions: body.predictions,
+    }));
+  }
+  return errorJson(405, { error: 'method_not_allowed' });
+}
+
+async function handlePredictionsAvailable(request, env, url) {
+  if (request.method !== 'GET') return errorJson(405, { error: 'method_not_allowed' });
+  const competition = String(url.searchParams.get('competition') || 'all');
+  const service = createPredictionService({ request, env, now: new Date() });
+  return predictionResponse(() => service.available(competition));
+}
+
+async function handleRankings(request, env, url) {
+  if (request.method !== 'GET') return errorJson(405, { error: 'method_not_allowed' });
+  const scope = String(url.searchParams.get('scope') || 'overall');
+  const competition = String(url.searchParams.get('competition') || '');
+  const service = createPredictionService({ request, env, now: new Date() });
+  return predictionResponse(() => service.rankings({
+    scope,
+    competition: scope === 'competition' ? competition : undefined,
+  }));
+}
+
+async function handleRankingMe(request, env) {
+  if (request.method !== 'GET') return errorJson(405, { error: 'method_not_allowed' });
+  const service = createPredictionService({ request, env, now: new Date() });
+  return predictionResponse(() => service.rankingMe());
+}
+
+function resetForbidden() {
+  const error = new Error('reset_forbidden');
+  error.code = 'reset_forbidden';
+  error.status = 403;
+  return error;
+}
+
+function assertTestPredictionReset(request, env) {
+  const url = new URL(request.url);
+  try {
+    assertSafeResetTarget({ origin: url.origin, environment: env.CIAO_ENV });
+  } catch {
+    throw resetForbidden();
+  }
+  if (!env.TEST_RESET_TOKEN) throw resetForbidden();
+  if (request.headers.get('x-ciao-test-reset-token') !== env.TEST_RESET_TOKEN) throw resetForbidden();
+  let name;
+  try {
+    name = predictionObjectName({ environment: env.CIAO_ENV, season: env.PREDICTION_SEASON });
+  } catch {
+    throw resetForbidden();
+  }
+  if (!name.startsWith('prediction-league:test:')) throw resetForbidden();
+  return name;
+}
+
+async function handleTestPredictionReset(request, env) {
+  if (request.method !== 'POST') return errorJson(405, { error: 'method_not_allowed' });
+  return predictionResponse(async () => {
+    const name = assertTestPredictionReset(request, env);
+    if (!env.PREDICTION_LEAGUE) throw resetForbidden();
+    const id = env.PREDICTION_LEAGUE.idFromName(name);
+    const stub = env.PREDICTION_LEAGUE.get(id);
+    const response = await stub.fetch(new Request('https://prediction-league.internal/reset', {
+      method: 'POST',
+      headers: { 'content-type':'application/json' },
+      body: JSON.stringify({ environment:'test', season:env.PREDICTION_SEASON }),
+    }));
+    let payload;
+    try { payload = await response.json(); } catch { payload = null; }
+    if (!response.ok || !payload?.ok || !payload?.stages) {
+      const error = new Error('prediction_backend_unavailable');
+      error.code = 'prediction_backend_unavailable';
+      error.status = 503;
+      throw error;
+    }
+    return { stages: payload.stages };
   });
 }
 
@@ -324,18 +442,21 @@ export default {
         api: 'ciao-web-api',
         matches_provider: 'bsd-v2',
         bsd_configured: Boolean(env.BSD_API_KEY),
+        prediction_backend: 'durable-object-sqlite',
+        prediction_environment: env.CIAO_ENV || null,
+        prediction_season: env.PREDICTION_SEASON || null,
+        prediction_do_configured: Boolean(env.PREDICTION_LEAGUE),
       });
     }
 
-    if (url.pathname === V23_2_MATCHES) {
-      return handleV23_2Matches(request, env, url);
-    }
-    if (url.pathname === V23_3_STANDINGS) {
-      return handleV23_3Standings(request, env, url);
-    }
-    if (url.pathname === V23_3_MATCH_CENTER) {
-      return handleV23_3MatchCenter(request, env, url);
-    }
+    if (url.pathname === V23_2_MATCHES) return handleV23_2Matches(request, env, url);
+    if (url.pathname === V23_3_STANDINGS) return handleV23_3Standings(request, env, url);
+    if (url.pathname === V23_3_MATCH_CENTER) return handleV23_3MatchCenter(request, env, url);
+    if (url.pathname === V23_3_PREDICTIONS_AVAILABLE) return handlePredictionsAvailable(request, env, url);
+    if (url.pathname === V23_3_PREDICTIONS) return handlePredictions(request, env, url);
+    if (url.pathname === V23_3_RANKINGS_ME) return handleRankingMe(request, env);
+    if (url.pathname === V23_3_RANKINGS) return handleRankings(request, env, url);
+    if (url.pathname === V23_3_TEST_RESET) return handleTestPredictionReset(request, env);
 
     if (url.pathname.startsWith('/api/')) {
       return env.CIAO_WEB_API.fetch(request);
