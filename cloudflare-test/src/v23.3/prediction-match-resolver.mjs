@@ -18,9 +18,17 @@ function text(value) {
 export function normalizePredictionSeason(value) {
   const raw = text(value);
   const match = raw.match(/(20\d{2})[\/-](\d{2}|20\d{2})/);
-  if (!match) throw new PredictionMatchError('season_mismatch', 409);
-  const end = match[2].length === 4 ? match[2].slice(2) : match[2];
-  return `${match[1]}-${end}`;
+  if (match) {
+    const end = match[2].length === 4 ? match[2].slice(2) : match[2];
+    return `${match[1]}-${end}`;
+  }
+  const startOnly = raw.match(/^(20\d{2})$/);
+  if (startOnly) {
+    const start = Number(startOnly[1]);
+    const end = String((start + 1) % 100).padStart(2, '0');
+    return `${startOnly[1]}-${end}`;
+  }
+  throw new PredictionMatchError('season_mismatch', 409);
 }
 
 export function assertPredictionWritable({ match, activeSeason, now = new Date() } = {}) {
