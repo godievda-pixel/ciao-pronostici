@@ -27,18 +27,12 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-function transaction(sql, fn) {
-  sql.exec('BEGIN IMMEDIATE');
-  try {
-    const value = fn();
-    sql.exec('COMMIT');
-    return value;
-  } catch (error) {
-    try {
-      sql.exec('ROLLBACK');
-    } catch {}
-    throw error;
+function transaction(storage, fn) {
+  if (typeof storage?.transactionSync === 'function') {
+    return storage.transactionSync(fn);
   }
+  // Lightweight test doubles do not always expose transactionSync.
+  return fn();
 }
 
 export class PredictionLeague {
@@ -71,7 +65,7 @@ export class PredictionLeague {
         ) {
           return json({ ok: false, error: 'invalid_participant_payload' }, 400);
         }
-        const participant = transaction(this.sql, () => (
+        const participant = transaction(this.state.storage, () => (
           upsertParticipant(this.sql, body.participant, nowIso())
         ));
         return json({ ok: true, participant });
@@ -88,7 +82,7 @@ export class PredictionLeague {
           return json({ ok: false, error: 'invalid_write_payload' }, 400);
         }
 
-        const saved = transaction(this.sql, () => {
+        const saved = transaction(this.state.storage, () => {
           const participant = upsertParticipant(this.sql, body.participant, nowIso());
           return body.predictions.map(item => upsertPrediction(
             this.sql,
@@ -120,7 +114,7 @@ export class PredictionLeague {
       if (url.pathname === '/snapshot' && request.method === 'POST') {
         const body = await bodyOf(request);
         if (!body) return json({ ok: false, error: 'invalid_snapshot_payload' }, 400);
-        const snapshot = transaction(this.sql, () => createRankingSnapshot(this.sql, {
+        const snapshot = transaction(this.state.storage, () => createRankingSnapshot(this.sql, {
           ...body,
           nowIso: nowIso(),
           randomUUID: this.randomUUID,
@@ -131,7 +125,7 @@ export class PredictionLeague {
       if (url.pathname === '/reconcile' && request.method === 'POST') {
         const body = await bodyOf(request);
         if (!body) return json({ ok: false, error: 'invalid_reconcile_payload' }, 400);
-        const result = transaction(this.sql, () => reconcileMatchPredictions(this.sql, {
+        const result = transaction(this.state.storage, () => reconcileMatchPredictions(this.sql, {
           ...body,
           scorePrediction,
         }));
@@ -148,7 +142,7 @@ export class PredictionLeague {
         ) {
           return json({ ok: false, error: 'reset_forbidden' }, 403);
         }
-        const result = transaction(this.sql, () => resetPredictionDomain(this.sql));
+        const result = transaction(this.state.storage, () => resetPredictionDomain(this.sql));
         return json({
           ok: true,
           stages: {
