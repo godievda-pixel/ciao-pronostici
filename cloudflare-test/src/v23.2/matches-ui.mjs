@@ -61,16 +61,17 @@ export function renderMatchesHub() {
   </section>`;
 }
 
-function formatKickoff(value) {
+export function formatKickoff(value, { timeZone } = {}) {
   const time = Date.parse(value || '');
   if (!Number.isFinite(time)) return 'Время уточняется';
-  return new Intl.DateTimeFormat('ru-RU', {
+  const options = {
     day: 'numeric',
     month: 'short',
     hour: '2-digit',
     minute: '2-digit',
-    timeZone: 'Europe/Rome',
-  }).format(new Date(time));
+  };
+  if (timeZone) options.timeZone = timeZone;
+  return new Intl.DateTimeFormat('ru-RU', options).format(new Date(time));
 }
 
 function scoreText(match) {
