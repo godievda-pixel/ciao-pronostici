@@ -1,5 +1,7 @@
 import { createPredictionClient } from './prediction-client.mjs';
 
+export const USER_FEEDBACK_ROUND3_BUILD = '2026-09-02-r3';
+
 export const RANKING_FILTERS = Object.freeze([
   {key:'overall',label:'Общий'},
   {key:'serie_a',label:'Серия А'},
