@@ -1,6 +1,7 @@
 import { createPredictionClient } from './prediction-client.mjs';
 
 export const USER_FEEDBACK_ROUND3_BUILD = '2026-09-02-r3';
+export const USER_FEEDBACK_ROUND4_BUILD = '2026-09-02-r4';
 
 export const RANKING_FILTERS = Object.freeze([
   {key:'overall',label:'Общий'},
@@ -13,6 +14,30 @@ export const RANKING_FILTERS = Object.freeze([
 
 export function withRankingPositions(rows = []) {
   return (Array.isArray(rows) ? rows : []).map((row, index) => Object.freeze({ position:index + 1, ...row }));
+}
+
+function pluralRu(value, one, few, many) {
+  const number = Math.abs(Math.trunc(Number(value) || 0));
+  const mod100 = number % 100;
+  const mod10 = number % 10;
+  if (mod100 >= 11 && mod100 <= 14) return many;
+  if (mod10 === 1) return one;
+  if (mod10 >= 2 && mod10 <= 4) return few;
+  return many;
+}
+
+export function rankingParticipantCountLabel(value) {
+  const number = Math.max(0, Math.trunc(Number(value) || 0));
+  return `${number} ${pluralRu(number, 'участник', 'участника', 'участников')}`;
+}
+
+export function rankingPointsLabel(value) {
+  const number = Math.trunc(Number(value) || 0);
+  return `${number} ${pluralRu(number, 'очко', 'очка', 'очков')}`;
+}
+
+function rankingPointsUnit(value) {
+  return rankingPointsLabel(value).replace(/^-?\d+\s+/, '');
 }
 
 let client = null;
@@ -68,7 +93,7 @@ function heroHtml() {
     </div>
     <div class="cw233-ranking-hero-stats">
       <div class="cw233-ranking-stat"><strong>${rank > 0 ? `#${rank}` : '—'}</strong><span>место</span></div>
-      <div class="cw233-ranking-stat"><strong>${points}</strong><span>очков</span></div>
+      <div class="cw233-ranking-stat"><strong>${points}</strong><span>${esc(rankingPointsUnit(points))}</span></div>
     </div>
   </div>`;
 }
@@ -92,17 +117,18 @@ function rankingHtml() {
     ? 'Общий рейтинг'
     : RANKING_FILTERS.find(item => item.key === active)?.label || 'Рейтинг';
   return `<div class="cw233-ranking-section">
-    <div class="section-title cw233-ranking-section-head"><h3>${esc(title)}</h3><span>${positioned.length} игроков</span></div>
+    <div class="section-title cw233-ranking-section-head"><h3>${esc(title)}</h3><span>${esc(rankingParticipantCountLabel(positioned.length))}</span></div>
     <div class="card"><div class="cw233-ranking-list">${positioned.map(row => {
       const isMe = me?.user_id === row.user_id;
       const name = text(row.display_name) || 'Участник';
       const username = text(row.username).replace(/^@/, '');
       const positionLabel = row.position === 1 ? '1' : row.position === 2 ? '2' : row.position === 3 ? '3' : row.position;
+      const points = Number(row.points) || 0;
       return `<div class="list-row cw233-ranking-row${isMe ? ' is-me' : ''}">
         <div class="cw233-ranking-position${podiumClass(row.position)}"><div class="pos">${positionLabel}</div></div>
         <div class="cw233-ranking-avatar">${esc(initials(name))}</div>
         <div class="cw233-ranking-person"><div class="person">${esc(name)}</div>${username ? `<span class="cw233-ranking-username">@${esc(username)}</span>` : ''}</div>
-        <div class="cw233-ranking-points"><div class="pts">${Number(row.points) || 0}</div><span>очк.</span></div>
+        <div class="cw233-ranking-points"><div class="pts">${points}</div><span>${esc(rankingPointsUnit(points))}</span></div>
       </div>`;
     }).join('')}</div></div>
   </div>`;
