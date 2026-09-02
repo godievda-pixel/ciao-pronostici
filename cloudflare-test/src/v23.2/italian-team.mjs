@@ -1,4 +1,4 @@
-import { localizeTeamName } from './team-registry.mjs';
+import { russianTeamName } from './team-registry.mjs';
 
 const ITALIAN_CLUBS = new Set([
   'Интер','Ювентус','Милан','Наполи','Рома','Аталанта','Лацио','Болонья','Фиорентина','Торино',
@@ -19,6 +19,6 @@ export function isItalianTeam(team = {}) {
 
   const sourceName = text(team.rawName || team.raw_name || team.name || team.team_name);
   if (!sourceName) return false;
-  const localized = localizeTeamName(sourceName);
+  const localized = russianTeamName(sourceName);
   return ITALIAN_CLUBS.has(localized) || ITALIAN_CLUBS.has(sourceName);
 }
