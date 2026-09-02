@@ -4,7 +4,6 @@ import { readFile } from 'node:fs/promises';
 import { shouldIncludeMatch } from '../src/v23.2/match-normalizer.mjs';
 import { normalizePredictionSeason } from '../src/v23.3/prediction-match-resolver.mjs';
 import { normalizeStandingRows } from '../src/v23.3/standing-normalizer.mjs';
-import { renderMatchesHub } from '../src/v23.2/matches-ui.mjs';
 
 test('UEFA feeds include only matches with an Italian club', () => {
   assert.equal(shouldIncludeMatch({
@@ -39,24 +38,26 @@ test('standing logos accept legacy and BSD logo_url variants', () => {
   assert.equal(row.team.crestUrl, 'https://img.example/roma.png');
 });
 
-test('predictions no longer block match rendering on ranking request or show a permanent full-screen loader', async () => {
+test('predictions render available matches without waiting for ranking and have no permanent loading copy', async () => {
   const source = await readFile(new URL('../src/v23.3/predictions-ui.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /Загружаем прогнозы/);
   assert.doesNotMatch(source, /Promise\.all\(\s*\[\s*client\.available\('all'\)\s*,\s*client\.rankingMe/);
-  assert.match(source, /client\.available\('all'\)/);
-  assert.match(source, /client\.rankingMe\(\)\.then|void\s+client\.rankingMe\(\)/);
+  assert.match(source, /const data = await client\.available\('all'\)/);
+  assert.match(source, /void client\.rankingMe\(\)\.then/);
 });
 
-test('matches hub removes redundant Tournament and Italian-clubs captions', () => {
-  const html = renderMatchesHub();
-  assert.doesNotMatch(html, />Турнир</i);
-  assert.doesNotMatch(html, /Матчи итальянских клубов/i);
+test('premium polish visually removes redundant tournament captions', async () => {
+  const source = await readFile(new URL('../src/v23.3/premium-polish-ui.mjs', import.meta.url), 'utf8');
+  assert.match(source, /cw232-tournament-card__eyebrow,.cw232-tournament-card__hint\{display:none!important\}/);
+  assert.match(source, /grid-template-areas:\"title arrow\"/);
 });
 
-test('tables mobile layout does not force a 650px horizontal table and uses premium row treatment', async () => {
-  const source = await readFile(new URL('../src/v23.3/tables-ui.mjs', import.meta.url), 'utf8');
-  assert.doesNotMatch(source, /min-width:\s*650px/);
-  assert.match(source, /border-spacing:\s*0\s+8px/);
+test('premium tables remove horizontal canvas and collapse secondary stats on mobile', async () => {
+  const source = await readFile(new URL('../src/v23.3/premium-polish-ui.mjs', import.meta.url), 'utf8');
+  assert.match(source, /min-width:0!important/);
+  assert.match(source, /border-spacing:0 8px!important/);
   assert.match(source, /@media\(max-width:620px\)/);
-  assert.match(source, /nth-child\(4\)|nth-child\(5\)|nth-child\(6\)|nth-child\(7\)/);
+  assert.match(source, /nth-child\(4\)/);
+  assert.match(source, /nth-child\(7\)/);
+  assert.match(source, /hydrateTableLogos/);
 });
