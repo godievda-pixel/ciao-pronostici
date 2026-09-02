@@ -1,5 +1,7 @@
 import { createPredictionClient } from './prediction-client.mjs';
 
+export const USER_FEEDBACK_ROUND4_BUILD = '2026-09-02-r4';
+
 export const PREDICTION_FILTERS = Object.freeze([
   { key:'all', label:'Все' },
   { key:'serie_a', label:'Серия А' },
@@ -9,6 +11,10 @@ export const PREDICTION_FILTERS = Object.freeze([
   { key:'uecl', label:'ЛК' },
   { key:'unfilled', label:'Не заполнено' },
 ]);
+
+const PREDICTION_COMPETITIONS = Object.freeze(
+  PREDICTION_FILTERS.map(item => item.key).filter(key => !['all', 'unfilled'].includes(key)),
+);
 
 function text(value) { return String(value ?? '').trim(); }
 function time(match) {
@@ -21,6 +27,47 @@ function esc(value) {
   }[c]));
 }
 
+function sortMatches(rows = []) {
+  return [...rows].sort((a, b) => (
+    time(a) - time(b) || text(a?.matchId).localeCompare(text(b?.matchId))
+  ));
+}
+
+export async function loadPredictionCompetitionsProgressively({
+  competitions = PREDICTION_COMPETITIONS,
+  load,
+  onUpdate = () => {},
+} = {}) {
+  if (typeof load !== 'function') throw new Error('prediction competition loader required');
+  const keys = [...new Set((Array.isArray(competitions) ? competitions : []).map(text).filter(Boolean))];
+  const byMatch = new Map();
+  const errors = {};
+  let pending = keys.length;
+
+  const snapshot = () => Object.freeze({
+    matches:Object.freeze(sortMatches([...byMatch.values()])),
+    errors:Object.freeze({ ...errors }),
+    pending,
+  });
+
+  await Promise.all(keys.map(async competition => {
+    try {
+      const data = await load(competition);
+      for (const match of Array.isArray(data?.matches) ? data.matches : []) {
+        const id = text(match?.matchId);
+        if (id) byMatch.set(id, match);
+      }
+    } catch (error) {
+      errors[competition] = text(error?.code || error?.message) || 'prediction_load_failed';
+    } finally {
+      pending -= 1;
+      onUpdate(snapshot());
+    }
+  }));
+
+  return snapshot();
+}
+
 export function filterPredictionMatches(matches = [], filter = 'all') {
   const rows = Array.isArray(matches) ? matches : [];
   if (filter === 'all') return [...rows];
@@ -29,9 +76,7 @@ export function filterPredictionMatches(matches = [], filter = 'all') {
 }
 
 export function groupPredictionMatchesByDate(matches = []) {
-  const sorted = [...(Array.isArray(matches) ? matches : [])].sort((a, b) => (
-    time(a) - time(b) || text(a?.matchId).localeCompare(text(b?.matchId))
-  ));
+  const sorted = sortMatches(Array.isArray(matches) ? matches : []);
   const groups = new Map();
   for (const match of sorted) {
     const date = new Date(match?.kickoffAt || '');
@@ -70,6 +115,8 @@ let client = null;
 let me = null;
 let pageActive = false;
 let loadingMatches = false;
+let loadingFailed = false;
+let loadGeneration = 0;
 
 function initData() { return text(globalThis.Telegram?.WebApp?.initData); }
 function telegramUser() { return globalThis.Telegram?.WebApp?.initDataUnsafe?.user || null; }
@@ -171,15 +218,21 @@ function mineMatchHtml(match) {
   </div>`;
 }
 
+function loadingBody() {
+  return '<div class="cw233-prediction-loading" aria-label="Загрузка матчей"><span></span><span></span><span></span></div>';
+}
+
 function makeBody(rows) {
-  if (loadingMatches) return '';
+  if (loadingMatches && !rows.length) return loadingBody();
+  if (loadingFailed && !rows.length) return '<div class="empty">Не удалось загрузить матчи. Попробуй открыть раздел ещё раз.</div>';
   const groups = groupPredictionMatchesByDate(rows);
   if (!groups.length) return '<div class="empty">Нет матчей для этого фильтра</div>';
   return groups.map(group => `<div class="section-title"><h3>${esc(formatDay(group.key))}</h3><span>${group.matches.length} матч.</span></div><div class="matches">${group.matches.map(makeMatchHtml).join('')}</div>`).join('');
 }
 
 function mineBody(rows) {
-  if (loadingMatches) return '';
+  if (loadingMatches && !rows.length) return loadingBody();
+  if (loadingFailed && !rows.length) return '<div class="empty">Не удалось загрузить матчи. Попробуй открыть раздел ещё раз.</div>';
   if (!rows.length) return '<div class="empty">Сохранённых прогнозов пока нет</div>';
   return `<div class="section-title"><h3>Мои прогнозы</h3><span>${rows.length}</span></div><div class="card mine-card">${rows.map(mineMatchHtml).join('')}</div>`;
 }
@@ -193,30 +246,52 @@ function render() {
   main.innerHTML = `${heroHtml()}${tabsHtml()}${filtersHtml()}${activeMode === 'mine' ? mineBody(selected) : makeBody(selected)}${activeMode === 'make' ? '<div class="savebar"><button type="button" class="save" data-cw233-save-all>Сохранить прогнозы</button></div>' : ''}`;
 }
 
+async function reloadMatches(generation = loadGeneration) {
+  const finalState = await loadPredictionCompetitionsProgressively({
+    load:competition => client.available(competition),
+    onUpdate(state) {
+      if (!pageActive || generation !== loadGeneration) return;
+      matches = [...state.matches];
+      loadingMatches = state.pending > 0 && matches.length === 0;
+      loadingFailed = false;
+      render();
+    },
+  });
+  if (!pageActive || generation !== loadGeneration) return finalState;
+  matches = [...finalState.matches];
+  loadingMatches = false;
+  loadingFailed = matches.length === 0 && Object.keys(finalState.errors).length === PREDICTION_COMPETITIONS.length;
+  render();
+  return finalState;
+}
+
 async function open() {
+  const generation = ++loadGeneration;
   pageActive = true;
   loadingMatches = true;
+  loadingFailed = false;
+  matches = [];
   render();
   try {
     client = client || createPredictionClient({ initData:initData() });
-    const data = await client.available('all');
-    if (!pageActive) return;
-    matches = Array.isArray(data?.matches) ? data.matches : [];
-    loadingMatches = false;
-    render();
     void client.rankingMe().then(current => {
-      if (!pageActive) return;
+      if (!pageActive || generation !== loadGeneration) return;
       me = current && typeof current === 'object' ? current : null;
       render();
     }).catch(() => {});
+    await reloadMatches(generation);
   } catch (error) {
+    if (!pageActive || generation !== loadGeneration) return;
     loadingMatches = false;
-    const main = contentNode();
-    if (pageActive && main) main.innerHTML = `${heroHtml()}${tabsHtml()}${filtersHtml()}<div class="empty">${esc(error?.code || 'Не удалось загрузить прогнозы')}</div>`;
+    loadingFailed = true;
+    render();
   }
 }
 
-function close() { pageActive = false; }
+function close() {
+  pageActive = false;
+  loadGeneration += 1;
+}
 
 async function saveDrafts() {
   if (!drafts.size) {
@@ -241,10 +316,7 @@ async function saveDrafts() {
     render();
   } catch (error) {
     if (error?.code === 'prediction_locked') {
-      try {
-        const data = await client.available('all');
-        matches = Array.isArray(data?.matches) ? data.matches : matches;
-      } catch {}
+      try { await reloadMatches(loadGeneration); } catch {}
       render();
     }
     globalThis.Telegram?.WebApp?.showAlert?.(error?.code === 'prediction_locked' ? 'Дедлайн этого прогноза уже наступил' : 'Не удалось сохранить прогноз');
