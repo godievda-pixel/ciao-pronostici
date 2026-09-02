@@ -44,10 +44,10 @@ jobs:
         run: npm run inspect:api-contract
 
       - name: Observe v23.3 prediction contract
-        run: npm run probe:predictions
+        run: node scripts/probe-prediction-contract.mjs
 
       - name: Observe v23.3 reset contract
-        run: npm run probe:reset
+        run: node scripts/probe-reset-contract.mjs
 
       - name: Probe BSD provider contract
         run: node scripts/probe-bsd-provider.mjs
