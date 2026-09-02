@@ -57,6 +57,23 @@ function requestLiterals(source) {
   );
 }
 
+function stringList(value) {
+  return Array.isArray(value)
+    ? value.map(item => String(item ?? '').trim()).filter(Boolean)
+    : [];
+}
+
+export function predictionContractStaticSummary(literals = {}) {
+  const actions = stringList(literals.action);
+  const competitionKeyLiterals = stringList(literals.competition_key);
+  return Object.freeze({
+    legacyStateAction: actions.includes('state'),
+    legacySaveAction: actions.includes('save_predictions'),
+    competitionKeyLiterals: Object.freeze(competitionKeyLiterals),
+    competitionAwareClientContractObserved: competitionKeyLiterals.length > 0,
+  });
+}
+
 export async function observeContract({ baseUrl, testOrigin, fetchImpl = fetch }) {
   const baseResponse = await fetchImpl(baseUrl, {
     headers: { 'cache-control': 'no-cache' },
@@ -70,6 +87,7 @@ export async function observeContract({ baseUrl, testOrigin, fetchImpl = fetch }
   const routeLiterals = discoverApiRouteLiterals(source);
   const sourceHints = extractSourceHints(source);
   const literals = requestLiterals(source);
+  const predictionContractStatic = predictionContractStaticSummary(literals);
   const safe = safeCalls(calls);
   const probes = [];
 
@@ -114,6 +132,7 @@ export async function observeContract({ baseUrl, testOrigin, fetchImpl = fetch }
     routeLiterals,
     sourceHints,
     requestLiterals: literals,
+    predictionContractStatic,
     safeGetRoutes: safe.map(call => call.route),
     probes,
   };
@@ -141,6 +160,7 @@ export async function main() {
     discovered: result.calls.length,
     routeLiterals: result.routeLiterals,
     requestLiterals: result.requestLiterals,
+    predictionContractStatic: result.predictionContractStatic,
     sourceHints: result.sourceHints.length,
     clubSourceHints,
     v233SourceHints,

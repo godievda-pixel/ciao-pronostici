@@ -41,6 +41,10 @@ jobs:
         if: github.event_name == 'push'
         run: npm run inspect:api-contract
 
+      - name: Observe v23.3 prediction contract
+        if: github.event_name == 'push'
+        run: node scripts/probe-prediction-contract.mjs
+
       - name: Probe BSD provider contract
         if: github.event_name == 'push'
         run: node scripts/probe-bsd-provider.mjs
@@ -55,6 +59,15 @@ jobs:
         with:
           name: ciao-v23-2-api-contract
           path: cloudflare-test/artifacts/api-contract-observed.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload v23.3 prediction contract observation
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ciao-v23-3-prediction-contract
+          path: cloudflare-test/artifacts/v23-3-prediction-contract.json
           if-no-files-found: error
           retention-days: 7
 
