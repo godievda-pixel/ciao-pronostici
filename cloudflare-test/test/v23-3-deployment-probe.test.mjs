@@ -43,3 +43,18 @@ test('deployment probe explicitly verifies v23.3 Home and Tables runtime markers
   assert.match(source, /hasTablesRuntime/);
   assert.match(source, /deployed TEST is missing v23\.3 Tables runtime/);
 });
+
+test('deployment probe explicitly verifies v23.3 canonical Match Center runtime and link resolver', async () => {
+  const source = await readFile(new URL('../scripts/probe-test-deployment.mjs', import.meta.url), 'utf8');
+
+  assert.match(source, /\/v23\.3\/match-center\.mjs/);
+  assert.match(source, /\/v23\.3\/match-center-links\.mjs/);
+  assert.match(source, /hasMatchCenterRuntime/);
+  assert.match(source, /hasMatchCenterLinksRuntime/);
+  assert.match(source, /createMatchCenterController/);
+  assert.match(source, /openCanonicalMatchCenter/);
+  assert.match(source, /resolveCanonicalMatchTarget/);
+  assert.match(source, /installCanonicalMatchLinks/);
+  assert.match(source, /deployed TEST is missing v23\.3 Match Center runtime/);
+  assert.match(source, /deployed TEST is missing v23\.3 Match Center links runtime/);
+});
