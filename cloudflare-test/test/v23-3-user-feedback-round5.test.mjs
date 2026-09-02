@@ -2,7 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { listCanonicalPredictionMatches } from '../src/v23.3/prediction-match-resolver.mjs';
-import worker from '../src/worker.js';
+import {
+  serieAStateCrestLookup,
+  resolveSerieAStateCrest,
+} from '../src/v23.3/serie-a-legacy-bridge.mjs';
 
 function legacyStatePayload() {
   return {
@@ -33,48 +36,19 @@ test('ranking rows are isolated from legacy pos/person/pts/list-row classes so t
   assert.match(source, /cw233-ranking-points-unit/);
 });
 
-test('Serie A standings use the same legacy state team logos as stable v22.5 when table rows omit crests', async () => {
-  const upstreamCalls = [];
-  const response = await worker.fetch(
-    new Request('https://ciao-web-app-test.example/api/v23.3/standings?competition=serie_a', {
-      headers:{ 'x-telegram-init-data':'tg' },
-    }),
-    {
-      CIAO_WEB_API:{
-        async fetch(request) {
-          const url = new URL(request.url);
-          let body = {};
-          try { body = await request.clone().json(); } catch {}
-          upstreamCalls.push(`${url.pathname}:${body.action || ''}`);
-          if (url.pathname === '/api/ciao-core-api-fast-v4' && body.action === 'serie_a_table') {
-            return Response.json({
-              ok:true,
-              serie_a_table:{ rows:[{
-                position:1,
-                team:{ id:65, name:'Рома' },
-                played:2,
-                goal_difference:4,
-                points:6,
-              }] },
-            });
-          }
-          if (url.pathname === '/api/ciao-core-api-fast-v4' && body.action === 'state') {
-            return Response.json(legacyStatePayload());
-          }
-          if (url.pathname === '/api/ciao-schedule-fast-v1') {
-            return new Response('schedule unavailable', { status:503 });
-          }
-          throw new Error(`unexpected upstream ${url.pathname}`);
-        },
-      },
-      ASSETS:{ fetch:async () => new Response('asset') },
-    },
-  );
+test('Serie A standings hydrate real crests from the same stable state teams used by v22.5', async () => {
+  const lookup = serieAStateCrestLookup(legacyStatePayload());
+  assert.equal(resolveSerieAStateCrest(lookup, { id:'65', name:'Рома' }), 'https://img.test/roma.png');
+  assert.equal(resolveSerieAStateCrest(lookup, { id:'', name:'Интер' }), 'https://img.test/inter.png');
+  assert.equal(resolveSerieAStateCrest(lookup, { id:'999', name:'Неизвестный клуб' }), '');
 
-  const payload = await response.json();
-  assert.equal(response.status, 200);
-  assert.equal(payload.data.rows[0].team.crestUrl, 'https://img.test/roma.png');
-  assert.ok(upstreamCalls.includes('/api/ciao-core-api-fast-v4:state'));
+  const bridgeSource = await readFile(new URL('../src/v23.3/serie-a-legacy-bridge.mjs', import.meta.url), 'utf8');
+  const indexSource = await readFile(new URL('../src/v23.3/index.mjs', import.meta.url), 'utf8');
+  assert.match(bridgeSource, /\/api\/ciao-core-api-fast-v4/);
+  assert.match(bridgeSource, /action:'state'/);
+  assert.match(bridgeSource, /cw233-table-logo-fallback/);
+  assert.doesNotMatch(bridgeSource, /sports\.bzzoiro\.com\/img\/team\/\$\{/);
+  assert.match(indexSource, /\.\/serie-a-legacy-bridge\.mjs/);
 });
 
 test('Serie A prediction feed falls back to the proven v22.5 state round instead of depending on schedule-fast', async () => {
@@ -111,4 +85,5 @@ test('Serie A prediction feed falls back to the proven v22.5 state round instead
   assert.equal(result.matches[0].season, '2026-27');
   assert.equal(result.matches[0].homeTeam.crestUrl, 'https://img.test/roma.png');
   assert.ok(calls.includes('/api/ciao-core-api-fast-v4:state'));
+  assert.equal(calls.some(call => call.startsWith('/api/ciao-schedule-fast-v1:')), false);
 });
