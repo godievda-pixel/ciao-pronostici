@@ -105,3 +105,49 @@ test('v23.3 build applies the stable Home patch and refuses a missing anchor', a
     /v23\.3 Home anchor missing/,
   );
 });
+
+test('v23.3 unified build entry is injected exactly once and replaces split runtime entries', async () => {
+  const { injectV233Entry } = await buildModule();
+  assert.equal(typeof injectV233Entry, 'function');
+
+  const base = '<html><head></head><body><script id="ciao-v232-core"></script><script id="ciao-v232-matches-ui"></script></body></html>';
+  const once = injectV233Entry(base);
+  const twice = injectV233Entry(once);
+
+  assert.equal(twice, once);
+  assert.equal((once.match(/id="ciao-v233"/g) || []).length, 1);
+  assert.match(once, /src="\/v23\.3\/index\.mjs"/);
+  assert.doesNotMatch(once, /id="ciao-v233-home"/);
+  assert.doesNotMatch(once, /id="ciao-v233-tables"/);
+  assert.match(once, /id="ciao-v232-core"/);
+  assert.match(once, /id="ciao-v232-matches-ui"/);
+});
+
+test('v23.3 browser entry assembles current runtime but exposes neither reset nor blocked predictions', async () => {
+  const { copyV233Modules } = await buildModule();
+  const files = await copyV233Modules();
+  assert.equal(files.includes('index.mjs'), true);
+
+  const entry = await readFile(
+    new URL('../dist/v23.3/index.mjs', import.meta.url),
+    'utf8',
+  );
+  assert.match(entry, /home-integration\.mjs/);
+  assert.match(entry, /tables-ui\.mjs/);
+  assert.match(entry, /CiaoV233/);
+  assert.match(entry, /Object\.freeze/);
+  assert.match(entry, /predictions[^\n]*blocked/i);
+  assert.doesNotMatch(entry, /predictions-ui\.mjs/);
+  assert.doesNotMatch(entry, /reset-contract\.mjs/);
+  assert.doesNotMatch(entry, /createReset|executeReset|resetUser/i);
+});
+
+test('v23.3 build pipeline uses the unified entry while preserving the Home source patch', async () => {
+  const source = await readFile(
+    new URL('../scripts/build.mjs', import.meta.url),
+    'utf8',
+  );
+  assert.match(source, /injectV233Entry\s*\(/);
+  assert.match(source, /applyV233HomeBuildPatch\s*\(/);
+  assert.doesNotMatch(source, /injectV233TablesEntry\s*\(\s*\n?\s*injectV233HomeEntry\s*\(/);
+});
