@@ -28,10 +28,10 @@ test('matches hub exposes all five approved tournament destinations', () => {
   }
 
   assert.match(html, /Serie A/);
-  assert.match(html, /Coppa Italia/);
-  assert.match(html, /Champions League/);
-  assert.match(html, /Europa League/);
-  assert.match(html, /Conference League/);
+  assert.match(html, /Кубок Италии/);
+  assert.match(html, /Лига Чемпионов/);
+  assert.match(html, /Лига Европы/);
+  assert.match(html, /Лига Конференций/);
 });
 
 test('Champions League screen renders its own theme, stage and canonical matches', () => {
@@ -55,7 +55,7 @@ test('Champions League screen renders its own theme, stage and canonical matches
   });
 
   assert.match(html, /data-cw232-theme="champions"/);
-  assert.match(html, /Champions League/);
+  assert.match(html, /Лига Чемпионов/);
   assert.match(html, /League Phase/);
   assert.match(html, /data-cw232-match="ucl:401"/);
   assert.match(html, /Интер/);
