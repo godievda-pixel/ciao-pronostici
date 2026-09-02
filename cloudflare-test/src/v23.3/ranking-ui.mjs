@@ -3,6 +3,7 @@ import { createPredictionClient } from './prediction-client.mjs';
 export const USER_FEEDBACK_ROUND3_BUILD = '2026-09-02-r3';
 export const USER_FEEDBACK_ROUND4_BUILD = '2026-09-02-r4';
 export const USER_FEEDBACK_ROUND5_BUILD = '2026-09-02-r5';
+export const USER_FEEDBACK_ROUND6_BUILD = '2026-09-02-r6';
 
 export const RANKING_FILTERS = Object.freeze([
   {key:'overall',label:'Общий'},
@@ -65,16 +66,7 @@ function ensureRankingPremiumStyle() {
   style.id = RANKING_STYLE_ID;
   style.textContent = `
     .cw233-ranking-page .cw233-ranking-list{display:grid!important;gap:8px!important;padding:0!important}
-    .cw233-ranking-page .cw233-ranking-row{
-      display:grid!important;
-      grid-template-columns:34px 36px minmax(0,1fr) 58px!important;
-      column-gap:10px!important;
-      align-items:center!important;
-      min-height:62px!important;
-      width:100%!important;
-      padding:10px 11px!important;
-      box-sizing:border-box!important;
-    }
+    .cw233-ranking-page .cw233-ranking-row{display:grid!important;grid-template-columns:34px 36px minmax(0,1fr) 58px!important;column-gap:10px!important;align-items:center!important;min-height:62px!important;width:100%!important;padding:10px 11px!important;box-sizing:border-box!important}
     .cw233-ranking-page .cw233-ranking-position{display:grid!important;place-items:center!important;width:34px!important;height:34px!important;min-width:34px!important}
     .cw233-ranking-page .cw233-ranking-position-value{display:block!important;width:100%!important;text-align:center!important;font-size:11px!important;font-weight:950!important;line-height:1!important;font-variant-numeric:tabular-nums!important}
     .cw233-ranking-page .cw233-ranking-person{display:grid!important;align-content:center!important;gap:3px!important;min-width:0!important;overflow:hidden!important}
@@ -83,13 +75,7 @@ function ensureRankingPremiumStyle() {
     .cw233-ranking-page .cw233-ranking-points{display:grid!important;grid-template-rows:auto auto!important;justify-items:end!important;align-content:center!important;gap:2px!important;width:58px!important;min-width:58px!important;line-height:1!important;text-align:right!important}
     .cw233-ranking-page .cw233-ranking-points-value{display:block!important;font-size:17px!important;font-weight:950!important;line-height:1!important;color:#fff!important;font-variant-numeric:tabular-nums!important}
     .cw233-ranking-page .cw233-ranking-points-unit{display:block!important;max-width:58px!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;font-size:7px!important;font-weight:850!important;line-height:1!important;letter-spacing:.02em!important;text-transform:uppercase!important;color:var(--muted)!important}
-    @media(max-width:390px){
-      .cw233-ranking-page .cw233-ranking-row{grid-template-columns:32px 34px minmax(0,1fr) 54px!important;column-gap:8px!important;padding-left:9px!important;padding-right:9px!important}
-      .cw233-ranking-page .cw233-ranking-position{width:32px!important;height:32px!important;min-width:32px!important}
-      .cw233-ranking-page .cw233-ranking-points{width:54px!important;min-width:54px!important}
-      .cw233-ranking-page .cw233-ranking-name{font-size:11px!important}
-      .cw233-ranking-page .cw233-ranking-points-value{font-size:16px!important}
-    }
+    @media(max-width:390px){.cw233-ranking-page .cw233-ranking-row{grid-template-columns:32px 34px minmax(0,1fr) 54px!important;column-gap:8px!important;padding-left:9px!important;padding-right:9px!important}.cw233-ranking-page .cw233-ranking-position{width:32px!important;height:32px!important;min-width:32px!important}.cw233-ranking-page .cw233-ranking-points{width:54px!important;min-width:54px!important}.cw233-ranking-page .cw233-ranking-name{font-size:11px!important}.cw233-ranking-page .cw233-ranking-points-value{font-size:16px!important}}
   `;
   document.head.appendChild(style);
 }
@@ -101,6 +87,15 @@ export function resolveRankingDisplayName(current, tgUser) {
   if (telegramName) return telegramName;
   const username = text(current?.username || tgUser?.username).replace(/^@/, '');
   return username ? `@${username}` : 'Участник';
+}
+
+export function resolveCurrentRankingRow(rankingRows = [], tgUser = {}) {
+  const id = text(tgUser?.id);
+  if (!id) return null;
+  const wanted = `telegram:${id}`;
+  const index = (Array.isArray(rankingRows) ? rankingRows : []).findIndex(row => text(row?.user_id) === wanted);
+  if (index < 0) return null;
+  return Object.freeze({ position:index + 1, ...rankingRows[index] });
 }
 
 function initials(value) {
@@ -120,99 +115,48 @@ function heroHtml() {
   const subtitle = usernameLine(me, tgUser);
   const rank = Number(me?.position);
   const points = Number(me?.points) || 0;
-  return `<div class="hero cw233-ranking-hero">
-    <div class="cw233-ranking-identity">
-      <div class="cw233-ranking-avatar cw233-ranking-avatar--hero">${esc(initials(name))}</div>
-      <div class="cw233-ranking-identity-copy">
-        <span class="cw233-ranking-kicker">УЧАСТНИК</span>
-        <h2>${esc(name)}</h2>
-        <p>${esc(subtitle)}</p>
-      </div>
-    </div>
-    <div class="cw233-ranking-hero-stats">
-      <div class="cw233-ranking-stat"><strong>${rank > 0 ? `#${rank}` : '—'}</strong><span>место</span></div>
-      <div class="cw233-ranking-stat"><strong>${points}</strong><span>${esc(rankingPointsUnit(points))}</span></div>
-    </div>
-  </div>`;
+  return `<div class="hero cw233-ranking-hero"><div class="cw233-ranking-identity"><div class="cw233-ranking-avatar cw233-ranking-avatar--hero">${esc(initials(name))}</div><div class="cw233-ranking-identity-copy"><span class="cw233-ranking-kicker">УЧАСТНИК</span><h2>${esc(name)}</h2><p>${esc(subtitle)}</p></div></div><div class="cw233-ranking-hero-stats"><div class="cw233-ranking-stat"><strong>${rank > 0 ? `#${rank}` : '—'}</strong><span>место</span></div><div class="cw233-ranking-stat"><strong>${points}</strong><span>${esc(rankingPointsUnit(points))}</span></div></div></div>`;
 }
 
 function filtersHtml() {
-  return `<div class="cw233-ranking-filters-wrap"><div class="cw231-filters cw233-ranking-filters" role="tablist" aria-label="Рейтинг по турнирам">${RANKING_FILTERS.map(filter => (
-    `<button type="button" data-cw233-rank-filter="${filter.key}" aria-selected="${filter.key === active}">${filter.label}</button>`
-  )).join('')}</div></div>`;
+  return `<div class="cw233-ranking-filters-wrap"><div class="cw231-filters cw233-ranking-filters" role="tablist" aria-label="Рейтинг по турнирам">${RANKING_FILTERS.map(filter => `<button type="button" data-cw233-rank-filter="${filter.key}" aria-selected="${filter.key === active}">${filter.label}</button>`).join('')}</div></div>`;
 }
 
-function podiumClass(position) {
-  return position >= 1 && position <= 3 ? ` is-podium is-podium-${position}` : '';
-}
+function podiumClass(position) { return position >= 1 && position <= 3 ? ` is-podium is-podium-${position}` : ''; }
 
 function rankingHtml() {
   const positioned = withRankingPositions(rows);
-  if (!positioned.length) {
-    return '<div class="empty"><div class="cw233-ranking-empty"><strong>Рейтинг формируется</strong><span>Участники появятся здесь автоматически</span></div></div>';
-  }
-  const title = active === 'overall'
-    ? 'Общий рейтинг'
-    : RANKING_FILTERS.find(item => item.key === active)?.label || 'Рейтинг';
-  return `<div class="cw233-ranking-section">
-    <div class="section-title cw233-ranking-section-head"><h3>${esc(title)}</h3><span>${esc(rankingParticipantCountLabel(positioned.length))}</span></div>
-    <div class="card"><div class="cw233-ranking-list">${positioned.map(row => {
-      const isMe = me?.user_id === row.user_id;
-      const name = text(row.display_name) || 'Участник';
-      const username = text(row.username).replace(/^@/, '');
-      const positionLabel = row.position === 1 ? '1' : row.position === 2 ? '2' : row.position === 3 ? '3' : row.position;
-      const points = Number(row.points) || 0;
-      return `<div class="cw233-ranking-row${isMe ? ' is-me' : ''}">
-        <div class="cw233-ranking-position${podiumClass(row.position)}"><span class="cw233-ranking-position-value">${positionLabel}</span></div>
-        <div class="cw233-ranking-avatar">${esc(initials(name))}</div>
-        <div class="cw233-ranking-person"><div class="cw233-ranking-name">${esc(name)}</div>${username ? `<span class="cw233-ranking-username">@${esc(username)}</span>` : ''}</div>
-        <div class="cw233-ranking-points"><strong class="cw233-ranking-points-value">${points}</strong><span class="cw233-ranking-points-unit">${esc(rankingPointsUnit(points))}</span></div>
-      </div>`;
-    }).join('')}</div></div>
-  </div>`;
+  if (!positioned.length) return '<div class="empty"><div class="cw233-ranking-empty"><strong>Рейтинг формируется</strong><span>Участники появятся здесь автоматически</span></div></div>';
+  const title = active === 'overall' ? 'Общий рейтинг' : RANKING_FILTERS.find(item => item.key === active)?.label || 'Рейтинг';
+  return `<div class="cw233-ranking-section"><div class="section-title cw233-ranking-section-head"><h3>${esc(title)}</h3><span>${esc(rankingParticipantCountLabel(positioned.length))}</span></div><div class="card"><div class="cw233-ranking-list">${positioned.map(row => {
+    const isMe = me?.user_id === row.user_id;
+    const name = text(row.display_name) || 'Участник';
+    const username = text(row.username).replace(/^@/, '');
+    const points = Number(row.points) || 0;
+    return `<div class="cw233-ranking-row${isMe ? ' is-me' : ''}"><div class="cw233-ranking-position${podiumClass(row.position)}"><span class="cw233-ranking-position-value">${row.position}</span></div><div class="cw233-ranking-avatar">${esc(initials(name))}</div><div class="cw233-ranking-person"><div class="cw233-ranking-name">${esc(name)}</div>${username ? `<span class="cw233-ranking-username">@${esc(username)}</span>` : ''}</div><div class="cw233-ranking-points"><strong class="cw233-ranking-points-value">${points}</strong><span class="cw233-ranking-points-unit">${esc(rankingPointsUnit(points))}</span></div></div>`;
+  }).join('')}</div></div></div>`;
 }
 
-function pageHtml(body) {
-  return `<div class="cw233-ranking-page">${heroHtml()}${filtersHtml()}${body}</div>`;
-}
-
-function render() {
-  if (!pageActive) return;
-  const main = contentNode();
-  if (!main) return;
-  main.innerHTML = pageHtml(rankingHtml());
-}
-
-function loading() {
-  const main = contentNode();
-  if (!main) return;
-  main.innerHTML = pageHtml(`<div class="cw233-ranking-skeleton" aria-hidden="true">
-    <div class="cw233-ranking-skeleton-row"></div>
-    <div class="cw233-ranking-skeleton-row"></div>
-    <div class="cw233-ranking-skeleton-row"></div>
-  </div>`);
-}
+function pageHtml(body) { return `<div class="cw233-ranking-page">${heroHtml()}${filtersHtml()}${body}</div>`; }
+function render() { if (!pageActive) return; const main = contentNode(); if (main) main.innerHTML = pageHtml(rankingHtml()); }
+function loading() { const main = contentNode(); if (main) main.innerHTML = pageHtml('<div class="cw233-ranking-skeleton" aria-hidden="true"><div class="cw233-ranking-skeleton-row"></div><div class="cw233-ranking-skeleton-row"></div><div class="cw233-ranking-skeleton-row"></div></div>'); }
 
 async function load() {
   pageActive = true;
   loading();
   try {
     client = client || createPredictionClient({ initData:initData() });
-    const [ranking, current] = await Promise.all([
-      active === 'overall'
-        ? client.rankings({ scope:'overall' })
-        : client.rankings({ scope:'competition', competition:active }),
-      client.rankingMe(),
-    ]);
+    const ranking = active === 'overall'
+      ? await client.rankings({ scope:'overall' })
+      : await client.rankings({ scope:'competition', competition:active });
     if (!pageActive) return;
     rows = Array.isArray(ranking) ? ranking : [];
-    me = current && typeof current === 'object' ? current : null;
+    const current = resolveCurrentRankingRow(rows, telegramUser());
+    if (current) me = current;
     render();
   } catch (error) {
     const main = contentNode();
-    if (pageActive && main) {
-      main.innerHTML = pageHtml(`<div class="empty"><div class="cw233-ranking-empty"><strong>Не удалось загрузить рейтинг</strong><span>${esc(error?.code || 'Попробуйте ещё раз')}</span></div></div>`);
-    }
+    if (pageActive && main) main.innerHTML = pageHtml(`<div class="empty"><div class="cw233-ranking-empty"><strong>Не удалось загрузить рейтинг</strong><span>${esc(error?.code || 'Попробуйте ещё раз')}</span></div></div>`);
   }
 }
 
@@ -223,20 +167,11 @@ export function installRankingUi() {
   ensureRankingPremiumStyle();
   document.addEventListener('click', event => {
     const nav = event.target?.closest?.('.nav button[data-tab]');
-    if (nav?.dataset?.tab === 'table') {
-      void load();
-      return;
-    }
-    if (nav) {
-      close();
-      return;
-    }
+    if (nav?.dataset?.tab === 'table') { void load(); return; }
+    if (nav) { close(); return; }
     if (!pageActive) return;
     const filter = event.target?.closest?.('[data-cw233-rank-filter]');
-    if (filter) {
-      active = filter.dataset.cw233RankFilter || 'overall';
-      void load();
-    }
+    if (filter) { active = filter.dataset.cw233RankFilter || 'overall'; void load(); }
   });
   return Object.freeze({ open:load, close });
 }
