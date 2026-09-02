@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import {
   assertSmokeOrigin,
   proveScoringParity,
@@ -96,4 +97,18 @@ test('authenticated smoke proves persistence isolation lock rejection and never 
   assert.equal(report.lockedFixture, 'uel:3');
   assert.equal(JSON.stringify(report).includes('super-secret-init'), false);
   assert.equal(requests.every(request => new URL(request.url).origin === TEST_ORIGIN), true);
+});
+
+test('package exposes explicit smoke and non-destructive contract probe commands', async () => {
+  const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.equal(pkg.scripts['smoke:predictions'], 'node scripts/smoke-prediction-backend.mjs');
+  assert.equal(pkg.scripts['probe:predictions'], 'node scripts/probe-prediction-contract.mjs');
+  assert.equal(pkg.scripts['probe:reset'], 'node scripts/probe-reset-contract.mjs');
+});
+
+test('Ciao TEST CI validates Wrangler bundling after build without deploying', async () => {
+  const workflow = await readFile(new URL('../../.github/workflows/ciao-test-check.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /name: Validate TEST Worker bundle/);
+  assert.match(workflow, /npx wrangler deploy --dry-run/);
+  assert.doesNotMatch(workflow, /run:\s*npx wrangler deploy\s*$/m);
 });
