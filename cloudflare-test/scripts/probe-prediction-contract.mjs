@@ -8,9 +8,7 @@ const defaultInputPath = resolve(root, 'artifacts/api-contract-observed.json');
 const defaultOutputPath = resolve(root, 'artifacts/v23-3-prediction-contract.json');
 
 function strings(values) {
-  return Array.isArray(values)
-    ? values.map(value => String(value ?? '').trim()).filter(Boolean)
-    : [];
+  return Array.isArray(values) ? values.map(value => String(value ?? '').trim()).filter(Boolean) : [];
 }
 
 export function buildStaticPredictionObservation(observedContract = {}) {
@@ -23,13 +21,13 @@ export function buildStaticPredictionObservation(observedContract = {}) {
 
 function emptyAuthenticatedSmoke() {
   return Object.freeze({
-    performed: false,
-    isolatedFixture: false,
-    persistenceRoundTrip: false,
-    crossCompetitionIsolation: false,
-    deadlineBoundaryRejected: false,
-    scoringParity: false,
-    productionDataUntouched: true,
+    performed:false,
+    isolatedFixture:false,
+    persistenceRoundTrip:false,
+    crossCompetitionIsolation:false,
+    deadlineBoundaryRejected:false,
+    scoringParity:false,
+    productionDataUntouched:true,
   });
 }
 
@@ -39,47 +37,46 @@ export function createPredictionContractReport({
   observedAt = new Date().toISOString(),
 } = {}) {
   const staticObservation = buildStaticPredictionObservation(observedContract);
-  const smoke = authenticatedSmoke?.performed
-    ? Object.freeze({ ...authenticatedSmoke })
-    : emptyAuthenticatedSmoke();
-  const gate = evaluatePredictionGate({
-    staticObservation,
-    authenticatedSmoke: smoke.performed ? smoke : null,
-  });
-
+  const smoke = authenticatedSmoke?.performed ? Object.freeze({ ...authenticatedSmoke }) : emptyAuthenticatedSmoke();
+  const gate = evaluatePredictionGate({ staticObservation, authenticatedSmoke:smoke.performed ? smoke : null });
   return Object.freeze({
     observedAt,
-    pass: gate.pass,
-    status: gate.status,
-    requiresAuthenticatedSmoke: gate.requiresAuthenticatedSmoke,
-    mutatedUserData: false,
+    pass:gate.pass,
+    status:gate.status,
+    requiresAuthenticatedSmoke:gate.requiresAuthenticatedSmoke,
+    mutatedUserData:false,
     staticObservation,
-    staticSignals: gate.staticSignals,
-    authenticatedSmoke: smoke,
-    reasons: gate.reasons,
+    staticSignals:gate.staticSignals,
+    authenticatedSmoke:smoke,
+    reasons:gate.reasons,
   });
+}
+
+async function optionalJson(path) {
+  const value = String(path || '').trim();
+  if (!value) return null;
+  return JSON.parse(await readFile(value, 'utf8'));
 }
 
 export async function main({
   inputPath = process.env.PREDICTION_CONTRACT_INPUT || defaultInputPath,
+  smokeInputPath = process.env.PREDICTION_AUTH_SMOKE_INPUT || '',
   outputPath = process.env.PREDICTION_CONTRACT_OUTPUT || defaultOutputPath,
 } = {}) {
-  const raw = await readFile(inputPath, 'utf8');
-  const observedContract = JSON.parse(raw);
-  const report = createPredictionContractReport({ observedContract });
+  const observedContract = JSON.parse(await readFile(inputPath, 'utf8'));
+  const authenticatedSmoke = await optionalJson(smokeInputPath);
+  const report = createPredictionContractReport({ observedContract, authenticatedSmoke });
 
-  await mkdir(dirname(outputPath), { recursive: true });
+  await mkdir(dirname(outputPath), { recursive:true });
   await writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-
   console.log(JSON.stringify({
-    ok: true,
-    pass: report.pass,
-    status: report.status,
-    requiresAuthenticatedSmoke: report.requiresAuthenticatedSmoke,
-    mutatedUserData: report.mutatedUserData,
-    output: outputPath,
+    ok:true,
+    pass:report.pass,
+    status:report.status,
+    requiresAuthenticatedSmoke:report.requiresAuthenticatedSmoke,
+    mutatedUserData:report.mutatedUserData,
+    output:outputPath,
   }));
-
   return report;
 }
 
