@@ -1,6 +1,7 @@
 import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { applyHomeV233SourcePatch } from './home-v23-3-source-patch.mjs';
 import { applyProfileTournamentSourcePatch } from './profile-source-patch.mjs';
 
 export const BASE_BUILD = 'ciao-web-v23-1-cloudflare-test-20260901';
@@ -180,6 +181,24 @@ export function injectV232Entry(input) {
   return html;
 }
 
+export function injectV233HomeEntry(input) {
+  let html = String(input);
+  if (!/<\/body>/i.test(html)) throw new Error('v23.3 Home module entry requires body anchor');
+  if (html.includes('id="ciao-v233-home"')) return html;
+  return html.replace(
+    /<\/body>/i,
+    '<script type="module" id="ciao-v233-home" src="/v23.3/home-integration.mjs"></script>\n</body>',
+  );
+}
+
+export function applyV233HomeBuildPatch(input) {
+  const patched = applyHomeV233SourcePatch(input);
+  if (!patched.includes('cw233-home-multicompetition')) {
+    throw new Error('v23.3 Home source patch did not apply');
+  }
+  return patched;
+}
+
 async function copyModules(sourceDir, outDir) {
   await mkdir(outDir, { recursive: true });
   const files = (await readdir(sourceDir)).filter(name => name.endsWith('.mjs'));
@@ -232,8 +251,9 @@ export async function build() {
     throw new Error('v23.2 club profile tournament source patch did not apply');
   }
 
+  const homePatched = applyV233HomeBuildPatch(profilePatched);
   await Promise.all([copyV232Modules(), copyV233Modules()]);
-  const html = injectV232Entry(applyPatch(profilePatched, css, js));
+  const html = injectV233HomeEntry(injectV232Entry(applyPatch(homePatched, css, js)));
   await mkdir(dirname(outPath), { recursive: true });
   await writeFile(outPath, html, 'utf8');
   return { output: outPath, bytes: Buffer.byteLength(html), build: TEST_BUILD };
