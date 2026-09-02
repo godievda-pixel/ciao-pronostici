@@ -57,14 +57,16 @@ test('Coppa bracket never guesses an unresolved opponent', () => {
   assert.equal(next.awayLabel, 'Соперник определяется');
 });
 
-test('Coppa screen exposes Matches and Playoff Bracket tabs without document overflow styling', () => {
+test('Coppa screen keeps only the schedule after bracket moves to Tables', () => {
   const html = renderCompetitionScreen('coppa_italia', {
     competition: 'coppa_italia',
     matches: [match('100', 'Round of 16', team('10', 'Милан'), team('11', 'Лацио'))],
   });
-  assert.match(html, /data-cw232-coppa-view="matches"/);
-  assert.match(html, /data-cw232-coppa-view="bracket"/);
-  assert.match(html, /Матчи/);
-  assert.match(html, /Сетка Плей-офф/);
-  assert.match(html, /cw232-bracket-viewport/);
+
+  assert.match(html, /data-cw232-stage="Round of 16"/);
+  assert.match(html, /Милан/);
+  assert.match(html, /Лацио/);
+  assert.doesNotMatch(html, /data-cw232-coppa-view="bracket"/);
+  assert.doesNotMatch(html, /Сетка Плей-офф/);
+  assert.doesNotMatch(html, /cw232-bracket-viewport/);
 });
