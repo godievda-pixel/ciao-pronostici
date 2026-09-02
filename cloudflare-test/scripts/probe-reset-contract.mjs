@@ -13,16 +13,16 @@ const DEFAULT_TEST_ORIGIN = 'https://ciao-web-app-test.ciao-web.workers.dev';
 
 export function createResetContractReport({
   predictionContractReport = {},
+  guardedBackendResetVerified = false,
   origin = DEFAULT_TEST_ORIGIN,
   environment = 'test',
   now = new Date(),
 } = {}) {
   const plan = createResetPlan({ origin, environment, now });
   const predictionGateStatus = String(predictionContractReport?.status || '').trim() || 'UNKNOWN';
-  const guardedBackendResetVerified = false;
   const capability = evaluateResetCapability({
     predictionGateStatus,
-    guardedBackendResetVerified,
+    guardedBackendResetVerified: guardedBackendResetVerified === true,
   });
 
   return Object.freeze({
@@ -32,7 +32,8 @@ export function createResetContractReport({
     dryRun: plan.dryRun,
     mutatedUserData: false,
     canExecuteProductionReset: false,
-    guardedBackendResetVerified,
+    requiresExplicitProductionApproval: capability.requiresExplicitProductionApproval,
+    guardedBackendResetVerified: guardedBackendResetVerified === true,
     predictionGateStatus,
     resetKey: plan.resetKey,
     requiredStages: plan.requiredStages,
