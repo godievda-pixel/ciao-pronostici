@@ -9,8 +9,8 @@ export const COMPETITION_KEYS = Object.freeze([
 export const COMPETITIONS = Object.freeze({
   serie_a: Object.freeze({
     key: 'serie_a',
-    title: 'Serie A',
-    shortTitle: 'Serie A',
+    title: 'Серия А',
+    shortTitle: 'Серия А',
     theme: 'serie-a',
     navigation: 'rounds',
     european: false,

@@ -27,7 +27,7 @@ test('matches hub exposes all five approved tournament destinations', () => {
     assert.match(html, new RegExp(`data-cw232-competition="${competition}"`));
   }
 
-  assert.match(html, /Serie A/);
+  assert.match(html, /Серия А/);
   assert.match(html, /Кубок Италии/);
   assert.match(html, /Лига Чемпионов/);
   assert.match(html, /Лига Европы/);
