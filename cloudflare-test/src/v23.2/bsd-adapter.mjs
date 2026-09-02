@@ -70,6 +70,17 @@ function venueFrom(event) {
   return text(venue || event?.venue_name);
 }
 
+function sourceMatchReference(event, side) {
+  const object = event?.[`${side}_source_event`] || event?.[`${side}_source_match`];
+  return text(
+    event?.[`${side}_source_event_id`]
+      || event?.[`${side}_source_match_id`]
+      || event?.[`${side}_from_event_id`]
+      || event?.[`${side}_from_match_id`]
+      || (object && typeof object === 'object' ? object.id : object),
+  );
+}
+
 function localizeMatchTeams(match) {
   return Object.freeze({
     ...match,
@@ -103,6 +114,8 @@ export function adaptBsdEvents(payload, competition, options = {}) {
         home_score: score(event, 'home', status),
         away_score: score(event, 'away', status),
         venue: venueFrom(event),
+        home_source_match_id: sourceMatchReference(event, 'home'),
+        away_source_match_id: sourceMatchReference(event, 'away'),
         rawVersion: 'bsd-football-v2',
       };
       const match = localizeMatchTeams(normalizeMatch(raw, competition));
