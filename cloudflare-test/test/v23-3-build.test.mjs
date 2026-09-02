@@ -39,7 +39,8 @@ test('build copies v23.3 browser modules required by multi-competition UI', asyn
   assert.match(homeRuntime, /CiaoV233Home/);
   assert.match(homeRuntime, /Кальчо сегодня/);
   assert.match(tablesRuntime, /installTablesUi/);
-  assert.match(tablesRuntime, /Кубок Италии/);
+  assert.match(tablesRuntime, /TABLE_COMPETITIONS/);
+  assert.match(tablesRuntime, /coppa_italia/);
 });
 
 test('v23.3 build injects the Home module exactly once', async () => {
