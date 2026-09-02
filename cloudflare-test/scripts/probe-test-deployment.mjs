@@ -1,5 +1,5 @@
 import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { matchFingerprint } from '../src/v23.2/match-deduper.mjs';
 import { isKnownTeamName } from '../src/v23.2/team-registry.mjs';
@@ -7,7 +7,14 @@ import { profileCompetitionMatches } from '../src/v23.2/profile-matches.mjs';
 
 const ORIGIN = 'https://ciao-web-app-test.ciao-web.workers.dev/';
 const RANGE = Object.freeze({ from: '2026-07-01', to: '2027-06-30' });
-const COMPETITIONS = Object.freeze(['coppa_italia', 'ucl', 'uel', 'uecl']);
+const EXTERNAL_COMPETITIONS = Object.freeze(['coppa_italia', 'ucl', 'uel', 'uecl']);
+const UEFA_COMPETITIONS = Object.freeze(['ucl', 'uel', 'uecl']);
+const EXPECTED_HEALTH = Object.freeze({
+  service: 'ciao-web-app-test',
+  build: 'ciao-web-v23-2-bsd-test-20260902',
+  matchesProvider: 'bsd-v2',
+});
+const RESET_BANNER_TEXT = 'Начало нового сезона!';
 const ITALIAN_PROFILE_NAMES = new Set([
   'Интер', 'Милан', 'Наполи', 'Рома', 'Ювентус', 'Фиорентина', 'Аталанта', 'Лацио',
   'Болонья', 'Торино', 'Дженоа', 'Комо', 'Удинезе', 'Кальяри', 'Парма', 'Лечче',
@@ -16,9 +23,9 @@ const ITALIAN_PROFILE_NAMES = new Set([
 const EXPECTED = [
   'id="ciao-v232-core"',
   'id="ciao-v232-matches-ui"',
-  'id="ciao-v233-home"',
-  'id="ciao-v233-tables"',
+  'id="ciao-v233"',
   'cw231-favorite-normalized-link',
+  'cw233-home-multicompetition',
 ];
 const MODULES = [
   '/v23.2/index.mjs',
@@ -30,6 +37,7 @@ const MODULES = [
   '/v23.2/profile-matches.mjs',
   '/v23.2/profile-integration.mjs',
   '/v23.2/coppa-bracket.mjs',
+  '/v23.3/index.mjs',
   '/v23.3/home-integration.mjs',
   '/v23.3/tables-ui.mjs',
   '/v23.3/match-center.mjs',
@@ -64,9 +72,17 @@ async function fetchText(url) {
   return { response, text: await response.text() };
 }
 
+function telegramHeaders() {
+  return {
+    accept: 'application/json',
+    'cache-control': 'no-cache, no-store, max-age=0',
+    'x-telegram-init-data': 'deployment-probe',
+  };
+}
+
 async function probeHealth() {
   try {
-    const { response, text } = await fetchText(new globalThis.URL('/healthz', ORIGIN));
+    const { response, text } = await fetchText(new URL('/healthz', ORIGIN));
     let json = null;
     try { json = JSON.parse(text); } catch {}
     return {
@@ -91,6 +107,16 @@ function safeTeam(team) {
   };
 }
 
+function isItalianTeam(team) {
+  const code = String(team?.countryCode || '').toUpperCase();
+  if (code === 'IT' || code === 'ITA') return true;
+  return ITALIAN_PROFILE_NAMES.has(String(team?.name || '').trim());
+}
+
+function foreignVsForeign(matches = []) {
+  return matches.some(match => !isItalianTeam(match?.homeTeam) && !isItalianTeam(match?.awayTeam));
+}
+
 function duplicateFingerprints(matches) {
   const counts = new Map();
   for (const match of matches) {
@@ -102,30 +128,27 @@ function duplicateFingerprints(matches) {
     .map(([fingerprint, count]) => ({ fingerprint, count }));
 }
 
-function unknownTeamNames(matches) {
+function unknownNamesFromTeams(teams = []) {
   const unknown = new Set();
-  for (const match of matches) {
-    for (const team of [match?.homeTeam, match?.awayTeam]) {
-      const raw = String(team?.rawName || team?.name || '').trim();
-      if (raw && !isKnownTeamName(raw)) unknown.add(raw);
-    }
+  for (const team of teams) {
+    const raw = String(team?.rawName || team?.name || '').trim();
+    if (raw && !isKnownTeamName(raw)) unknown.add(raw);
   }
-  return [...unknown].sort((a, b) => a.localeCompare(b));
+  return [...unknown];
+}
+
+function unknownTeamNames(matches) {
+  return unknownNamesFromTeams(matches.flatMap(match => [match?.homeTeam, match?.awayTeam]))
+    .sort((a, b) => a.localeCompare(b));
 }
 
 async function probeLiveCompetition(competition) {
-  const url = new globalThis.URL('/api/v23.2/matches', ORIGIN);
+  const url = new URL('/api/v23.2/matches', ORIGIN);
   url.searchParams.set('competition', competition);
   url.searchParams.set('from', RANGE.from);
   url.searchParams.set('to', RANGE.to);
   try {
-    const response = await fetch(url, {
-      headers: {
-        accept: 'application/json',
-        'cache-control': 'no-cache, no-store, max-age=0',
-        'x-telegram-init-data': 'deployment-probe',
-      },
-    });
+    const response = await fetch(url, { headers: telegramHeaders() });
     let payload = null;
     try { payload = await response.json(); } catch {}
     const matches = Array.isArray(payload?.data?.matches) ? payload.data.matches : [];
@@ -149,6 +172,7 @@ async function probeLiveCompetition(competition) {
       competition: payload?.data?.competition || payload?.competition || competition,
       matchCount: matches.length,
       matches,
+      foreignVsForeign: UEFA_COMPETITIONS.includes(competition) ? foreignVsForeign(matches) : null,
       duplicateFingerprints: duplicateFingerprints(matches),
       unknownTeamNames: unknownTeamNames(matches),
       fiorentina,
@@ -171,6 +195,7 @@ async function probeLiveCompetition(competition) {
       competition,
       matchCount: 0,
       matches: [],
+      foreignVsForeign: false,
       duplicateFingerprints: [],
       unknownTeamNames: [],
       fiorentina: [],
@@ -178,6 +203,82 @@ async function probeLiveCompetition(competition) {
       upstreamStage: null,
       upstreamStatus: null,
       upstreamCode: null,
+    };
+  }
+}
+
+async function probeStandings(competition) {
+  const url = new URL('/api/v23.3/standings', ORIGIN);
+  url.searchParams.set('competition', competition);
+  try {
+    const response = await fetch(url, { headers: telegramHeaders() });
+    let payload = null;
+    try { payload = await response.json(); } catch {}
+    const rows = Array.isArray(payload?.data?.rows) ? payload.data.rows : [];
+    const unknown = unknownNamesFromTeams(rows.map(row => row?.team)).sort((a, b) => a.localeCompare(b));
+    const foreignRows = rows.filter(row => !isItalianTeam(row?.team));
+    return {
+      status: response.status,
+      ok: Boolean(response.ok && payload?.ok),
+      provider: payload?.data?.provider || null,
+      competition,
+      rowCount: rows.length,
+      foreignClubCount: foreignRows.length,
+      hasForeignClub: foreignRows.length > 0,
+      unknownTeamNames: unknown,
+      sample: rows.slice(0, 3).map(row => ({
+        position: row?.position ?? null,
+        team: safeTeam(row?.team),
+        played: row?.played ?? null,
+        points: row?.points ?? null,
+      })),
+      error: payload?.error || null,
+    };
+  } catch (error) {
+    return {
+      status: 0,
+      ok: false,
+      competition,
+      rowCount: 0,
+      foreignClubCount: 0,
+      hasForeignClub: false,
+      unknownTeamNames: [],
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+async function probeMatchCenter(match) {
+  if (!match?.competition || !match?.matchId) {
+    return { ok: false, status: 0, error: 'no_external_match_candidate' };
+  }
+  const url = new URL('/api/v23.3/match-center', ORIGIN);
+  url.searchParams.set('competition', match.competition);
+  url.searchParams.set('match_id', match.matchId);
+  try {
+    const response = await fetch(url, { headers: telegramHeaders() });
+    let payload = null;
+    try { payload = await response.json(); } catch {}
+    const snapshot = payload?.data?.match || null;
+    return {
+      status: response.status,
+      ok: Boolean(response.ok && payload?.ok && snapshot),
+      provider: payload?.data?.provider || null,
+      competition: match.competition,
+      matchId: snapshot?.matchId || match.matchId,
+      matchStatus: snapshot?.status || null,
+      minute: snapshot?.minute ?? null,
+      homeScore: snapshot?.homeScore ?? null,
+      awayScore: snapshot?.awayScore ?? null,
+      error: payload?.error || null,
+    };
+  } catch (error) {
+    return {
+      status: 0,
+      ok: false,
+      competition: match.competition,
+      matchId: match.matchId,
+      error: error instanceof Error ? error.message : String(error),
     };
   }
 }
@@ -192,7 +293,7 @@ export function profileFeedCheck(competitionRows) {
       candidate = [match?.homeTeam, match?.awayTeam]
         .find(team => (
           team?.name
-          && (team?.countryCode === 'ITA' || ITALIAN_PROFILE_NAMES.has(String(team.name).trim()))
+          && (team?.countryCode === 'ITA' || team?.countryCode === 'IT' || ITALIAN_PROFILE_NAMES.has(String(team.name).trim()))
         ));
       if (candidate) break;
     }
@@ -229,37 +330,53 @@ async function probeModules() {
   const rows = [];
   for (const path of MODULES) {
     try {
-      const { response, text } = await fetchText(new globalThis.URL(path, ORIGIN));
+      const { response, text } = await fetchText(new URL(path, ORIGIN));
       rows.push({
         path,
         status: response.status,
         contentType: response.headers.get('content-type'),
         contentSecurityPolicy: response.headers.get('content-security-policy'),
         bytes: Buffer.byteLength(text),
-        hasInstallMatchesUi: path.endsWith('/matches-ui.mjs') ? text.includes('installMatchesUi') : undefined,
-        hasTournamentCapture: path.endsWith('/matches-ui.mjs')
+        hasInstallMatchesUi: path === '/v23.2/matches-ui.mjs' ? text.includes('installMatchesUi') : undefined,
+        hasTournamentCapture: path === '/v23.2/matches-ui.mjs'
           ? text.includes('event.stopPropagation?.();') && text.includes('controller.openCompetition(card.dataset.cw232Competition)')
           : undefined,
-        hasCoppaScheduleOnly: path.endsWith('/matches-ui.mjs')
+        hasCoppaScheduleOnly: path === '/v23.2/matches-ui.mjs'
           ? !text.includes('${renderCoppaTabs()}') && !text.includes('data-cw232-coppa-panel="bracket"')
           : undefined,
-        hasCoreMarker: path.endsWith('/index.mjs') ? text.includes('CiaoV232Core') : undefined,
-        hasProfileImport: path.endsWith('/index.mjs') ? text.includes("profile-integration.mjs") : undefined,
-        hasProfileRuntime: path.endsWith('/profile-integration.mjs')
+        hasCoreMarker: path === '/v23.2/index.mjs' ? text.includes('CiaoV232Core') : undefined,
+        hasProfileImport: path === '/v23.2/index.mjs' ? text.includes("profile-integration.mjs") : undefined,
+        hasProfileRuntime: path === '/v23.2/profile-integration.mjs'
           ? text.includes('CiaoV232Profile') && text.includes('cw232-profile-tournament-enrichment')
           : undefined,
-        hasHomeRuntime: path.endsWith('/home-integration.mjs')
+        hasSerieALabel: path === '/v23.2/competition-config.mjs'
+          ? text.includes("title: 'Серия А'") && text.includes("shortTitle: 'Серия А'")
+          : undefined,
+        hasUnifiedRuntime: path === '/v23.3/index.mjs'
+          ? text.includes('CiaoV233') && text.includes("home-integration.mjs") && text.includes("tables-ui.mjs")
+          : undefined,
+        predictionsBlocked: path === '/v23.3/index.mjs'
+          ? text.includes("predictions: 'blocked'") && !text.includes('predictions-ui.mjs')
+          : undefined,
+        hasHomeRuntime: path === '/v23.3/home-integration.mjs'
           ? text.includes('CiaoV233Home') && text.includes('Кальчо сегодня')
           : undefined,
-        hasTablesRuntime: path.endsWith('/tables-ui.mjs')
+        homeMultiCompetition: path === '/v23.3/home-integration.mjs'
+          ? text.includes('loadAllCompetitionMatches') && text.includes('Все турниры')
+          : undefined,
+        hasTablesRuntime: path === '/v23.3/tables-ui.mjs'
           ? text.includes('installTablesUi') && text.includes('ciao-v233-tables-overlay') && text.includes('coppa_italia')
           : undefined,
-        hasMatchCenterRuntime: path.endsWith('/match-center.mjs')
-          ? text.includes('createMatchCenterController')
-            && text.includes('openCanonicalMatchCenter')
-            && text.includes('15_000')
+        hasCoppaBracket: path === '/v23.3/tables-ui.mjs'
+          ? text.includes('renderCoppaBracket') && text.includes('buildCoppaBracket')
           : undefined,
-        hasMatchCenterLinksRuntime: path.endsWith('/match-center-links.mjs')
+        documentOverflowGuard: path === '/v23.3/tables-ui.mjs'
+          ? text.includes('overflow-x:hidden') && text.includes('max-width:100%') && text.includes('overflow-x:auto')
+          : undefined,
+        hasMatchCenterRuntime: path === '/v23.3/match-center.mjs'
+          ? text.includes('createMatchCenterController') && text.includes('openCanonicalMatchCenter') && text.includes('15_000')
+          : undefined,
+        hasMatchCenterLinksRuntime: path === '/v23.3/match-center-links.mjs'
           ? text.includes('resolveCanonicalMatchTarget') && text.includes('installCanonicalMatchLinks')
           : undefined,
       });
@@ -289,6 +406,8 @@ async function probe() {
       const { response, text: html } = await fetchText(ORIGIN);
       latestHtml = html;
       const markers = Object.fromEntries(EXPECTED.map(marker => [marker, html.includes(marker)]));
+      const homeResetBannerAbsent = !html.includes(RESET_BANNER_TEXT);
+      const homeMultiCompetition = html.includes('cw233-home-multicompetition');
       attempts.push({
         attempt: index + 1,
         startedAt,
@@ -300,11 +419,12 @@ async function probe() {
         etag: response.headers.get('etag'),
         markers,
         profileMarker: html.includes('cw232-profile-tournament-enrichment'),
-        homeMarker: html.includes('id="ciao-v233-home"'),
-        tablesMarker: html.includes('id="ciao-v233-tables"'),
+        unifiedV233Marker: html.includes('id="ciao-v233"'),
+        homeResetBannerAbsent,
+        homeMultiCompetition,
         bytes: Buffer.byteLength(html),
       });
-      if (response.ok && EXPECTED.every(marker => markers[marker])) break;
+      if (response.ok && EXPECTED.every(marker => markers[marker]) && homeResetBannerAbsent) break;
     } catch (error) {
       attempts.push({
         attempt: index + 1,
@@ -316,21 +436,38 @@ async function probe() {
     if (index < 8) await sleep(10_000);
   }
 
-  const [modules, health, ...competitions] = await Promise.all([
+  const [modules, health, competitionRows, standingsRows] = await Promise.all([
     probeModules(),
     probeHealth(),
-    ...COMPETITIONS.map(probeLiveCompetition),
+    Promise.all(EXTERNAL_COMPETITIONS.map(probeLiveCompetition)),
+    Promise.all(UEFA_COMPETITIONS.map(probeStandings)),
   ]);
-  const matchesModule = modules.find(item => item.path.endsWith('/matches-ui.mjs'));
-  const indexModule = modules.find(item => item.path.endsWith('/index.mjs'));
-  const profileModule = modules.find(item => item.path.endsWith('/profile-integration.mjs'));
-  const homeModule = modules.find(item => item.path.endsWith('/home-integration.mjs'));
-  const tablesModule = modules.find(item => item.path.endsWith('/tables-ui.mjs'));
-  const matchCenterModule = modules.find(item => item.path.endsWith('/match-center.mjs'));
-  const matchCenterLinksModule = modules.find(item => item.path.endsWith('/match-center-links.mjs'));
+  const competitions = competitionRows;
+  const standings = standingsRows;
+
+  const matchesModule = modules.find(item => item.path === '/v23.2/matches-ui.mjs');
+  const v232IndexModule = modules.find(item => item.path === '/v23.2/index.mjs');
+  const competitionConfigModule = modules.find(item => item.path === '/v23.2/competition-config.mjs');
+  const profileModule = modules.find(item => item.path === '/v23.2/profile-integration.mjs');
+  const v233IndexModule = modules.find(item => item.path === '/v23.3/index.mjs');
+  const homeModule = modules.find(item => item.path === '/v23.3/home-integration.mjs');
+  const tablesModule = modules.find(item => item.path === '/v23.3/tables-ui.mjs');
+  const matchCenterModule = modules.find(item => item.path === '/v23.3/match-center.mjs');
+  const matchCenterLinksModule = modules.find(item => item.path === '/v23.3/match-center-links.mjs');
   const profileFeed = profileFeedCheck(competitions);
-  const allUnknownTeamNames = [...new Set(competitions.flatMap(row => row.unknownTeamNames))]
-    .sort((a, b) => a.localeCompare(b));
+  const matchCenterCandidate = competitions
+    .find(row => row.competition === 'ucl')?.matches?.[0]
+    || competitions.flatMap(row => row.matches)[0]
+    || null;
+  const matchCenter = await probeMatchCenter(matchCenterCandidate);
+  const allUnknownTeamNames = [...new Set([
+    ...competitions.flatMap(row => row.unknownTeamNames),
+    ...standings.flatMap(row => row.unknownTeamNames),
+  ])].sort((a, b) => a.localeCompare(b));
+  const releaseHeldForUnknownTeams = allUnknownTeamNames.length > 0;
+  const predictionsBlocked = Boolean(v233IndexModule?.predictionsBlocked);
+  const documentOverflowGuard = Boolean(tablesModule?.documentOverflowGuard);
+
   const report = {
     url: ORIGIN,
     expected: EXPECTED,
@@ -339,7 +476,12 @@ async function probe() {
     latest: attempts.at(-1) || null,
     health,
     competitions: competitions.map(publicCompetitionSummary),
+    standings,
+    matchCenter,
     allUnknownTeamNames,
+    releaseHeldForUnknownTeams,
+    predictionsBlocked,
+    documentOverflowGuard,
     profileFeed,
     modules,
     navigation: snippets(latestHtml, NAV_MARKERS),
@@ -351,7 +493,12 @@ async function probe() {
     latest: report.latest,
     health,
     competitions: report.competitions,
+    standings,
+    matchCenter,
     allUnknownTeamNames,
+    releaseHeldForUnknownTeams,
+    predictionsBlocked,
+    documentOverflowGuard,
     profileFeed,
     modules,
     navigation: report.navigation.map(item => ({ marker: item.marker, found: item.found, index: item.index })),
@@ -359,7 +506,19 @@ async function probe() {
 
   const missingExpected = EXPECTED.filter(marker => !report.latest?.markers?.[marker]);
   if (missingExpected.length) {
-    throw new Error(`deployed TEST is missing v23.3 Tables runtime markers: ${missingExpected.join(', ')}`);
+    throw new Error(`deployed TEST is missing v23.3 runtime markers: ${missingExpected.join(', ')}`);
+  }
+  if (!report.latest?.homeResetBannerAbsent) {
+    throw new Error('deployed TEST still contains the Home reset banner');
+  }
+  if (!report.latest?.homeMultiCompetition) {
+    throw new Error('deployed TEST is missing the multi-competition Home marker');
+  }
+  if (!health.ok
+      || health.service !== EXPECTED_HEALTH.service
+      || health.build !== EXPECTED_HEALTH.build
+      || health.matchesProvider !== EXPECTED_HEALTH.matchesProvider) {
+    throw new Error(`deployed TEST health contract mismatch: service=${health.service} build=${health.build} provider=${health.matchesProvider}`);
   }
   if (!matchesModule?.hasTournamentCapture) {
     throw new Error('deployed TEST does not contain tournament capture navigation fix');
@@ -367,11 +526,23 @@ async function probe() {
   if (!matchesModule?.hasCoppaScheduleOnly) {
     throw new Error('deployed TEST Matches still contains the Coppa bracket panel');
   }
-  if (!homeModule?.hasHomeRuntime) {
-    throw new Error('deployed TEST is missing v23.3 Home runtime');
+  if (!competitionConfigModule?.hasSerieALabel) {
+    throw new Error('deployed TEST competition config is missing the Серия А label');
   }
-  if (!tablesModule?.hasTablesRuntime) {
-    throw new Error('deployed TEST is missing v23.3 Tables runtime');
+  if (!v233IndexModule?.hasUnifiedRuntime) {
+    throw new Error('deployed TEST is missing unified v23.3 browser runtime');
+  }
+  if (!predictionsBlocked) {
+    throw new Error('deployed TEST prediction gate is not explicitly BLOCKED');
+  }
+  if (!homeModule?.hasHomeRuntime || !homeModule?.homeMultiCompetition) {
+    throw new Error('deployed TEST is missing v23.3 multi-competition Home runtime');
+  }
+  if (!tablesModule?.hasTablesRuntime || !tablesModule?.hasCoppaBracket) {
+    throw new Error('deployed TEST Tables is missing the Coppa bracket runtime');
+  }
+  if (!documentOverflowGuard) {
+    throw new Error('deployed TEST is missing the document overflow guard styles');
   }
   if (!matchCenterModule?.hasMatchCenterRuntime) {
     throw new Error('deployed TEST is missing v23.3 Match Center runtime');
@@ -379,6 +550,7 @@ async function probe() {
   if (!matchCenterLinksModule?.hasMatchCenterLinksRuntime) {
     throw new Error('deployed TEST is missing v23.3 Match Center links runtime');
   }
+
   if (health.bsdConfigured === true) {
     for (const row of competitions) {
       if (!row.ok) {
@@ -390,19 +562,36 @@ async function probe() {
           + ` error=${row.error || 'none'}`,
         );
       }
+      if (row.matchCount < 1) throw new Error(`deployed TEST ${row.competition} has no matches`);
+      if (UEFA_COMPETITIONS.includes(row.competition) && !row.foreignVsForeign) {
+        throw new Error(`deployed TEST ${row.competition} does not prove a foreign-vs-foreign fixture`);
+      }
     }
-    const ucl = competitions.find(row => row.competition === 'ucl');
+
     const coppa = competitions.find(row => row.competition === 'coppa_italia');
-    if (!ucl || ucl.matchCount < 1) throw new Error('deployed TEST UCL has no matches');
-    if (!coppa || coppa.matchCount < 1) throw new Error('deployed TEST Coppa Italia has no matches');
-    if (coppa.duplicateFingerprints.length) {
+    if (coppa?.duplicateFingerprints?.length) {
       throw new Error(`deployed TEST Coppa Italia still has ${coppa.duplicateFingerprints.length} duplicate fingerprints`);
     }
-    if (!profileFeed.ok) throw new Error(`deployed TEST profile tournament feed unavailable: ${profileFeed.reason || 'no_matches'}`);
+
+    for (const row of standings) {
+      if (!row.ok || row.rowCount < 1 || !row.hasForeignClub) {
+        throw new Error(`deployed TEST ${row.competition} standings are incomplete or missing foreign clubs`);
+      }
+    }
+    if (!matchCenter.ok) {
+      throw new Error(`deployed TEST external Match Center failed: status=${matchCenter.status} error=${matchCenter.error || 'none'}`);
+    }
+    if (!profileFeed.ok) {
+      throw new Error(`deployed TEST profile tournament feed unavailable: ${profileFeed.reason || 'no_matches'}`);
+    }
+  }
+
+  if (releaseHeldForUnknownTeams) {
+    throw new Error(`deployed TEST release held for unknown team names: ${allUnknownTeamNames.join(', ')}`);
   }
 
   if (report.latest?.profileMarker) {
-    if (!indexModule?.hasProfileImport || !profileModule?.hasProfileRuntime) {
+    if (!v232IndexModule?.hasProfileImport || !profileModule?.hasProfileRuntime) {
       throw new Error('deployed TEST profile build is missing profile tournament runtime');
     }
   }

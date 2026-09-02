@@ -32,16 +32,19 @@ test('deployment profile probe recognizes a known Italian club even when BSD omi
   assert.deepEqual(result.sampleMatchIds, ['ucl:601024']);
 });
 
-test('deployment probe explicitly verifies v23.3 Home and Tables runtime markers', async () => {
+test('deployment probe explicitly verifies unified v23.3 Home and Tables runtime markers', async () => {
   const source = await readFile(new URL('../scripts/probe-test-deployment.mjs', import.meta.url), 'utf8');
 
-  assert.match(source, /id="ciao-v233-home"/);
-  assert.match(source, /id="ciao-v233-tables"/);
+  assert.match(source, /id="ciao-v233"/);
+  assert.doesNotMatch(source, /id="ciao-v233-home"/);
+  assert.doesNotMatch(source, /id="ciao-v233-tables"/);
+  assert.match(source, /\/v23\.3\/index\.mjs/);
   assert.match(source, /\/v23\.3\/home-integration\.mjs/);
   assert.match(source, /\/v23\.3\/tables-ui\.mjs/);
+  assert.match(source, /hasUnifiedRuntime/);
   assert.match(source, /hasHomeRuntime/);
   assert.match(source, /hasTablesRuntime/);
-  assert.match(source, /deployed TEST is missing v23\.3 Tables runtime/);
+  assert.match(source, /deployed TEST is missing unified v23\.3 browser runtime/);
 });
 
 test('deployment probe explicitly verifies v23.3 canonical Match Center runtime and link resolver', async () => {
@@ -55,6 +58,7 @@ test('deployment probe explicitly verifies v23.3 canonical Match Center runtime 
   assert.match(source, /openCanonicalMatchCenter/);
   assert.match(source, /resolveCanonicalMatchTarget/);
   assert.match(source, /installCanonicalMatchLinks/);
+  assert.match(source, /\/api\/v23\.3\/match-center/);
   assert.match(source, /deployed TEST is missing v23\.3 Match Center runtime/);
   assert.match(source, /deployed TEST is missing v23\.3 Match Center links runtime/);
 });
