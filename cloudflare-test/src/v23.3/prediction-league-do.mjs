@@ -62,6 +62,21 @@ export class PredictionLeague {
     const url = new URL(request.url);
 
     try {
+      if (url.pathname === '/participant' && request.method === 'POST') {
+        const body = await bodyOf(request);
+        if (
+          !body
+          || body.season !== this.env.PREDICTION_SEASON
+          || !body.participant
+        ) {
+          return json({ ok: false, error: 'invalid_participant_payload' }, 400);
+        }
+        const participant = transaction(this.sql, () => (
+          upsertParticipant(this.sql, body.participant, nowIso())
+        ));
+        return json({ ok: true, participant });
+      }
+
       if (url.pathname === '/write' && request.method === 'POST') {
         const body = await bodyOf(request);
         if (
