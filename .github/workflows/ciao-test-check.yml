@@ -54,7 +54,7 @@ jobs:
 
       - name: Probe deployed TEST markers
         if: github.event_name == 'push'
-        run: node scripts/probe-test-deployment.mjs
+        run: node scripts/probe-test-deployment-v233.mjs
 
       - name: Upload v23.2 API contract observation
         if: github.event_name == 'push'
