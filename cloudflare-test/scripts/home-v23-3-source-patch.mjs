@@ -44,6 +44,10 @@ globalThis.addEventListener?.('ciao-v233-home-ready', ()=>{
   globalThis.CiaoV233Home?.ensure?.().catch?.(()=>{});
 });
 globalThis.addEventListener?.('ciao-v233-home-updated', __cw233RefreshHome);
+globalThis.addEventListener?.('ciao-v233-open-serie-a-match', event => {
+  const legacyId = Number(event?.detail?.legacyId) || 0;
+  if (legacyId) openMatchCenter(legacyId);
+});
 predict = __cw231HomeHtml;`;
 
   source = source.replace(anchor, replacement);
