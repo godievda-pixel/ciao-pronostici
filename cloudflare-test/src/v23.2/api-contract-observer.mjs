@@ -86,6 +86,17 @@ export function discoverObjectLiteralValues(source, key) {
   return [...values].sort();
 }
 
+export const V233_SOURCE_MARKERS = Object.freeze([
+  'Начало нового сезона!',
+  'function predict',
+  'function mine',
+  "action:'save_predictions'",
+  "action:'state'",
+  'openMatchCenter',
+  '__cw231HomeHtml',
+  'serie_a_table',
+]);
+
 const SOURCE_HINT_MARKERS = Object.freeze([
   'Матчи',
   '__cw209LoadSchedule',
@@ -110,6 +121,7 @@ const SOURCE_HINT_MARKERS = Object.freeze([
   'API_BASE',
   'apiFetch',
   'apiJson',
+  ...V233_SOURCE_MARKERS,
 ]);
 
 export function extractSourceHints(source) {
@@ -120,7 +132,7 @@ export function extractSourceHints(source) {
     let from = 0;
     let foundForMarker = 0;
 
-    while (hints.length < 20 && foundForMarker < 3) {
+    while (hints.length < 80 && foundForMarker < 3) {
       const index = text.indexOf(marker, from);
       if (index < 0) break;
 
