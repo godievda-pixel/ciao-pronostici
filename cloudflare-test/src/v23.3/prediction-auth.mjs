@@ -16,6 +16,10 @@ function extractUser(payload = {}) {
     payload?.me,
     payload?.profile,
     payload?.state?.user,
+    payload?.data?.user,
+    payload?.data?.me,
+    payload?.data?.profile,
+    payload?.data?.state?.user,
   ];
   return candidates.find(item => item && typeof item === 'object') || null;
 }
