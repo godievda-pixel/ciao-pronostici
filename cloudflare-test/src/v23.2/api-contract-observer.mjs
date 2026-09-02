@@ -76,7 +76,7 @@ export function discoverObjectLiteralValues(source, key) {
   }
 
   const numberPattern = new RegExp(
-    `(?:["']?${wanted}["']?\\s*:\\s*)(-?\\d+(?:\\.\\d+)?)\\b`,
+    `(?:["']?${wanted}["']?\\s*:\\s*)(-?\\d+(?:\.\\d+)?)\\b`,
     'g',
   );
   while ((match = numberPattern.exec(text))) {
@@ -92,6 +92,8 @@ export const V233_SOURCE_MARKERS = Object.freeze([
   'function mine',
   "action:'save_predictions'",
   "action:'state'",
+  "action:'serie_a_table'",
+  '__cw11RefreshSerieA',
   'openMatchCenter',
   '__cw231HomeHtml',
   'serie_a_table',
@@ -132,7 +134,7 @@ export function extractSourceHints(source) {
     let from = 0;
     let foundForMarker = 0;
 
-    while (hints.length < 80 && foundForMarker < 3) {
+    while (hints.length < 100 && foundForMarker < 3) {
       const index = text.indexOf(marker, from);
       if (index < 0) break;
 
