@@ -96,11 +96,13 @@ test('predictions screen does not start the expensive rankingMe request while lo
 
 test('Home score and status use separate premium blocks so text cannot merge', async () => {
   const source = await readFile(new URL('../src/v23.3/home-integration.mjs', import.meta.url), 'utf8');
-  const polish = await readFile(new URL('../src/v23.3/premium-polish-ui.mjs', import.meta.url), 'utf8');
+  const polish = await readFile(new URL('../src/v23.3/round6-polish-ui.mjs', import.meta.url), 'utf8');
+  const index = await readFile(new URL('../src/v23.3/index.mjs', import.meta.url), 'utf8');
   assert.match(source, /cw231-today-score-value/);
   assert.match(source, /cw231-today-score-status/);
   assert.match(polish, /\.cw231-today-score-value/);
   assert.match(polish, /\.cw231-today-score-status/);
+  assert.match(index, /\.\/round6-polish-ui\.mjs/);
 });
 
 test('Serie A adapter preserves flattened legacy crest fields used by prediction cards', () => {
