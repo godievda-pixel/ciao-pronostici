@@ -152,3 +152,5 @@ test('ranking text uses participant wording and proper Russian point forms', () 
   assert.equal(rankingUi.rankingPointsLabel(3), '3 очка');
   assert.equal(rankingUi.rankingPointsLabel(11), '11 очков');
 });
+
+// CI-only: re-probe the live TEST deployment after Cloudflare has received round4.
