@@ -19,8 +19,7 @@ class FakeSql {
     this.calls.push({ query, params });
     const q = String(query).replace(/\s+/g, ' ').trim();
     if (/^(BEGIN|COMMIT|ROLLBACK)/i.test(q)) return cursor();
-    if (/CREATE TABLE|CREATE INDEX|schema_meta/i.test(q)) {
-      if (/prediction_cache_generation/i.test(q) && /UPDATE schema_meta/i.test(q)) this.cacheGeneration += 1;
+    if (/CREATE TABLE|CREATE INDEX/i.test(q) || /INSERT OR (?:REPLACE|IGNORE) INTO schema_meta/i.test(q)) {
       return cursor();
     }
     if (/INSERT INTO participants/i.test(q)) {
