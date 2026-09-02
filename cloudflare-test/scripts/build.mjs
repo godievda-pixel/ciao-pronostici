@@ -191,6 +191,16 @@ export function injectV233HomeEntry(input) {
   );
 }
 
+export function injectV233TablesEntry(input) {
+  let html = String(input);
+  if (!/<\/body>/i.test(html)) throw new Error('v23.3 Tables module entry requires body anchor');
+  if (html.includes('id="ciao-v233-tables"')) return html;
+  return html.replace(
+    /<\/body>/i,
+    '<script type="module" id="ciao-v233-tables" src="/v23.3/tables-ui.mjs"></script>\n</body>',
+  );
+}
+
 export function applyV233HomeBuildPatch(input) {
   const patched = applyHomeV233SourcePatch(input);
   if (!patched.includes('cw233-home-multicompetition')) {
@@ -253,7 +263,9 @@ export async function build() {
 
   const homePatched = applyV233HomeBuildPatch(profilePatched);
   await Promise.all([copyV232Modules(), copyV233Modules()]);
-  const html = injectV233HomeEntry(injectV232Entry(applyPatch(homePatched, css, js)));
+  const html = injectV233TablesEntry(
+    injectV233HomeEntry(injectV232Entry(applyPatch(homePatched, css, js))),
+  );
   await mkdir(dirname(outPath), { recursive: true });
   await writeFile(outPath, html, 'utf8');
   return { output: outPath, bytes: Buffer.byteLength(html), build: TEST_BUILD };
