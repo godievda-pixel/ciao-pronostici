@@ -1,10 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateEntryHtml, validateReleaseHtml } from '../scripts/build.mjs';
+import * as productionBuild from '../scripts/build.mjs';
 
-test('production entry keeps the stable v22.5 release route', () => {
-  const entry = `<!doctype html><script>const target = new URL('/releases/v22-5.html', location.origin);</script>`;
-  assert.equal(validateEntryHtml(entry), true);
+const { validateReleaseHtml } = productionBuild;
+
+test('production root serves the stable v22.5 release directly', () => {
+  const entry = '<!doctype html><script>location.replace("/releases/v22-5.html")</script>';
+  const release = '<!doctype html><html><head><meta name="ciao-build" content="ciao-web-v22-5-20260830"></head><body>app</body></html>';
+  assert.equal(typeof productionBuild.rootHtmlFor, 'function');
+  assert.equal(productionBuild.rootHtmlFor({ entry, release }), release);
 });
 
 test('production release accepts the real grouped no-x2 CSS patch', () => {
