@@ -17,6 +17,7 @@ test('build copies v23.3 browser modules required by multi-competition UI', asyn
   assert.equal(files.includes('tables-ui.mjs'), true);
   assert.equal(files.includes('match-center.mjs'), true);
   assert.equal(files.includes('match-center-links.mjs'), true);
+  assert.equal(files.includes('legacy-match-center-theme.mjs'), true);
   assert.equal(files.includes('prediction-client.mjs'), true);
   assert.equal(files.includes('predictions-ui.mjs'), true);
   assert.equal(files.includes('navigation-ui.mjs'), true);
@@ -28,6 +29,7 @@ test('build copies v23.3 browser modules required by multi-competition UI', asyn
   const tablesRuntime = await readFile(new URL('../dist/v23.3/tables-ui.mjs', import.meta.url), 'utf8');
   const matchCenterRuntime = await readFile(new URL('../dist/v23.3/match-center.mjs', import.meta.url), 'utf8');
   const matchCenterLinksRuntime = await readFile(new URL('../dist/v23.3/match-center-links.mjs', import.meta.url), 'utf8');
+  const legacyMatchCenterTheme = await readFile(new URL('../dist/v23.3/legacy-match-center-theme.mjs', import.meta.url), 'utf8');
   const predictionClient = await readFile(new URL('../dist/v23.3/prediction-client.mjs', import.meta.url), 'utf8');
   const predictionsRuntime = await readFile(new URL('../dist/v23.3/predictions-ui.mjs', import.meta.url), 'utf8');
   const navigationRuntime = await readFile(new URL('../dist/v23.3/navigation-ui.mjs', import.meta.url), 'utf8');
@@ -38,15 +40,22 @@ test('build copies v23.3 browser modules required by multi-competition UI', asyn
   assert.match(dataClient, /loadMatchCenterSnapshot/);
   assert.match(homeRuntime, /CiaoV233Home/);
   assert.match(homeRuntime, /Кальчо сегодня/);
-  assert.match(homeRuntime, /installCanonicalMatchCenter/);
   assert.match(homeRuntime, /installCanonicalMatchLinks/);
+  assert.doesNotMatch(homeRuntime, /installCanonicalMatchCenter/);
   assert.match(tablesRuntime, /installTablesUi/);
   assert.match(tablesRuntime, /TABLE_COMPETITIONS/);
   assert.match(tablesRuntime, /coppa_italia/);
   assert.match(matchCenterRuntime, /createMatchCenterController/);
   assert.match(matchCenterRuntime, /openCanonicalMatchCenter/);
+  assert.match(matchCenterRuntime, /openExternalLegacyMatchCenter/);
   assert.match(matchCenterLinksRuntime, /resolveCanonicalMatchTarget/);
   assert.match(matchCenterLinksRuntime, /installCanonicalMatchLinks/);
+  assert.match(legacyMatchCenterTheme, /\.mc-hero/);
+  assert.match(legacyMatchCenterTheme, /\.mc-tab\.active/);
+  assert.match(legacyMatchCenterTheme, /coppa_italia/);
+  assert.match(legacyMatchCenterTheme, /champions_league/);
+  assert.match(legacyMatchCenterTheme, /europa_league/);
+  assert.match(legacyMatchCenterTheme, /conference_league/);
   assert.match(predictionClient, /\/api\/v23\.3\/predictions/);
   assert.match(predictionsRuntime, /installPredictionsUi/);
   assert.match(navigationRuntime, /NAVIGATION_LABELS/);
@@ -116,6 +125,7 @@ test('v23.3 browser entry enables predictions and ranking without exposing reset
   assert.equal(files.includes('index.mjs'), true);
   const entry = await readFile(new URL('../dist/v23.3/index.mjs', import.meta.url), 'utf8');
   assert.match(entry, /navigation-ui\.mjs/);
+  assert.match(entry, /legacy-match-center-theme\.mjs/);
   assert.match(entry, /home-integration\.mjs/);
   assert.match(entry, /tables-ui\.mjs/);
   assert.match(entry, /predictions-ui\.mjs/);
