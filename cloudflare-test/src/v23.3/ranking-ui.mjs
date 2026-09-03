@@ -8,9 +8,30 @@ export const USER_FEEDBACK_ROUND7_BUILD = '2026-09-03-r7';
 export const USER_FEEDBACK_ROUND11_BUILD = '2026-09-03-r11';
 
 export const RANKING_FILTERS = Object.freeze([
-  {key:'overall',label:'Общий'}, {key:'serie_a',label:'Серия А'}, {key:'coppa_italia',label:'Кубок Италии'},
+  {key:'overall',label:'Общий'}, {key:'serie_a',label:'Серия А'}, {key:'coppa_italia',label:'КИ'},
   {key:'ucl',label:'ЛЧ'}, {key:'uel',label:'ЛЕ'}, {key:'uecl',label:'ЛК'},
 ]);
+
+const RANKING_TITLES = Object.freeze({
+  overall:'Общий рейтинг',
+  serie_a:'Серия А',
+  coppa_italia:'Кубок Италии',
+  ucl:'Лига Чемпионов',
+  uel:'Лига Европы',
+  uecl:'Лига Конференций',
+});
+const RANKING_THEMES = Object.freeze({
+  overall:'serie-a', serie_a:'serie-a', coppa_italia:'coppa',
+  ucl:'champions', uel:'europa', uecl:'conference',
+});
+
+export function rankingThemeForCompetition(value) {
+  return RANKING_THEMES[String(value ?? '').trim()] || 'serie-a';
+}
+
+export function rankingTitleForCompetition(value) {
+  return RANKING_TITLES[String(value ?? '').trim()] || 'Рейтинг';
+}
 
 export function withRankingPositions(rows = []) {
   return (Array.isArray(rows) ? rows : []).map((row,index) => Object.freeze({ position:index + 1, ...row }));
@@ -41,7 +62,6 @@ function esc(value) { return String(value ?? '').replace(/[&<>"']/g,c => ({'&':'
 function initData() { return text(globalThis.Telegram?.WebApp?.initData); }
 function telegramUser() { return globalThis.Telegram?.WebApp?.initDataUnsafe?.user || null; }
 function contentNode() { return document.querySelector('#ciao-miniapp-root .content'); }
-function themeFor(value) { return ({overall:'serie-a',serie_a:'serie-a',coppa_italia:'coppa',ucl:'champions',uel:'europa',uecl:'conference'})[text(value)] || 'serie-a'; }
 function setHtmlIfChanged(node, html) { if (!node || node.innerHTML === html) return false; node.innerHTML = html; return true; }
 
 function ensureRankingPremiumStyle() {
@@ -78,20 +98,19 @@ function usernameLine(current,tgUser){const username=text(current?.username||tgU
 function heroHtml(){const tgUser=telegramUser();const name=resolveRankingDisplayName(me,tgUser);const subtitle=usernameLine(me,tgUser);const rank=Number(me?.position);const points=Number(me?.points)||0;return `<div class="hero cw233-ranking-hero"><div class="cw233-ranking-identity"><div class="cw233-ranking-avatar cw233-ranking-avatar--hero">${esc(initials(name))}</div><div class="cw233-ranking-identity-copy"><span class="cw233-ranking-kicker">УЧАСТНИК</span><h2>${esc(name)}</h2><p>${esc(subtitle)}</p></div></div><div class="cw233-ranking-hero-stats"><div class="cw233-ranking-stat"><strong>${rank>0?`#${rank}`:'—'}</strong><span>место</span></div><div class="cw233-ranking-stat"><strong>${points}</strong><span>${esc(rankingPointsUnit(points))}</span></div></div></div>`;}
 function filtersHtml(){return `<div class="cw233-ranking-filters-wrap"><div class="cw231-filters cw233-ranking-filters" role="tablist" aria-label="Рейтинг по турнирам">${RANKING_FILTERS.map(filter=>`<button type="button" data-cw233-rank-filter="${filter.key}" aria-selected="${filter.key===active}">${filter.label}</button>`).join('')}</div></div>`;}
 function podiumClass(position){return position>=1&&position<=3?` is-podium is-podium-${position}`:'';}
-function rankingHtml(){const positioned=withRankingPositions(rows);if(!positioned.length)return '<div class="empty"><div class="cw233-ranking-empty"><strong>Рейтинг формируется</strong><span>Участники появятся здесь автоматически</span></div></div>';const title=active==='overall'?'Общий рейтинг':RANKING_FILTERS.find(item=>item.key===active)?.label||'Рейтинг';return `<div class="cw233-ranking-section"><div class="section-title cw233-ranking-section-head"><h3>${esc(title)}</h3><span>${esc(rankingParticipantCountLabel(positioned.length))}</span></div><div class="card"><div class="cw233-ranking-list">${positioned.map(row=>{const isMe=me?.user_id===row.user_id;const name=text(row.display_name)||'Участник';const username=text(row.username).replace(/^@/,'');const points=Number(row.points)||0;return `<div class="cw233-ranking-row${podiumClass(row.position)}${isMe?' is-me':''}"><div class="cw233-ranking-position${podiumClass(row.position)}"><span class="cw233-ranking-position-value">${row.position}</span></div><div class="cw233-ranking-avatar">${esc(initials(name))}</div><div class="cw233-ranking-person"><div class="cw233-ranking-name">${esc(name)}</div>${username?`<span class="cw233-ranking-username">@${esc(username)}</span>`:''}</div><div class="cw233-ranking-points"><strong class="cw233-ranking-points-value">${points}</strong><span class="cw233-ranking-points-unit">${esc(rankingPointsUnit(points))}</span></div></div>`;}).join('')}</div></div></div>`;}
+function rankingHtml(){const positioned=withRankingPositions(rows);if(!positioned.length)return '<div class="empty"><div class="cw233-ranking-empty"><strong>Рейтинг формируется</strong><span>Участники появятся здесь автоматически</span></div></div>';const title=rankingTitleForCompetition(active);return `<div class="cw233-ranking-section"><div class="section-title cw233-ranking-section-head"><h3>${esc(title)}</h3><span>${esc(rankingParticipantCountLabel(positioned.length))}</span></div><div class="card"><div class="cw233-ranking-list">${positioned.map(row=>{const isMe=me?.user_id===row.user_id;const name=text(row.display_name)||'Участник';const username=text(row.username).replace(/^@/,'');const points=Number(row.points)||0;return `<div class="cw233-ranking-row${podiumClass(row.position)}${isMe?' is-me':''}"><div class="cw233-ranking-position${podiumClass(row.position)}"><span class="cw233-ranking-position-value">${row.position}</span></div><div class="cw233-ranking-avatar">${esc(initials(name))}</div><div class="cw233-ranking-person"><div class="cw233-ranking-name">${esc(name)}</div>${username?`<span class="cw233-ranking-username">@${esc(username)}</span>`:''}</div><div class="cw233-ranking-points"><strong class="cw233-ranking-points-value">${points}</strong><span class="cw233-ranking-points-unit">${esc(rankingPointsUnit(points))}</span></div></div>`;}).join('')}</div></div></div>`;}
 
-function dispatchThemeRefresh(){try{document.dispatchEvent(new Event('ciao-v233-round11-theme'));}catch{}}
 function ensureRankingShell(){
   if(!pageActive)return null;const main=contentNode();if(!main)return null;
   let page=main.querySelector('.cw233-ranking-page');
-  if(!page){main.innerHTML=`<div class="cw233-ranking-page" data-cw233-round11-theme="${themeFor(active)}"><div class="cw233-ranking-hero-slot">${heroHtml()}</div>${filtersHtml()}<div class="cw233-ranking-content"></div></div>`;page=main.querySelector('.cw233-ranking-page');}
+  const theme=rankingThemeForCompetition(active);
+  if(!page){main.innerHTML=`<div class="cw233-ranking-page" data-cw233-theme="${theme}" data-cw233-round11-theme="${theme}"><div class="cw233-ranking-hero-slot">${heroHtml()}</div>${filtersHtml()}<div class="cw233-ranking-content"></div></div>`;page=main.querySelector('.cw233-ranking-page');}
   return page;
 }
 function updateRankingChrome(){
-  const page=ensureRankingShell();if(!page)return;page.dataset.cw233Round11Theme=themeFor(active);
+  const page=ensureRankingShell();if(!page)return;const theme=rankingThemeForCompetition(active);page.dataset.cw233Theme=theme;page.dataset.cw233Round11Theme=theme;
   const hero=page.querySelector('.cw233-ranking-hero-slot');if(hero)setHtmlIfChanged(hero,heroHtml());
   for(const button of page.querySelectorAll('[data-cw233-rank-filter]'))button.setAttribute('aria-selected',String(button.dataset.cw233RankFilter===active));
-  dispatchThemeRefresh();
 }
 function renderRankingContent({loading=false,error=null}={}){
   const page=ensureRankingShell();if(!page)return;const target=page.querySelector('.cw233-ranking-content');if(!target)return;
