@@ -2,6 +2,18 @@ import * as Core from './match-center-core.mjs';
 
 export * from './match-center-core.mjs';
 
+export function createMatchCenterController(options) {
+  return Core.createMatchCenterController(options);
+}
+
+export function renderMatchCenter(state) {
+  return Core.renderMatchCenter(state);
+}
+
+export function patchMatchCenterOverlay(overlay, state) {
+  return Core.patchMatchCenterOverlay(overlay, state);
+}
+
 let routedApi = null;
 let actionDocument = null;
 
