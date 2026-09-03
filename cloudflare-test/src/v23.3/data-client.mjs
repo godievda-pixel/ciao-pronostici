@@ -1,11 +1,12 @@
 import { getCompetitionConfig } from '../v23.2/competition-config.mjs';
 import { resolveTelegramInitData } from '../v23.2/data-client.mjs';
+import { createMatchCenterSectionCache } from './match-center-section-cache.mjs';
 
 const STANDINGS_CACHE_TTL = 45_000;
 const STANDINGS_CACHE = new Map();
 const STANDINGS_INFLIGHT = new Map();
-const MATCH_CENTER_CACHE = new Map();
-const MATCH_CENTER_INFLIGHT = new Map();
+const MATCH_CENTER_CACHE = createMatchCenterSectionCache({ maxEntries:120 });
+const MATCH_CENTER_SECTIONS = new Set(['overview', 'stats', 'events', 'lineups', 'players']);
 const FETCH_IDS = new WeakMap();
 let nextFetchId = 1;
 
@@ -27,28 +28,15 @@ function requestCacheKey(path, initData, fetchImpl) {
   return `${fetchIdentity(fetchImpl)}\n${String(initData || '')}\n${path}`;
 }
 
+function matchCenterCacheKey(competition, matchId, section, initData, fetchImpl) {
+  return `${fetchIdentity(fetchImpl)}\n${String(initData || '')}\n${competition}\n${matchId}\n${section}`;
+}
+
 function freshStanding(key, now = Date.now()) {
   const cached = STANDINGS_CACHE.get(key);
   if (!cached) return null;
   if (now - cached.at > STANDINGS_CACHE_TTL) {
     STANDINGS_CACHE.delete(key);
-    return null;
-  }
-  return cached.value;
-}
-
-function matchCenterTtl(snapshot) {
-  const status = String(snapshot?.match?.status || snapshot?.status || '').toLowerCase();
-  if (status === 'live') return 10_000;
-  if (status === 'finished') return 5 * 60_000;
-  return 60_000;
-}
-
-function freshMatchCenter(key, now = Date.now()) {
-  const cached = MATCH_CENTER_CACHE.get(key);
-  if (!cached) return null;
-  if (now - cached.at > cached.ttl) {
-    MATCH_CENTER_CACHE.delete(key);
     return null;
   }
   return cached.value;
@@ -117,39 +105,81 @@ export async function loadCompetitionStandings(
   return pending;
 }
 
-export async function loadMatchCenterSnapshot(
+async function loadMatchCenterResource(
   competition,
   matchId,
+  section,
   {
     initData = resolveTelegramInitData(),
     fetchImpl = globalThis.fetch,
     force = false,
+    status = null,
   } = {},
 ) {
   getCompetitionConfig(competition);
+  const canonicalMatchId = String(matchId || '');
+  const canonicalSection = String(section || 'base');
+  if (!initData) throw createClientError('telegram_auth_required');
+
   const query = new URLSearchParams({
     competition,
-    match_id: String(matchId || ''),
+    match_id: canonicalMatchId,
   });
+  if (section) query.set('section', section);
   const path = `/api/v23.3/match-center?${query.toString()}`;
-  if (!initData) throw createClientError('telegram_auth_required');
-  const key = requestCacheKey(path, initData, fetchImpl);
+  const key = matchCenterCacheKey(
+    competition,
+    canonicalMatchId,
+    canonicalSection,
+    initData,
+    fetchImpl,
+  );
+
   if (!force) {
-    const cached = freshMatchCenter(key);
+    const cached = MATCH_CENTER_CACHE.get(key);
     if (cached !== null) return cached;
   }
-  const inflight = MATCH_CENTER_INFLIGHT.get(key);
+
+  const inflight = MATCH_CENTER_CACHE.getInflight(key);
   if (inflight) return inflight;
+
   const pending = loadJson(path, { initData, fetchImpl }).then(value => {
-    MATCH_CENTER_CACHE.set(key, {
-      at:Date.now(),
-      ttl:matchCenterTtl(value),
-      value,
-    });
+    const resolvedStatus = status || value?.match?.status || value?.status || null;
+    MATCH_CENTER_CACHE.set(key, value, { status:resolvedStatus });
     return value;
   }).finally(() => {
-    if (MATCH_CENTER_INFLIGHT.get(key) === pending) MATCH_CENTER_INFLIGHT.delete(key);
+    MATCH_CENTER_CACHE.forgetInflight(key, pending);
   });
-  MATCH_CENTER_INFLIGHT.set(key, pending);
+
+  MATCH_CENTER_CACHE.rememberInflight(key, pending);
   return pending;
+}
+
+export async function loadMatchCenterBase(
+  competition,
+  matchId,
+  options = {},
+) {
+  return loadMatchCenterResource(competition, matchId, null, options);
+}
+
+export async function loadMatchCenterSection(
+  competition,
+  matchId,
+  section,
+  options = {},
+) {
+  const canonicalSection = String(section || '').trim().toLowerCase();
+  if (!MATCH_CENTER_SECTIONS.has(canonicalSection)) {
+    throw createClientError('invalid_match_center_section');
+  }
+  return loadMatchCenterResource(competition, matchId, canonicalSection, options);
+}
+
+export async function loadMatchCenterSnapshot(
+  competition,
+  matchId,
+  options = {},
+) {
+  return loadMatchCenterBase(competition, matchId, options);
 }
