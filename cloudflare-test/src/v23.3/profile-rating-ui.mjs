@@ -37,8 +37,8 @@ export function applyProfileRankingPoints(documentRef = globalThis.document, poi
   if (!stat || !value) return false;
   const normalized = Number.isFinite(Number(points)) ? Math.trunc(Number(points)) : 0;
   value.textContent = String(normalized);
-  stat.dataset.cw233ProfilePoints = 'true';
-  value.dataset.cw233ProfilePoints = 'true';
+  stat.setAttribute?.('data-cw233-profile-points', 'true');
+  value.setAttribute?.('data-cw233-profile-points', 'true');
   return true;
 }
 
