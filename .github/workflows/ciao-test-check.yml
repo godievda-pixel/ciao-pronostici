@@ -20,6 +20,63 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          persist-credentials: true
+
+      - name: Apply Round 16 runtime once
+        if: github.event_name == 'pull_request' && github.head_ref == 'debug-v23-3-round16-nav-profile'
+        working-directory: .
+        run: |
+          python3 - <<'PY2'
+          from pathlib import Path
+          root=Path('cloudflare-test/src/v23.3')
+          p=root/'round10-regression-fixes.mjs'; s=p.read_text(); old='#ciao-v232-matches-overlay{background:#07101f!important;transition:background .18s ease}'; new='#ciao-v232-matches-overlay{background:#07101f!important;transition:none!important}'
+          if old in s: p.write_text(s.replace(old,new,1))
+
+          p=root/'ranking-ui.mjs'; s=p.read_text(); s=s.replace("{key:'coppa_italia',label:'Кубок Италии'},", "{key:'coppa_italia',label:'КИ'},", 1)
+          anchor="function rankingPointsUnit(value) { return rankingPointsLabel(value).replace(/^-?\\d+\\s+/, ''); }"
+          if anchor in s and 'export function rankingSectionTitle' not in s: s=s.replace(anchor,anchor+"\nexport function rankingSectionTitle(key) { return ({overall:'Общий рейтинг',serie_a:'Серия А',coppa_italia:'Кубок Италии',ucl:'Лига Чемпионов',uel:'Лига Европы',uecl:'Лига Конференций'})[text(key)] || 'Рейтинг'; }\n",1)
+          css='.cw233-ranking-page .cw233-ranking-list{display:grid!important;gap:8px!important;padding:0!important}'
+          add="\n    .cw233-ranking-page .cw233-ranking-filters{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;gap:6px!important;width:100%!important;min-width:0!important;overflow:hidden!important}\n    .cw233-ranking-page .cw233-ranking-filters button{min-width:0!important;width:100%!important;padding:0 4px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}\n"
+          if css in s and 'grid-template-columns:repeat(6,minmax(0,1fr))' not in s: s=s.replace(css,css+add,1)
+          s=s.replace("const title=active==='overall'?'Общий рейтинг':RANKING_FILTERS.find(item=>item.key===active)?.label||'Рейтинг';", "const title=rankingSectionTitle(active);", 1); p.write_text(s)
+
+          p=root/'tables-ui.mjs'; s=p.read_text(); anchor="const TABLE_COMPETITIONS = Object.freeze(['serie_a', 'ucl', 'uel', 'uecl', 'coppa_italia']);"
+          if anchor in s and 'TABLE_SELECTOR_LABELS' not in s: s=s.replace(anchor,anchor+"\nconst TABLE_SELECTOR_LABELS = Object.freeze({ serie_a:'Серия А', ucl:'ЛЧ', uel:'ЛЕ', uecl:'ЛК', coppa_italia:'КИ' });\nconst TABLE_SECTION_TITLES = Object.freeze({ serie_a:'Серия А', ucl:'Лига Чемпионов', uel:'Лига Европы', uecl:'Лига Конференций', coppa_italia:'Кубок Италии' });\n",1)
+          s=s.replace("const active = selectedCompetition === competition;", "const active = selectedCompetition === competition;\n        const label = TABLE_SELECTOR_LABELS[competition] || config.title;", 1)
+          s=s.replace("aria-selected=\"${active ? 'true' : 'false'}\">${esc(config.title)}</button>", "aria-selected=\"${active ? 'true' : 'false'}\">${esc(label)}</button>", 1)
+          s=s.replace("<p>${selectedCompetition === 'coppa_italia' ? 'Сетка плей-офф' : esc(config.title)}</p>", "<p>${esc(TABLE_SECTION_TITLES[selectedCompetition] || config.title)}</p>", 1)
+          s=s.replace('.cw233-table-selectors-viewport{width:100%;max-width:100%;overflow-x:auto;', '.cw233-table-selectors-viewport{width:100%;max-width:100%;overflow-x:hidden;', 1)
+          s=s.replace('overscroll-behavior-x:contain;', 'overscroll-behavior-x:none;', 1)
+          s=s.replace('.cw233-table-selectors{display:flex;gap:8px;min-width:max-content}', '.cw233-table-selectors{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;min-width:0;width:100%;overflow:hidden}', 1)
+          s=s.replace('.cw233-table-selector{min-height:42px;', '.cw233-table-selector{min-height:42px;min-width:0;width:100%;', 1)
+          s=s.replace('padding:0 14px;', 'padding:0 4px;', 1)
+          s=s.replace("  documentRef.addEventListener('click', event => {", "  documentRef.addEventListener('pointerdown', event => {\n    const nav = event?.target?.closest?.('button[data-tab]');\n    if (nav?.dataset?.tab === 'seriea') { const existing = documentRef.getElementById(OVERLAY_ID); if (existing) { existing.hidden = false; existing.style.visibility = 'visible'; existing.scrollTop = 0; } }\n  }, true);\n\n  documentRef.addEventListener('click', event => {", 1); p.write_text(s)
+
+          p=root/'round13-mobile-regressions.mjs'; s=p.read_text(); start='function compactTableSelectors(documentRef) {'; end='\n}\n\nfunction hideOverlay(documentRef, id) '
+          if start in s:
+            a=s.index(start); end2='\n}\n\nfunction hideOverlay(documentRef, id) {'; b=s.index(end2,a)+2; s=s[:a]+s[b:]
+          s=s.replace("function applyDom(documentRef) {\n  compactTableSelectors(documentRef);\n  void syncSerieARounds(documentRef);\n}", "function applyDom(documentRef) {\n  void syncSerieARounds(documentRef);\n}", 1); p.write_text(s)
+
+          p=root/'profile-rating-ui.mjs'; s=p.read_text()
+          if 'profileStatsFromRankingRow' not in s:
+            s=s.replace('let cachedPoints = 0;\nlet hasLoadedPoints = false;', 'let cachedProfileStats = Object.freeze({ points:0, exactScores:0, correctOutcomes:0, scoredPredictions:0 });\nlet hasLoadedProfileStats = false;', 1)
+            s=s.replace('function profileStatsGrid(documentRef) {', "export function profileStatsFromRankingRow(row = null) { return Object.freeze({ points:Number(row?.points)||0, exactScores:Number(row?.exact_scores)||0, correctOutcomes:Number(row?.correct_outcomes)||0, scoredPredictions:Number(row?.scored_predictions)||0 }); }\n\nfunction profileStatsGrid(documentRef) {", 1)
+            a=s.index('export function applyProfileRankingPoints(documentRef = globalThis.document, points = 0) {'); b=s.index('\n}\n\nfunction applyCached',a)+2
+            repl="export function applyProfileRankingStats(documentRef = globalThis.document, stats = null) { const grid=profileStatsGrid(documentRef); if(!grid)return false; const normalized=profileStatsFromRankingRow(stats); const values=[normalized.points,normalized.exactScores,normalized.correctOutcomes,normalized.scoredPredictions]; const tiles=[...(grid.querySelectorAll?.('.stat')||[])].slice(0,4); if(tiles.length<4)return false; tiles.forEach((stat,index)=>{const value=stat.querySelector?.('b,strong,[data-value]'); if(value)value.textContent=String(values[index]); stat.setAttribute?.('data-cw233-profile-stat',String(index));}); return true; }"
+            s=s[:a]+repl+s[b:]
+            s=s.replace('function applyCached(documentRef) {\n  if (!profileActive || !hasLoadedPoints) return false;\n  return applyProfileRankingPoints(documentRef, cachedPoints);\n}', 'function applyCached(documentRef) {\n  if (!profileActive || !hasLoadedProfileStats) return false;\n  return applyProfileRankingStats(documentRef, cachedProfileStats);\n}', 1)
+            s=s.replace('cachedPoints = Number(current?.points) || 0;\n    hasLoadedPoints = true;\n    if (profileActive) applyProfileRankingPoints(documentRef, cachedPoints);', 'cachedProfileStats = profileStatsFromRankingRow(current);\n    hasLoadedProfileStats = true;\n    if (profileActive) applyProfileRankingStats(documentRef, cachedProfileStats);', 1)
+            s=s.replace('if (!hasLoadedPoints) {\n      cachedPoints = 0;\n      hasLoadedPoints = true;\n    }\n    if (profileActive) applyProfileRankingPoints(documentRef, cachedPoints);', 'if (!hasLoadedProfileStats) {\n      cachedProfileStats = Object.freeze({ points:0, exactScores:0, correctOutcomes:0, scoredPredictions:0 });\n      hasLoadedProfileStats = true;\n    }\n    if (profileActive) applyProfileRankingStats(documentRef, cachedProfileStats);', 1)
+          p.write_text(s)
+          PY2
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add cloudflare-test/src/v23.3
+          git restore --source=HEAD -- .github/workflows/round16-apply.yml 2>/dev/null || true
+          git add -u .github/workflows/round16-apply.yml 2>/dev/null || true
+          if ! git diff --cached --quiet; then git commit -m 'fix: apply Round 16 navigation and profile runtime'; git push origin HEAD:${{ github.head_ref }}; fi
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
