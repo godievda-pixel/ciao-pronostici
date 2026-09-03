@@ -1,17 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { round11ThemeForCompetition } from '../src/v23.3/round11-performance-themes.mjs';
+import { renderTablesHub, tablesThemeForCompetition } from '../src/v23.3/tables-ui.mjs';
 import { resetPredictionDomain } from '../src/v23.3/prediction-sql.mjs';
 
-test('Tables theme derives from the selected competition instead of stale decorator state', async () => {
-  assert.equal(round11ThemeForCompetition('uecl'), 'conference');
-  assert.equal(round11ThemeForCompetition('serie_a'), 'serie-a');
-  const source = await readFile(new URL('../src/v23.3/round11-performance-themes.mjs', import.meta.url), 'utf8');
-  assert.match(source, /tables\.dataset\?\.cw233TablesSelected/);
-  assert.match(source, /tables\.dataset\.cw233Theme\s*=\s*theme/);
-  assert.match(source, /tables\.dataset\.cw233Round11Theme\s*=\s*theme/);
-  assert.doesNotMatch(source, /clean\(tables\.dataset\?\.cw233Theme\)/);
+test('Tables theme derives natively from the selected competition instead of stale decorator state', async () => {
+  assert.equal(tablesThemeForCompetition('uecl'), 'conference');
+  assert.equal(tablesThemeForCompetition('serie_a'), 'serie-a');
+  const html = renderTablesHub({ selectedCompetition:'uecl', loading:true });
+  assert.match(html, /data-cw233-tables-selected="uecl"/);
+  assert.match(html, /data-cw233-theme="conference"/);
+  assert.match(html, /data-cw233-round11-theme="conference"/);
+
+  const tables = await readFile(new URL('../src/v23.3/tables-ui.mjs', import.meta.url), 'utf8');
+  const round11 = await readFile(new URL('../src/v23.3/round11-performance-themes.mjs', import.meta.url), 'utf8');
+  assert.match(tables, /current\.dataset\.cw233Theme\s*=\s*next\.dataset\?\.cw233Theme/);
+  assert.match(tables, /current\.dataset\.cw233Round11Theme\s*=\s*next\.dataset\?\.cw233Round11Theme/);
+  assert.doesNotMatch(round11, /tables\.dataset\?\.cw233TablesSelected/);
+  assert.doesNotMatch(round11, /tables\.dataset\.cw233Theme\s*=/);
 });
 
 test('Predictions use one persistent shell instead of replacing the whole content root', async () => {
