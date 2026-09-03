@@ -40,6 +40,7 @@ const MODULES = Object.freeze([
   '/v23.3/predictions-ui.mjs',
   '/v23.3/ranking-ui.mjs',
   '/v23.3/premium-polish-ui.mjs',
+  '/v23.3/round7-regression-fixes.mjs',
 ]);
 
 const sleep = ms => new Promise(resolveSleep => setTimeout(resolveSleep, ms));
@@ -136,7 +137,7 @@ async function probeModules(fetchImpl) {
       ok:response.ok,
       status:response.status,
       bytes:Buffer.byteLength(text),
-      hasUnifiedRuntime:path === '/v23.3/index.mjs' ? text.includes('CiaoV233') && text.includes("predictions: 'enabled'") && text.includes("ranking: 'enabled'") && text.includes('premium-polish-ui.mjs') : undefined,
+      hasUnifiedRuntime:path === '/v23.3/index.mjs' ? text.includes('CiaoV233') && text.includes("predictions: 'enabled'") && text.includes("ranking: 'enabled'") && text.includes('premium-polish-ui.mjs') && text.includes('round7-regression-fixes.mjs') : undefined,
       predictionsEnabled:path === '/v23.3/index.mjs' ? text.includes("predictions: 'enabled'") : undefined,
       rankingEnabled:path === '/v23.3/index.mjs' ? text.includes("ranking: 'enabled'") : undefined,
       homeMultiCompetition:path === '/v23.3/home-integration.mjs' ? text.includes('Кальчо сегодня') && text.includes('cw233-home-multicompetition') : undefined,
@@ -151,6 +152,9 @@ async function probeModules(fetchImpl) {
       hasNavigationRuntime:path === '/v23.3/navigation-ui.mjs' ? text.includes('NAVIGATION_LABELS') : undefined,
       hasPremiumPolish:path === '/v23.3/premium-polish-ui.mjs'
         ? text.includes('installPremiumPolishUi') && text.includes('cw232-tournament-card__eyebrow') && text.includes('@media(max-width:620px)')
+        : undefined,
+      hasRound7Runtime:path === '/v23.3/round7-regression-fixes.mjs'
+        ? text.includes('USER_FEEDBACK_ROUND7_BUILD') && text.includes('cw232-serie-a-back') && text.includes('z-index:80!important') && text.includes('min-width:660px!important')
         : undefined,
     });
   }
@@ -231,6 +235,7 @@ export async function probe({ fetchImpl = fetch } = {}) {
   const rankingModule = modules.find(row => row.path === '/v23.3/ranking-ui.mjs');
   const navigationModule = modules.find(row => row.path === '/v23.3/navigation-ui.mjs');
   const premiumModule = modules.find(row => row.path === '/v23.3/premium-polish-ui.mjs');
+  const round7Module = modules.find(row => row.path === '/v23.3/round7-regression-fixes.mjs');
   const predictionsEnabled = Boolean(indexModule?.predictionsEnabled);
   const rankingEnabled = Boolean(indexModule?.rankingEnabled);
   const documentOverflowGuard = Boolean(tablesModule?.documentOverflowGuard);
@@ -267,6 +272,7 @@ export async function probe({ fetchImpl = fetch } = {}) {
   if (!matchCenterModule?.hasMatchCenterRuntime || !matchLinksModule?.hasMatchCenterLinksRuntime) throw new Error('deployed TEST Match Center runtime incomplete');
   if (!predictionsModule?.hasPredictionsRuntime || !rankingModule?.hasRankingRuntime) throw new Error('deployed TEST predictions/ranking runtime incomplete');
   if (!premiumModule?.hasPremiumPolish) throw new Error('deployed TEST is missing v23.3 premium polish runtime');
+  if (!round7Module?.hasRound7Runtime) throw new Error('deployed TEST is missing exact round7 regression runtime');
 
   for (const row of competitions) {
     if (!row.ok || row.matchCount < 1) throw new Error(`deployed TEST ${row.competition} has no usable matches`);
