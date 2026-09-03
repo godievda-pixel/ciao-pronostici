@@ -11,7 +11,7 @@ import { matchCenterTheme } from '../src/v23.3/match-center-theme.mjs';
 
 const COMPETITIONS = ['serie_a', 'coppa_italia', 'ucl', 'uel', 'uecl'];
 const EXPECTED_TABS = ['overview', 'stats', 'events', 'lineups', 'players'];
-const EXPECTED_LABELS = ['Обзор', 'Статистика', 'События', 'Составы', 'Игроки'];
+const EXPECTED_LABELS = ['Обзор', 'Статы', 'События', 'Составы', 'Игроки'];
 
 function match(competition = 'ucl') {
   return {
