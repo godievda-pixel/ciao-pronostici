@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { shouldIncludeMatch } from '../src/v23.2/match-normalizer.mjs';
-import { competitionNavigationGroups } from '../src/v23.2/matches-ui.mjs';
+import { adaptBsdEvents } from '../src/v23.2/bsd-adapter.mjs';
 
 const team = name => ({ id:name, name, countryCode:name === 'Милан' ? 'ITA' : 'ENG', crestUrl:'' });
 const match = (overrides = {}) => ({
@@ -19,12 +19,24 @@ test('UEFA qualification matches are excluded before they can become bogus round
   assert.equal(shouldIncludeMatch(match({ stage:'League Stage', round:6 })), true);
 });
 
-test('defensive navigation filtering never exposes the provider round 636', () => {
-  const groups = competitionNavigationGroups([
-    match({ matchId:'uecl:q', stage:'Qualification Round 2', round:636 }),
-    match({ matchId:'uecl:6', stage:'League Stage', round:6 }),
-  ], 'uecl');
-  assert.deepEqual(groups.map(group => group.key), ['round:6']);
+test('BSD adapter drops provider round 636 qualification fixtures before the Match UI sees them', () => {
+  const rows = adaptBsdEvents({ results:[
+    {
+      id:63601, event_date:'2026-07-20T19:00:00Z', status:'finished',
+      round_name:'Qualification Round 2', round_number:636,
+      home_team:{id:'milan',name:'Milan',country_code:'ITA'},
+      away_team:{id:'qualifier',name:'Qualifier',country_code:'ISR'},
+      home_score:0, away_score:0,
+    },
+    {
+      id:6001, event_date:'2026-09-10T19:00:00Z', status:'scheduled',
+      round_name:'League Stage', round_number:6,
+      home_team:{id:'milan',name:'Milan',country_code:'ITA'},
+      away_team:{id:'chelsea',name:'Chelsea',country_code:'ENG'},
+    },
+  ] }, 'uecl');
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].round, 6);
 });
 
 test('UEFA tabs make the selected last round visible instead of leaving it off-screen', async () => {
