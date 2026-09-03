@@ -90,6 +90,55 @@ test('Round 18 controller keeps tab and section state without changing legacy op
   assert.equal(controller.getState().open, false);
 });
 
+test('Round 18 lazy section fetch is not blocked by false coverage from the base event detail', async () => {
+  const base = {
+    ...match('ucl'),
+    coverage:{
+      overview:false,
+      stats:false,
+      events:false,
+      lineups:false,
+      players:false,
+      momentum:false,
+      shotmap:false,
+    },
+  };
+  let sectionCalls = 0;
+  const controller = createMatchCenterController({
+    loadSnapshot:async () => ({ match:base }),
+    loadSection:async (_competition, _matchId, section) => {
+      sectionCalls += 1;
+      assert.equal(section, 'overview');
+      return {
+        section:'overview',
+        available:true,
+        coverage:{ ...base.coverage, overview:true },
+        data:{
+          venue:{ name:'Renzo Barbera', city:'Palermo', capacity:null },
+          referee:null,
+          form:{ home:[], away:[] },
+          prediction:null,
+          predictionSplit:null,
+          momentum:null,
+          shotmap:null,
+        },
+      };
+    },
+    documentRef:{ hidden:false, addEventListener(){} },
+  });
+
+  await controller.open({
+    competition:'ucl',
+    matchId:'ucl:77',
+    initialMatch:base,
+  });
+
+  assert.equal(sectionCalls, 1);
+  assert.equal(controller.getState().sectionState.overview.status, 'ready');
+  assert.equal(controller.getState().sections.overview.venue.name, 'Renzo Barbera');
+  assert.equal(controller.getState().match.coverage.overview, true);
+});
+
 test('Round 18 shell keeps a stable detail frame for loading, unavailable and error states', async () => {
   const loading = renderMatchCenter({
     competition:'ucl',
