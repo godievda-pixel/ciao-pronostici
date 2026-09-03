@@ -16,6 +16,18 @@ export function applyHomeV233SourcePatch(input) {
   }
 
   const replacement = `/* ${MARKER} */
+const __cw233LegacyOpenMatchCenter = openMatchCenter;
+openMatchCenter = function(id){
+  const legacyId = Number(id) || 0;
+  const canonical = globalThis.CiaoV233MatchCenter?.openCanonicalMatchCenter;
+  if (legacyId > 0 && typeof canonical === 'function') {
+    return canonical({
+      competition: 'serie_a',
+      matchId: \`serie_a:\${legacyId}\`,
+    });
+  }
+  return __cw233LegacyOpenMatchCenter(id);
+};
 const __cw233LegacyHomeHtml = __cw231HomeHtml;
 __cw231HomeHtml = function(){
   globalThis.CiaoV233Home?.ensure?.().catch?.(()=>{});
@@ -45,10 +57,6 @@ globalThis.addEventListener?.('ciao-v233-home-ready', ()=>{
   globalThis.CiaoV233Home?.ensure?.().catch?.(()=>{});
 });
 globalThis.addEventListener?.('ciao-v233-home-updated', __cw233RefreshHome);
-globalThis.addEventListener?.('ciao-v233-open-serie-a-match', event => {
-  const legacyId = Number(event?.detail?.legacyId) || 0;
-  if (legacyId) openMatchCenter(legacyId);
-});
 predict = __cw231HomeHtml;`;
 
   source = source.replace(anchor, replacement);
