@@ -44,14 +44,18 @@ test('Round 17 one capture router opens canonical target with initialMatch', () 
   const documentRef = { addEventListener(type, fn, capture) { assert.equal(type, 'click'); assert.equal(capture, true); handler = fn; } };
   let opened = null;
   installCanonicalMatchLinks(documentRef, { open:payload => { opened = payload; } });
-  handler({ target, preventDefault(){}, stopPropagation(){} });
+  handler({ target, preventDefault(){}, stopPropagation(){}, stopImmediatePropagation(){} });
   assert.equal(opened.matchId, 'uecl:502');
   assert.equal(opened.initialMatch.homeTeam.name, 'Фиорентина');
 });
 
 test('Round 17 Prediction cards expose canonical competition and match identity', async () => {
   const source = await readFile(new URL('../src/v23.3/predictions-ui.mjs', import.meta.url), 'utf8');
-  assert.match(source, /data-cw233-pred-card=.*data-cw233-competition=.*data-cw233-match=/s);
+  assert.match(source, /function canonicalMatchAttributes\(match\)/);
+  assert.match(source, /data-cw233-competition=/);
+  assert.match(source, /data-cw233-match=/);
+  assert.match(source, /rememberMatchBootstrap\(match\)/);
+  assert.match(source, /data-cw233-pred-card=[^\n]*canonicalMatchAttributes\(match\)/);
 });
 
 test('Round 17 Match Center module no longer owns generic match-card click routing', async () => {
