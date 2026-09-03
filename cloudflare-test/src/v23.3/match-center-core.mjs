@@ -21,7 +21,7 @@ export const MATCH_CENTER_TABS = Object.freeze([
 
 export const MATCH_CENTER_TAB_LABELS = Object.freeze({
   overview:'Обзор',
-  stats:'Статистика',
+  stats:'Статы',
   events:'События',
   lineups:'Составы',
   players:'Игроки',
