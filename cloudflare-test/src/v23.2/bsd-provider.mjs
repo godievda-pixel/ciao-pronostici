@@ -348,6 +348,36 @@ function resourceSections(payload) {
   return adaptBsdMatchCenterSections(object(payload) || {});
 }
 
+function lineupPlayers(side) {
+  return [...list(side?.starters), ...list(side?.substitutes)];
+}
+
+function enrichPlayersFromLineups(players, lineups, match) {
+  const byId = new Map();
+  for (const [side, teamName] of [
+    ['home', match?.homeTeam?.name],
+    ['away', match?.awayTeam?.name],
+  ]) {
+    for (const player of lineupPlayers(lineups?.[side])) {
+      const id = text(player?.playerId ?? player?.player_id ?? player?.id);
+      if (!id) continue;
+      byId.set(id, {
+        name:text(player?.name ?? player?.short_name ?? player?.shortName),
+        teamName:text(teamName),
+      });
+    }
+  }
+
+  return Object.freeze(list(players).map(player => {
+    const found = byId.get(text(player?.playerId ?? player?.player_id ?? player?.id));
+    if (!found) return player;
+    const name = text(player?.name) || found.name;
+    const teamName = text(player?.teamName ?? player?.team_name) || found.teamName;
+    if (name === text(player?.name) && teamName === text(player?.teamName ?? player?.team_name)) return player;
+    return Object.freeze({ ...player, name, teamName });
+  }));
+}
+
 function predictionPayload(payload) {
   const source = object(payload);
   if (!source) return null;
@@ -431,7 +461,7 @@ export async function fetchBsdMatchCenterSection(args) {
     throw new Error(`Unsupported Match Center section: ${section || 'empty'}`);
   }
 
-  const { event, sourceId } = await fetchCanonicalBsdEvent(args);
+  const { event, match, sourceId } = await fetchCanonicalBsdEvent(args);
   const baseSections = adaptBsdMatchCenterSections(event);
   const baseCoverage = baseMatchCenterCoverage(event);
 
@@ -461,6 +491,46 @@ export async function fetchBsdMatchCenterSection(args) {
         shotmap:sections.coverage.shotmap,
       }),
       data:available ? sections.overview : null,
+    });
+  }
+
+  if (section === 'players') {
+    const [payload, lineupPayload] = await Promise.all([
+      fetchOptionalEventResource({
+        sourceId,
+        resource:'player-stats',
+        apiKey:args.apiKey,
+        fetchImpl:args.fetchImpl,
+      }),
+      fetchOptionalEventResource({
+        sourceId,
+        resource:'lineups',
+        apiKey:args.apiKey,
+        fetchImpl:args.fetchImpl,
+      }).catch(() => null),
+    ]);
+    const fetchedSections = resourceSections(payload);
+    const fetchedAvailable = fetchedSections.coverage.players === true;
+    const fallbackAvailable = payload === null && baseSections.coverage.players === true;
+    const available = fetchedAvailable || fallbackAvailable;
+    const rawData = fetchedAvailable
+      ? fetchedSections.players
+      : fallbackAvailable
+        ? baseSections.players
+        : null;
+    const fetchedLineups = resourceSections(lineupPayload);
+    const lineups = fetchedLineups.coverage.lineups
+      ? fetchedLineups.lineups
+      : baseSections.coverage.lineups
+        ? baseSections.lineups
+        : null;
+    const data = available ? enrichPlayersFromLineups(rawData, lineups, match) : null;
+
+    return Object.freeze({
+      section,
+      available,
+      coverage:mergeSectionCoverage(baseCoverage, section, available),
+      data,
     });
   }
 
