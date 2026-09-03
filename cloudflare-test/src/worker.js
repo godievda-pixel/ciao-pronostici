@@ -3,12 +3,15 @@ export { PredictionLeague } from './v23.3/prediction-league-do.mjs';
 import { adaptSerieASchedule } from './v23.2/serie-a-adapter.mjs';
 import {
   BsdUpstreamError,
+  fetchBsdMatchCenterBase,
+  fetchBsdMatchCenterSection,
   fetchBsdMatchCenterSnapshot,
   fetchBsdMatches,
   fetchBsdStandings,
 } from './v23.2/bsd-provider.mjs';
 import { normalizeTeamAlias, russianTeamName } from './v23.2/team-registry.mjs';
 import { canonicalMatchCenterSnapshot } from './v23.3/match-center-snapshot.mjs';
+import { canonicalCoverage } from './v23.3/match-center-sections.mjs';
 import { createPredictionService } from './v23.3/prediction-service.mjs';
 import { assertSafeResetTarget } from './v23.3/reset-contract.mjs';
 import { predictionObjectName } from './v23.3/prediction-sql.mjs';
@@ -31,6 +34,7 @@ const LEGACY_SERIE_A_SCHEDULE = '/api/ciao-schedule-fast-v1';
 const LEGACY_CORE_API = '/api/ciao-core-api-fast-v4';
 const EXTERNAL_COMPETITIONS = new Set(['coppa_italia', 'ucl', 'uel', 'uecl']);
 const UEFA_STANDINGS_COMPETITIONS = new Set(['ucl', 'uel', 'uecl']);
+const MATCH_CENTER_SECTIONS = new Set(['overview', 'stats', 'events', 'lineups', 'players']);
 
 function errorJson(status, payload) {
   return Response.json({ ok: false, ...payload }, { status });
@@ -161,6 +165,19 @@ function bsdFailure(error, competition, fallbackError) {
     upstream_stage: upstream?.stage || 'unknown',
     upstream_status: upstream?.status ?? null,
     upstream_code: upstream?.code || 'unknown_error',
+  });
+}
+
+function bsdMatchCenterSectionFailure(error, competition, section) {
+  const upstream = error instanceof BsdUpstreamError ? error : null;
+  return errorJson(502, {
+    error:'match_center_section_upstream_failed',
+    provider:'bsd-v2',
+    competition,
+    section,
+    upstream_stage:upstream?.stage || 'unknown',
+    upstream_status:upstream?.status ?? null,
+    upstream_code:upstream?.code || 'unknown_error',
   });
 }
 
@@ -510,6 +527,7 @@ async function handleV23_3MatchCenter(request, env, url) {
 
   const competition = String(url.searchParams.get('competition') || '');
   const matchId = String(url.searchParams.get('match_id') || '');
+  const section = String(url.searchParams.get('section') || '').trim().toLowerCase();
   const supported = competition === 'serie_a' || EXTERNAL_COMPETITIONS.has(competition);
 
   if (!supported) {
@@ -521,8 +539,14 @@ async function handleV23_3MatchCenter(request, env, url) {
   if (!matchId.startsWith(`${competition}:`) || !matchId.slice(competition.length + 1).trim()) {
     return errorJson(400, { error: 'competition_match_mismatch', competition });
   }
+  if (section && !MATCH_CENTER_SECTIONS.has(section)) {
+    return errorJson(400, { error:'invalid_match_center_section', section, competition });
+  }
 
   if (competition === 'serie_a') {
+    if (section) {
+      return errorJson(400, { error:'match_center_section_not_available', section, competition });
+    }
     const match = await loadSerieAMatchCenterSnapshot(request, env, initData, matchId);
     if (!match) return errorJson(404, { error:'match_not_found', competition });
     return Response.json({
@@ -537,7 +561,23 @@ async function handleV23_3MatchCenter(request, env, url) {
   }
 
   try {
-    const match = await fetchBsdMatchCenterSnapshot({ competition, matchId, apiKey });
+    if (section) {
+      const result = await fetchBsdMatchCenterSection({ competition, matchId, section, apiKey });
+      return Response.json({
+        ok:true,
+        data:{
+          competition,
+          provider:'bsd-v2',
+          matchId,
+          section,
+          coverage:canonicalCoverage({ [section]:result.available }),
+          available:result.available,
+          data:result.data,
+        },
+      });
+    }
+
+    const match = await fetchBsdMatchCenterBase({ competition, matchId, apiKey });
     return Response.json({
       ok: true,
       data: {
@@ -550,6 +590,7 @@ async function handleV23_3MatchCenter(request, env, url) {
     if (error instanceof BsdUpstreamError && error.code === 'match_not_eligible') {
       return errorJson(404, { error:'match_not_eligible', competition });
     }
+    if (section) return bsdMatchCenterSectionFailure(error, competition, section);
     return bsdFailure(error, competition, 'match_center_upstream_failed');
   }
 }
