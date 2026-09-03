@@ -7,7 +7,12 @@ test('production entry keeps the stable v22.5 release route', () => {
   assert.equal(validateEntryHtml(entry), true);
 });
 
-test('production release requires the no-x2 marker and hides all legacy x2 surfaces', () => {
-  const release = `<html><head><meta name="ciao-prod-patch" content="ciao-prod-no-x2-20260903"><style>#ciao-miniapp-root .cw18-x2{display:none!important}#ciao-miniapp-root .cw18-summary-bonus{display:none!important}#ciao-miniapp-root .cw18-rule.x2{display:none!important}</style><body>5 / 3 / 2 / 0 · дедлайн −15 минут</body></html>`;
+test('production release accepts the real grouped no-x2 CSS patch', () => {
+  const release = `<html><head><style id="ciao-prod-no-x2-20260903">
+#ciao-miniapp-root .cw18-x2,
+#ciao-miniapp-root .cw18-summary-bonus,
+#ciao-miniapp-root .cw18-rule.x2{display:none!important}
+#ciao-miniapp-root .cw18-rules-card .settings-row>div>div::after{content:'5 / 3 / 2 / 0 · дедлайн −15 минут'}
+</style></head><body></body></html>`;
   assert.equal(validateReleaseHtml(release), true);
 });
