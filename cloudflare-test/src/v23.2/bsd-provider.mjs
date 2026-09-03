@@ -2,6 +2,8 @@ import { adaptBsdEvents } from './bsd-adapter.mjs';
 import { dedupeMatches } from './match-deduper.mjs';
 import { normalizeStandingRows } from '../v23.3/standing-normalizer.mjs';
 import { canonicalMatchCenterSnapshot } from '../v23.3/match-center-snapshot.mjs';
+import { canonicalMatchCenterBase } from '../v23.3/match-center-sections.mjs';
+import { adaptBsdMatchCenterSections } from '../v23.3/bsd-match-center-adapter.mjs';
 
 const BSD_BASE = 'https://sports.bzzoiro.com/api/v2';
 const MAX_RANGE_DAYS = 370;
@@ -12,6 +14,7 @@ const LEAGUE_NAMES = Object.freeze({
   uecl: ['Conference League', 'UEFA Conference League'],
 });
 const STANDINGS_COMPETITIONS = new Set(['ucl', 'uel', 'uecl']);
+const MATCH_CENTER_SECTIONS = new Set(['overview', 'stats', 'events', 'lineups', 'players']);
 
 export class BsdUpstreamError extends Error {
   constructor(stage, status, code = 'upstream_failed') {
@@ -279,6 +282,12 @@ function canonicalBsdMatch(event, competition, sourceId) {
   return match;
 }
 
+async function fetchCanonicalBsdEvent(args) {
+  const { event, sourceId } = await fetchBsdEvent(args);
+  const match = canonicalBsdMatch(event, args.competition, sourceId);
+  return Object.freeze({ event, match });
+}
+
 export async function fetchBsdMatches({
   competition,
   from,
@@ -317,13 +326,33 @@ export async function fetchBsdStandings({
 }
 
 export async function fetchBsdMatchSnapshot(args) {
-  const { event, sourceId } = await fetchBsdEvent(args);
-  return canonicalBsdMatch(event, args.competition, sourceId);
+  const { match } = await fetchCanonicalBsdEvent(args);
+  return match;
+}
+
+export async function fetchBsdMatchCenterBase(args) {
+  const { event, match } = await fetchCanonicalBsdEvent(args);
+  const sections = adaptBsdMatchCenterSections(event);
+  return canonicalMatchCenterBase(match, sections.coverage);
+}
+
+export async function fetchBsdMatchCenterSection(args) {
+  const section = text(args?.section).toLowerCase();
+  if (!MATCH_CENTER_SECTIONS.has(section)) {
+    throw new Error(`Unsupported Match Center section: ${section || 'empty'}`);
+  }
+  const { event } = await fetchCanonicalBsdEvent(args);
+  const sections = adaptBsdMatchCenterSections(event);
+  const available = sections.coverage[section] === true;
+  return Object.freeze({
+    section,
+    available,
+    data:available ? sections[section] : null,
+  });
 }
 
 export async function fetchBsdMatchCenterSnapshot(args) {
-  const { event, sourceId } = await fetchBsdEvent(args);
-  const match = canonicalBsdMatch(event, args.competition, sourceId);
+  const { event, match } = await fetchCanonicalBsdEvent(args);
   return canonicalMatchCenterSnapshot(match, extractBsdMatchDetails(event));
 }
 
