@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test test/*.test.mjs",
-    "build": "node scripts/build.mjs",
+    "build": "node scripts/build-with-test-baseline.mjs",
     "inspect:api-contract": "node scripts/inspect-api-contract.mjs",
     "smoke:predictions": "node scripts/smoke-prediction-backend.mjs",
     "probe:predictions": "node scripts/probe-prediction-contract.mjs",
