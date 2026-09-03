@@ -56,7 +56,7 @@ test('Tables compact UEFA labels fit the selector while preserving tournament co
   assert.equal(compactTableLabel('ucl'), 'ЛЧ');
   assert.equal(compactTableLabel('uel'), 'ЛЕ');
   assert.equal(compactTableLabel('uecl'), 'ЛК');
-  assert.equal(compactTableLabel('coppa_italia'), 'Кубок Италии');
+  assert.equal(compactTableLabel('coppa_italia'), 'КИ');
 });
 
 test('Round 13 runtime is loaded from the unified v23.3 entry point', async () => {
