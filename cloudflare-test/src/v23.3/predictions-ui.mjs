@@ -130,12 +130,16 @@ export function predictionNavigationGroups(matches = [], competition = '') {
 export function defaultPredictionNavigationKey(groups = [], now = new Date()) {
   const rows = Array.isArray(groups) ? groups : [];
   if (!rows.length) return '';
-  const writable = rows.find(group => group?.writable);
-  if (writable) return writable.key;
   const nowMs = now instanceof Date ? now.getTime() : Date.parse(now);
-  const future = rows.map(group => ({ group, first:Math.min(...group.matches.map(time)) }))
-    .filter(item => Number.isFinite(item.first) && item.first >= nowMs).sort((a,b) => a.first - b.first)[0];
-  return future?.group?.key || rows[rows.length - 1].key;
+  const future = rows
+    .map(group => ({ group, first:Math.min(...group.matches.map(time)) }))
+    .filter(item => Number.isFinite(item.first) && item.first >= nowMs)
+    .sort((a,b) => a.first - b.first);
+  const writableFuture = future.find(item => item.group?.writable);
+  if (writableFuture) return writableFuture.group.key;
+  if (future[0]) return future[0].group.key;
+  const writable = rows.find(group => group?.writable);
+  return writable?.key || rows[rows.length - 1].key;
 }
 
 export function predictionCardState(match = {}) {
@@ -289,7 +293,9 @@ export function updatePredictionCard(card, match) {
 }
 
 async function reloadMatches(generation = loadGeneration, force = false) {
-  const finalState = await client.available('all', force ? { force:true } : undefined);
+  const finalState = force
+    ? await client.available('all', { force:true })
+    : await client.available('all');
   if (!pageActive || generation !== loadGeneration) return finalState;
   matches = sortMatches(Array.isArray(finalState?.matches) ? finalState.matches : []);
   currentParticipant = finalState?.participant || currentParticipant;
