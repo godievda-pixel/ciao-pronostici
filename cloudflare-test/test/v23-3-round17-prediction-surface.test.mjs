@@ -29,7 +29,7 @@ test('Round 17 Predictions preserve scroll and focus around structural reconcili
   assert.match(code, /filterScrollLeft|filtersScrollLeft/);
   assert.match(code, /navScrollLeft|roundScrollLeft/);
   assert.match(code, /activeElement/);
-  assert.match(code, /\.focus\?\.\(\)|\.focus\(\)/);
+  assert.match(code, /\.focus\?\.\(\{[^}]*preventScroll\s*:\s*true[^}]*\}\)|\.focus\(\{[^}]*preventScroll\s*:\s*true[^}]*\}\)/);
 });
 
 test('Round 17 Predictions keep draft editing and locking logic independent from rendering reconciliation', async () => {
