@@ -4,6 +4,7 @@ export const USER_FEEDBACK_ROUND4_BUILD = '2026-09-02-r4';
 export const USER_FEEDBACK_ROUND6_BUILD = '2026-09-02-r6';
 export const USER_FEEDBACK_ROUND7_BUILD = '2026-09-03-r7';
 export const USER_FEEDBACK_ROUND11_BUILD = '2026-09-03-r11';
+export const USER_FEEDBACK_ROUND12_BUILD = '2026-09-03-r12';
 
 export const PREDICTION_FILTERS = Object.freeze([
   { key:'all', label:'Все' },
@@ -27,6 +28,7 @@ const COPPA_STAGE_LABELS = Object.freeze({
   'Semi-finals':'1/2 финала', 'Semi Finals':'1/2 финала', Semifinals:'1/2 финала', Final:'Финал',
 });
 const MATCH_CACHE_TTL = 45_000;
+const PREFETCH_RETRY_DELAYS = Object.freeze([0, 120, 300, 650, 1200, 2200, 4000]);
 
 function text(value) { return String(value ?? '').trim(); }
 function time(match) {
@@ -83,7 +85,7 @@ export async function loadPredictionCompetitionsProgressively({ competitions = P
 export function predictionRowsForMode(matches = [], mode = 'make') {
   const rows = Array.isArray(matches) ? matches : [];
   if (mode === 'mine') return sortMatches(rows.filter(match => Boolean(match?.prediction)));
-  return sortMatches(rows.filter(match => match?.state === 'open' || match?.state === 'round_locked'));
+  return sortMatches(rows.filter(match => match?.state === 'open' || match?.state === 'round_locked' || match?.state === 'hydrating'));
 }
 export function filterPredictionMatches(matches = [], filter = 'all') {
   const rows = Array.isArray(matches) ? matches : [];
@@ -144,6 +146,7 @@ export function defaultPredictionNavigationKey(groups = [], now = new Date()) {
 
 export function predictionCardState(match = {}) {
   const prediction = match?.prediction;
+  if (match?.state === 'hydrating') return Object.freeze({ kind:'hydrating', label:'Проверяем доступность прогноза…' });
   if (match?.state === 'finished') {
     const hasScore = Number.isInteger(Number(match?.homeScore)) && Number.isInteger(Number(match?.awayScore));
     const result = hasScore ? `${Number(match.homeScore)}:${Number(match.awayScore)}` : '—';
@@ -171,6 +174,7 @@ let loadingMatches = false;
 let loadingFailed = false;
 let loadGeneration = 0;
 let loadedAt = 0;
+let warmGeneration = 0;
 
 function initData() { return text(globalThis.Telegram?.WebApp?.initData); }
 function telegramUser() { return globalThis.Telegram?.WebApp?.initDataUnsafe?.user || null; }
@@ -219,15 +223,16 @@ function filtersHtml() {
   return `<div class="cw231-filters cw233-pred-filters" role="tablist" aria-label="Турниры">${PREDICTION_FILTERS.map(filter => `<button type="button" data-cw233-filter="${filter.key}" aria-selected="${filter.key === activeFilter}">${filter.label}</button>`).join('')}</div>`;
 }
 function makeMatchHtml(match) {
-  const state = predictionCardState(match); const score = scoreFor(match); const dirty = drafts.has(match.matchId);
-  return `<div class="match" data-cw233-pred-card="${esc(match.matchId)}"><div class="match-head"><div class="teams"><div class="team">${teamLogo(match,'home')}<span class="team-name">${esc(teamName(match,'home'))}</span></div><span class="dash">—</span><div class="team away"><span class="team-name">${esc(teamName(match,'away'))}</span>${teamLogo(match,'away')}</div></div></div><div class="score"><div class="score-side"><button type="button" data-cw233-delta="h:-1">−</button><div class="score-value" data-cw233-score="h">${score.h}</div><button type="button" data-cw233-delta="h:1">+</button></div><span class="colon">:</span><div class="score-side"><button type="button" data-cw233-delta="a:-1">−</button><div class="score-value" data-cw233-score="a">${score.a}</div><button type="button" data-cw233-delta="a:1">+</button></div></div><div class="meta"><span>${esc(formatKickoff(match.kickoffAt))}</span><span data-cw233-state class="${dirty ? '' : state.kind === 'saved' ? 'saved' : ''}">${dirty ? 'не сохранён' : esc(state.label)}</span></div></div>`;
+  const state = predictionCardState(match); const score = scoreFor(match); const dirty = drafts.has(match.matchId); const hydrating = match?.state === 'hydrating';
+  const disabled = hydrating ? ' disabled aria-disabled="true"' : '';
+  return `<div class="match${hydrating ? ' cw233-prediction-bootstrap' : ''}" data-cw233-pred-card="${esc(match.matchId)}"><div class="match-head"><div class="teams"><div class="team">${teamLogo(match,'home')}<span class="team-name">${esc(teamName(match,'home'))}</span></div><span class="dash">—</span><div class="team away"><span class="team-name">${esc(teamName(match,'away'))}</span>${teamLogo(match,'away')}</div></div></div><div class="score"><div class="score-side"><button type="button" data-cw233-delta="h:-1"${disabled}>−</button><div class="score-value" data-cw233-score="h">${score.h}</div><button type="button" data-cw233-delta="h:1"${disabled}>+</button></div><span class="colon">:</span><div class="score-side"><button type="button" data-cw233-delta="a:-1"${disabled}>−</button><div class="score-value" data-cw233-score="a">${score.a}</div><button type="button" data-cw233-delta="a:1"${disabled}>+</button></div></div><div class="meta"><span>${esc(formatKickoff(match.kickoffAt))}</span><span data-cw233-state class="${dirty ? '' : state.kind === 'saved' ? 'saved' : ''}">${dirty ? 'не сохранён' : esc(state.label)}</span></div></div>`;
 }
 function mineMatchHtml(match) {
   const prediction = match?.prediction; const points = prediction?.points == null ? '' : ` · +${Number(prediction.points)}`;
   const finalScore = match?.state === 'finished' && Number.isInteger(Number(match?.homeScore)) && Number.isInteger(Number(match?.awayScore)) ? `ИТОГ · ${Number(match.homeScore)}:${Number(match.awayScore)}` : '';
   return `<div class="mine-match" data-cw233-pred-card="${esc(match.matchId)}"><div class="mine-main"><div class="mine-pair"><div class="mine-team">${teamLogo(match,'home')}<span>${esc(teamName(match,'home'))}</span></div><span class="mine-dash">—</span><div class="mine-team away"><span>${esc(teamName(match,'away'))}</span>${teamLogo(match,'away')}</div></div><div class="mine-meta"><span>${esc(formatKickoff(match.kickoffAt))}</span><span class="mine-live">${esc(finalScore)}</span></div></div><div class="mine-prediction ${prediction?.points != null ? 'has-points' : ''}">${prediction ? `${Number(prediction.predicted_home)}:${Number(prediction.predicted_away)}${points}` : '—'}</div></div>`;
 }
-function loadingBody() { return '<div class="cw233-prediction-loading" aria-label="Загрузка матчей"><span></span><span></span><span></span></div>'; }
+function loadingBody() { return `<div class="cw233-prediction-loading" aria-label="Загрузка матчей">${Array.from({ length:6 }, () => '<span></span>').join('')}</div>`; }
 function navigationHtml(groups, selectedKey) {
   if (!groups.length) return '';
   return `<div class="cw233-pred-nav" role="tablist" aria-label="Этапы турнира">${groups.map(group => `<button type="button" data-cw233-pred-nav="${esc(group.key)}" data-cw233-pred-locked="${group.locked ? 'true' : 'false'}" aria-selected="${group.key === selectedKey}" aria-disabled="${group.locked ? 'true' : 'false'}">${esc(group.label)}${group.locked ? ' 🔒' : ''}</button>`).join('')}</div>`;
@@ -236,7 +241,7 @@ function lockedRoundBody(groups, selected) {
   return `${navigationHtml(groups, selected.key)}<div class="section-title"><h3>${esc(selected.label)}</h3></div><div class="cw233-pred-round-locked"><span>🔒<br>Откроется после расчёта предыдущего тура</span></div>`;
 }
 function makeBody(rows) {
-  const displayRows = activeFilter === 'all' ? rows.filter(match => match?.state === 'open') : rows;
+  const displayRows = activeFilter === 'all' ? rows.filter(match => match?.state === 'open' || match?.state === 'hydrating') : rows;
   if (loadingMatches && !displayRows.length) return loadingBody();
   if (loadingFailed && !displayRows.length) return '<div class="empty">Не удалось загрузить матчи. Попробуй открыть раздел ещё раз.</div>';
   if (!displayRows.length) return '<div class="empty">Нет матчей, на которые сейчас можно поставить прогноз</div>';
@@ -250,8 +255,8 @@ function makeBody(rows) {
     const selected = groups.find(group => group.key === selectedKey) || groups[0];
     if (!selected) return '<div class="empty">Нет матчей, на которые сейчас можно поставить прогноз</div>';
     if (selected.locked) return lockedRoundBody(groups, selected);
-    const writableMatches = selected.matches.filter(match => match?.state === 'open');
-    return `${navigationHtml(groups, selected.key)}<div class="section-title"><h3>${esc(selected.label)}</h3></div><div class="matches">${writableMatches.map(makeMatchHtml).join('')}</div>`;
+    const visibleMatches = selected.matches.filter(match => match?.state === 'open' || match?.state === 'hydrating');
+    return `${navigationHtml(groups, selected.key)}<div class="section-title"><h3>${esc(selected.label)}</h3></div><div class="matches">${visibleMatches.map(makeMatchHtml).join('')}</div>`;
   }
   const groups = groupPredictionMatchesByDate(displayRows);
   return groups.map(group => `<div class="section-title"><h3>${esc(formatDay(group.key))}</h3></div><div class="matches">${group.matches.map(makeMatchHtml).join('')}</div>`).join('');
@@ -271,12 +276,14 @@ function render() {
   const main = contentNode(); if (!main) return;
   const filterScrollLeft = main.querySelector('.cw233-pred-filters')?.scrollLeft || 0;
   const roundScrollLeft = main.querySelector('.cw233-pred-nav')?.scrollLeft || 0;
+  const mainScrollTop = Number(main.scrollTop) || 0;
   const modeRows = predictionRowsForMode(matches, activeMode);
   const selected = filterPredictionMatches(modeRows, activeFilter);
   const writable = activeMode === 'make' && selected.some(match => match?.state === 'open');
   main.innerHTML = `<div class="cw233-prediction-page" data-cw233-round11-theme="${themeFor(activeFilter)}">${heroHtml()}${tabsHtml()}${filtersHtml()}${activeMode === 'mine' ? mineBody(selected) : makeBody(selected)}${writable ? '<div class="savebar"><button type="button" class="save" data-cw233-save-all>Сохранить прогнозы</button></div>' : ''}</div>`;
   const filters = main.querySelector('.cw233-pred-filters'); const navigation = main.querySelector('.cw233-pred-nav');
   if (filters) filters.scrollLeft = filterScrollLeft; if (navigation) navigation.scrollLeft = roundScrollLeft;
+  main.scrollTop = mainScrollTop;
   dispatchThemeRefresh();
 }
 
@@ -289,6 +296,25 @@ export function updatePredictionCard(card, match) {
   if (home) home.textContent = String(score.h);
   if (away) away.textContent = String(score.a);
   if (state) { state.textContent = drafts.has(match.matchId) ? 'не сохранён' : predictionCardState(match).label; state.classList?.remove?.('saved'); }
+  return true;
+}
+
+function homeBootstrapMatches() {
+  const state = globalThis.CiaoV233Home?.state?.();
+  if (!state?.hydrated || !Array.isArray(state?.matches)) return [];
+  const now = Date.now() - 60_000;
+  return sortMatches(state.matches
+    .filter(match => PREDICTION_COMPETITIONS.includes(text(match?.competition)))
+    .filter(match => time(match) >= now)
+    .map(match => ({ ...match, state:'hydrating', prediction:null, __predictionBootstrap:true })));
+}
+
+function primePredictionBootstrap() {
+  if (loadedAt > 0 || matches.some(match => !match?.__predictionBootstrap)) return false;
+  const bootstrap = homeBootstrapMatches();
+  if (!bootstrap.length) return false;
+  matches = bootstrap;
+  if (pageActive) render();
   return true;
 }
 
@@ -306,15 +332,18 @@ async function reloadMatches(generation = loadGeneration, force = false) {
 }
 async function open() {
   const generation = ++loadGeneration; pageActive = true;
+  primePredictionBootstrap();
   const hasCache = matches.length > 0 && loadedAt > 0 && (Date.now() - loadedAt) <= MATCH_CACHE_TTL;
-  loadingMatches = matches.length === 0; loadingFailed = false; render();
+  loadingMatches = !hasCache; loadingFailed = false; render();
   try {
-    client = client || createPredictionClient({ initData:initData() });
+    const auth = initData();
+    if (!auth) throw new Error('telegram_auth_required');
+    client = client || createPredictionClient({ initData:auth });
     if (hasCache) loadingMatches = false;
     await reloadMatches(generation, hasCache);
   } catch {
     if (!pageActive || generation !== loadGeneration) return;
-    loadingMatches = false; loadingFailed = matches.length === 0; render();
+    loadingMatches = false; loadingFailed = loadedAt === 0 && !matches.length; render();
   }
 }
 function close() { pageActive = false; loadGeneration += 1; }
@@ -344,19 +373,33 @@ async function saveDrafts() {
   }
 }
 
+function warmPredictionCache(attempt = 0, generation = warmGeneration) {
+  if (generation !== warmGeneration) return false;
+  primePredictionBootstrap();
+  const auth = initData();
+  if (!auth) {
+    const delay = PREFETCH_RETRY_DELAYS[Math.min(attempt + 1, PREFETCH_RETRY_DELAYS.length - 1)];
+    if (attempt + 1 < PREFETCH_RETRY_DELAYS.length) setTimeout(() => warmPredictionCache(attempt + 1, generation), delay);
+    return false;
+  }
+  client = client || createPredictionClient({ initData:auth });
+  void client.prefetchAvailable('all');
+  return true;
+}
+
 function schedulePrefetch() {
-  const run = () => {
-    const auth = initData(); if (!auth) return;
-    client = client || createPredictionClient({ initData:auth });
-    void client.prefetchAvailable('all');
-  };
-  if (typeof globalThis.requestIdleCallback === 'function') globalThis.requestIdleCallback(run, { timeout:1800 });
-  else setTimeout(run, 1400);
+  const generation = ++warmGeneration;
+  const run = () => warmPredictionCache(0, generation);
+  if (typeof globalThis.requestIdleCallback === 'function') globalThis.requestIdleCallback(run, { timeout:550 });
+  else setTimeout(run, 180);
 }
 
 export function installPredictionsUi() {
   if (typeof document === 'undefined') return null;
   schedulePrefetch();
+  const warmFromHome = () => { primePredictionBootstrap(); schedulePrefetch(); };
+  globalThis.addEventListener?.('ciao-v233-home-ready', warmFromHome);
+  globalThis.addEventListener?.('ciao-v233-home-updated', warmFromHome);
   document.addEventListener('click', event => {
     const homePredict = event.target?.closest?.('[data-cw231-action="predict"]');
     if (homePredict) {
@@ -367,7 +410,7 @@ export function installPredictionsUi() {
       if (nav) nav.click(); else void open(); return;
     }
     const nav = event.target?.closest?.('.nav button[data-tab]');
-    if (nav?.dataset?.tab === 'mine') { void open(); return; }
+    if (nav?.dataset?.tab === 'mine') { primePredictionBootstrap(); void open(); return; }
     if (nav) { close(); return; }
     if (!pageActive) return;
     const mode = event.target?.closest?.('[data-cw233-mode]');
@@ -385,7 +428,7 @@ export function installPredictionsUi() {
     }
     if (event.target?.closest?.('[data-cw233-save-all]')) void saveDrafts();
   });
-  return Object.freeze({ open, close });
+  return Object.freeze({ open, close, warm:warmPredictionCache });
 }
 
 if (typeof document !== 'undefined') {
