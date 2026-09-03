@@ -36,7 +36,7 @@ const CSS = `
   #ciao-v233-tables-overlay .cw233-standing-team strong{font-size:10px!important}
 }
 @media(max-width:419px){
-  #ciao-v233-tables-overlay .cw233-standing-table,
+  #ciao-v233-tables-overlay .cw233-standing-table{min-width:0!important;width:100%!important;max-width:100%!important;table-layout:fixed!important;font-size:9px!important}
   #ciao-v233-tables-overlay .cw233-standing-table--full{min-width:0!important;width:100%!important;max-width:100%!important;table-layout:fixed!important;font-size:9px!important}
   #ciao-v233-tables-overlay .cw233-standing-table th,
   #ciao-v233-tables-overlay .cw233-standing-table td{padding-left:1px!important;padding-right:1px!important}
