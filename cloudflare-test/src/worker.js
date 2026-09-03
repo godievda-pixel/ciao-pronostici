@@ -7,6 +7,7 @@ import {
   fetchBsdMatches,
   fetchBsdStandings,
 } from './v23.2/bsd-provider.mjs';
+import { normalizeTeamAlias, russianTeamName } from './v23.2/team-registry.mjs';
 import { createPredictionService } from './v23.3/prediction-service.mjs';
 import { assertSafeResetTarget } from './v23.3/reset-contract.mjs';
 import { predictionObjectName } from './v23.3/prediction-sql.mjs';
@@ -107,6 +108,46 @@ function normalizeLegacySerieAStandings(payload) {
       goalDifference: numberOrNull(row?.goalDifference ?? row?.goal_difference ?? row?.goal_diff ?? row?.gd),
       points: numberOrNull(row?.points ?? row?.pts),
     })),
+  };
+}
+
+function normalizedTeamName(value) {
+  return normalizeTeamAlias(russianTeamName(String(value ?? '').trim()));
+}
+
+function serieACrestLookup(schedule) {
+  const byId = new Map();
+  const byName = new Map();
+  for (const match of Array.isArray(schedule?.matches) ? schedule.matches : []) {
+    for (const team of [match?.homeTeam, match?.awayTeam]) {
+      const crestUrl = String(team?.crestUrl || '').trim();
+      if (!crestUrl) continue;
+      const id = String(team?.id || '').trim();
+      const names = [team?.name, team?.rawName]
+        .map(normalizedTeamName)
+        .filter(Boolean);
+      if (id) byId.set(id, crestUrl);
+      for (const name of names) byName.set(name, crestUrl);
+    }
+  }
+  return { byId, byName };
+}
+
+function enrichSerieAStandingsCrests(standings, schedule) {
+  const lookup = serieACrestLookup(schedule);
+  return {
+    ...standings,
+    rows:(Array.isArray(standings?.rows) ? standings.rows : []).map(row => {
+      if (String(row?.team?.crestUrl || '').trim()) return row;
+      const id = String(row?.team?.id || '').trim();
+      const names = [row?.team?.name, row?.team?.rawName]
+        .map(normalizedTeamName)
+        .filter(Boolean);
+      const crestUrl = (id && lookup.byId.get(id))
+        || names.map(name => lookup.byName.get(name)).find(Boolean)
+        || '';
+      return crestUrl ? { ...row, team:{ ...row.team, crestUrl } } : row;
+    }),
   };
 }
 
@@ -347,6 +388,28 @@ async function handleV23_2Matches(request, env, url) {
   });
 }
 
+async function fetchSerieAScheduleForCrests(request, env, initData) {
+  try {
+    const response = await env.CIAO_WEB_API.fetch(new Request(
+      new URL(LEGACY_SERIE_A_SCHEDULE, request.url),
+      {
+        method:'POST',
+        headers:{
+          'content-type':'application/json',
+          'x-telegram-init-data':initData,
+        },
+        body:'{}',
+      },
+    ));
+    if (!response.ok) return null;
+    const payload = await response.json();
+    if (!payload?.ok) return null;
+    return adaptSerieASchedule(payload);
+  } catch {
+    return null;
+  }
+}
+
 async function handleSerieAStandings(request, env, initData) {
   const upstreamRequest = new Request(
     new URL(LEGACY_CORE_API, request.url),
@@ -360,7 +423,8 @@ async function handleSerieAStandings(request, env, initData) {
     },
   );
 
-  const crestPromise = serieACrestRegistry(env);
+  const legacySchedulePromise = fetchSerieAScheduleForCrests(request, env, initData);
+  const bsdCrestPromise = serieACrestRegistry(env);
   const upstream = await env.CIAO_WEB_API.fetch(upstreamRequest);
   let payload;
   try {
@@ -375,12 +439,14 @@ async function handleSerieAStandings(request, env, initData) {
     });
   }
 
-  const standings = normalizeLegacySerieAStandings(payload);
-  const registry = await crestPromise;
-  return Response.json({
-    ok: true,
-    data: enrichSerieAStandingsWithCrests(standings, registry),
-  });
+  let standings = normalizeLegacySerieAStandings(payload);
+  const [legacySchedule, bsdRegistry] = await Promise.all([
+    legacySchedulePromise,
+    bsdCrestPromise,
+  ]);
+  if (legacySchedule) standings = enrichSerieAStandingsCrests(standings, legacySchedule);
+  standings = enrichSerieAStandingsWithCrests(standings, bsdRegistry);
+  return Response.json({ ok: true, data: standings });
 }
 
 async function handleV23_3Standings(request, env, url) {
