@@ -137,7 +137,7 @@ test('locked prediction round renders exactly one lock affordance', async () => 
     readFile(new URL('../src/v23.3/round11-performance-themes.mjs', import.meta.url), 'utf8'),
   ]);
   assert.match(ui, /group\.locked \? ' 🔒' : ''/);
-  assert.doesNotMatch(themes, /data-cw233-pred-locked=['"]true['"]::after\s*\{[^}]*content:\s*['"] 🔒['"]/s);
+  assert.doesNotMatch(themes, /data-cw233-pred-locked='true']::after/);
 });
 
 test('first uncached Ranking load uses a neutral loading hero and never renders fake participant identity', async () => {
