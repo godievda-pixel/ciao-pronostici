@@ -1,0 +1,174 @@
+name: Apply Round 16 runtime
+on:
+  push:
+    branches: [debug-v23-3-round16-nav-profile]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: debug-v23-3-round16-nav-profile
+      - name: Apply runtime changes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root=Path('cloudflare-test/src/v23.3')
+
+          p=root/'round10-regression-fixes.mjs'
+          s=p.read_text()
+          old='#ciao-v232-matches-overlay{background:#07101f!important;transition:background .18s ease}'
+          new='#ciao-v232-matches-overlay{background:#07101f!important;transition:none!important}'
+          assert old in s, 'round10 transition anchor missing'
+          p.write_text(s.replace(old,new,1))
+
+          p=root/'ranking-ui.mjs'; s=p.read_text()
+          old="{key:'overall',label:'Общий'}, {key:'serie_a',label:'Серия А'}, {key:'coppa_italia',label:'Кубок Италии'},\n  {key:'ucl',label:'ЛЧ'}, {key:'uel',label:'ЛЕ'}, {key:'uecl',label:'ЛК'},"
+          new="{key:'overall',label:'Общий'}, {key:'serie_a',label:'Серия А'}, {key:'coppa_italia',label:'КИ'},\n  {key:'ucl',label:'ЛЧ'}, {key:'uel',label:'ЛЕ'}, {key:'uecl',label:'ЛК'},"
+          assert old in s, 'ranking labels anchor missing'
+          s=s.replace(old,new,1)
+          anchor="function rankingPointsUnit(value) { return rankingPointsLabel(value).replace(/^-?\\d+\\s+/, ''); }"
+          addition="""
+export function rankingSectionTitle(key) {
+  return ({
+    overall:'Общий рейтинг',
+    serie_a:'Серия А',
+    coppa_italia:'Кубок Италии',
+    ucl:'Лига Чемпионов',
+    uel:'Лига Европы',
+    uecl:'Лига Конференций',
+  })[text(key)] || 'Рейтинг';
+}
+"""
+          assert anchor in s, 'ranking title anchor missing'
+          s=s.replace(anchor,anchor+'\n'+addition,1)
+          css_anchor='.cw233-ranking-page .cw233-ranking-list{display:grid!important;gap:8px!important;padding:0!important}'
+          css_add="""\n    .cw233-ranking-page .cw233-ranking-filters{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;gap:6px!important;width:100%!important;min-width:0!important;overflow:hidden!important}
+    .cw233-ranking-page .cw233-ranking-filters button{min-width:0!important;width:100%!important;padding:0 4px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+"""
+          assert css_anchor in s, 'ranking css anchor missing'
+          s=s.replace(css_anchor,css_anchor+css_add,1)
+          old="const title=active==='overall'?'Общий рейтинг':RANKING_FILTERS.find(item=>item.key===active)?.label||'Рейтинг';"
+          new="const title=rankingSectionTitle(active);"
+          assert old in s, 'ranking title render anchor missing'
+          s=s.replace(old,new,1)
+          p.write_text(s)
+
+          p=root/'tables-ui.mjs'; s=p.read_text()
+          anchor="const TABLE_COMPETITIONS = Object.freeze(['serie_a', 'ucl', 'uel', 'uecl', 'coppa_italia']);"
+          addition="\nconst TABLE_SELECTOR_LABELS = Object.freeze({ serie_a:'Серия А', ucl:'ЛЧ', uel:'ЛЕ', uecl:'ЛК', coppa_italia:'КИ' });\nconst TABLE_SECTION_TITLES = Object.freeze({ serie_a:'Серия А', ucl:'Лига Чемпионов', uel:'Лига Европы', uecl:'Лига Конференций', coppa_italia:'Кубок Италии' });\n"
+          assert anchor in s, 'tables constants anchor missing'
+          s=s.replace(anchor,anchor+addition,1)
+          old="const config = getCompetitionConfig(competition);\n        const active = selectedCompetition === competition;"
+          new="const config = getCompetitionConfig(competition);\n        const active = selectedCompetition === competition;\n        const label = TABLE_SELECTOR_LABELS[competition] || config.title;"
+          assert old in s, 'tables selector anchor missing'
+          s=s.replace(old,new,1)
+          old="aria-selected=\"${active ? 'true' : 'false'}\">${esc(config.title)}</button>"
+          new="aria-selected=\"${active ? 'true' : 'false'}\">${esc(label)}</button>"
+          assert old in s, 'tables selector label anchor missing'
+          s=s.replace(old,new,1)
+          old="<p>${selectedCompetition === 'coppa_italia' ? 'Сетка плей-офф' : esc(config.title)}</p>"
+          new="<p>${esc(TABLE_SECTION_TITLES[selectedCompetition] || config.title)}</p>"
+          assert old in s, 'tables heading anchor missing'
+          s=s.replace(old,new,1)
+          old='.cw233-table-selectors-viewport{width:100%;max-width:100%;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin:0 0 18px;padding:0 0 4px}'
+          new='.cw233-table-selectors-viewport{width:100%;max-width:100%;overflow-x:hidden;overflow-y:hidden;overscroll-behavior-x:none;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin:0 0 18px;padding:0 0 4px}'
+          assert old in s, 'tables viewport anchor missing'
+          s=s.replace(old,new,1)
+          old='.cw233-table-selectors{display:flex;gap:8px;min-width:max-content}'
+          new='.cw233-table-selectors{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;min-width:0;width:100%;overflow:hidden}'
+          assert old in s, 'tables selectors anchor missing'
+          s=s.replace(old,new,1)
+          old='.cw233-table-selector{min-height:42px;border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:0 14px;background:rgba(255,255,255,.055);color:rgba(255,255,255,.7);font:800 12px/1 inherit;white-space:nowrap}'
+          new='.cw233-table-selector{min-height:42px;min-width:0;width:100%;border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:0 4px;background:rgba(255,255,255,.055);color:rgba(255,255,255,.7);font:800 11px/1 inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+          assert old in s, 'tables selector css anchor missing'
+          s=s.replace(old,new,1)
+          pointer_anchor="  documentRef.addEventListener('click', event => {"
+          pointer_add="""
+  documentRef.addEventListener('pointerdown', event => {
+    const nav = event?.target?.closest?.('button[data-tab]');
+    if (nav?.dataset?.tab === 'seriea') {
+      const existing = documentRef.getElementById(OVERLAY_ID);
+      if (existing) {
+        existing.hidden = false;
+        existing.style.visibility = 'visible';
+        existing.scrollTop = 0;
+      }
+    }
+  }, true);
+"""
+          assert pointer_anchor in s, 'tables click anchor missing'
+          s=s.replace(pointer_anchor,pointer_add+'\n'+pointer_anchor,1)
+          p.write_text(s)
+
+          p=root/'round13-mobile-regressions.mjs'; s=p.read_text()
+          start="function compactTableSelectors(documentRef) {"
+          end="\n}\n\nfunction hideOverlay(documentRef, id) {"
+          assert start in s and end in s, 'round13 compact mutation block missing'
+          a=s.index(start); b=s.index(end,a)+2
+          s=s[:a]+s[b:]
+          old="function applyDom(documentRef) {\n  compactTableSelectors(documentRef);\n  void syncSerieARounds(documentRef);\n}"
+          new="function applyDom(documentRef) {\n  void syncSerieARounds(documentRef);\n}"
+          assert old in s, 'round13 applyDom anchor missing'
+          s=s.replace(old,new,1)
+          p.write_text(s)
+
+          p=root/'profile-rating-ui.mjs'; s=p.read_text()
+          s=s.replace("let cachedPoints = 0;\nlet hasLoadedPoints = false;","let cachedProfileStats = Object.freeze({ points:0, exactScores:0, correctOutcomes:0, scoredPredictions:0 });\nlet hasLoadedProfileStats = false;",1)
+          marker="function profileStatsGrid(documentRef) {"
+          mapper="""
+export function profileStatsFromRankingRow(row = null) {
+  return Object.freeze({
+    points:Number(row?.points) || 0,
+    exactScores:Number(row?.exact_scores) || 0,
+    correctOutcomes:Number(row?.correct_outcomes) || 0,
+    scoredPredictions:Number(row?.scored_predictions) || 0,
+  });
+}
+
+"""
+          assert marker in s, 'profile marker missing'
+          s=s.replace(marker,mapper+marker,1)
+          old_start="export function applyProfileRankingPoints(documentRef = globalThis.document, points = 0) {"
+          a=s.index(old_start); b=s.index("\n}\n\nfunction applyCached",a)+2
+          replacement="""export function applyProfileRankingStats(documentRef = globalThis.document, stats = null) {
+  const grid = profileStatsGrid(documentRef);
+  if (!grid) return false;
+  const normalized = profileStatsFromRankingRow(stats);
+  const values = [normalized.points, normalized.exactScores, normalized.correctOutcomes, normalized.scoredPredictions];
+  const tiles = [...(grid.querySelectorAll?.('.stat') || [])].slice(0, 4);
+  if (tiles.length < 4) return false;
+  tiles.forEach((stat, index) => {
+    const value = stat.querySelector?.('b,strong,[data-value]');
+    if (value) value.textContent = String(values[index]);
+    stat.setAttribute?.('data-cw233-profile-stat', String(index));
+  });
+  return true;
+}
+"""
+          s=s[:a]+replacement+s[b:]
+          old="function applyCached(documentRef) {\n  if (!profileActive || !hasLoadedPoints) return false;\n  return applyProfileRankingPoints(documentRef, cachedPoints);\n}"
+          new="function applyCached(documentRef) {\n  if (!profileActive || !hasLoadedProfileStats) return false;\n  return applyProfileRankingStats(documentRef, cachedProfileStats);\n}"
+          assert old in s, 'profile cache anchor missing'
+          s=s.replace(old,new,1)
+          old="    cachedPoints = Number(current?.points) || 0;\n    hasLoadedPoints = true;\n    if (profileActive) applyProfileRankingPoints(documentRef, cachedPoints);"
+          new="    cachedProfileStats = profileStatsFromRankingRow(current);\n    hasLoadedProfileStats = true;\n    if (profileActive) applyProfileRankingStats(documentRef, cachedProfileStats);"
+          assert old in s, 'profile load anchor missing'
+          s=s.replace(old,new,1)
+          old="    if (!hasLoadedPoints) {\n      cachedPoints = 0;\n      hasLoadedPoints = true;\n    }\n    if (profileActive) applyProfileRankingPoints(documentRef, cachedPoints);"
+          new="    if (!hasLoadedProfileStats) {\n      cachedProfileStats = Object.freeze({ points:0, exactScores:0, correctOutcomes:0, scoredPredictions:0 });\n      hasLoadedProfileStats = true;\n    }\n    if (profileActive) applyProfileRankingStats(documentRef, cachedProfileStats);"
+          assert old in s, 'profile fallback anchor missing'
+          s=s.replace(old,new,1)
+          p.write_text(s)
+          PY
+      - name: Commit runtime changes and remove one-shot workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add cloudflare-test/src/v23.3 .github/workflows/round16-apply.yml
+          git rm .github/workflows/round16-apply.yml
+          git commit -m 'fix: apply Round 16 navigation and profile runtime'
+          git push origin debug-v23-3-round16-nav-profile
