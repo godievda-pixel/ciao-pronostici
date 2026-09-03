@@ -19,9 +19,19 @@ const CSS = `
   #ciao-v233-tables-overlay .cw233-standing-table,
   #ciao-v233-tables-overlay .cw233-standing-table--full{min-width:0!important;width:100%!important;max-width:100%!important;table-layout:fixed!important}
   #ciao-v233-tables-overlay .cw233-standing-table th,
-  #ciao-v233-tables-overlay .cw233-standing-table td{padding-left:5px!important;padding-right:5px!important}
-  #ciao-v233-tables-overlay .cw233-standing-table th:nth-child(1),#ciao-v233-tables-overlay .cw233-standing-table td:nth-child(1){width:42px!important}
-  #ciao-v233-tables-overlay .cw233-standing-table th:nth-child(2),#ciao-v233-tables-overlay .cw233-standing-table td:nth-child(2){width:43%!important}
+  #ciao-v233-tables-overlay .cw233-standing-table td{padding-left:3px!important;padding-right:3px!important}
+  #ciao-v233-tables-overlay .cw233-standing-table th:nth-child(1),#ciao-v233-tables-overlay .cw233-standing-table td:nth-child(1){width:34px!important}
+  #ciao-v233-tables-overlay .cw233-standing-table th:nth-child(2),#ciao-v233-tables-overlay .cw233-standing-table td:nth-child(2){width:130px!important}
+  #ciao-v233-tables-overlay .cw233-standing-table th:nth-child(3),#ciao-v233-tables-overlay .cw233-standing-table td:nth-child(3),
+  #ciao-v233-tables-overlay .cw233-standing-table th:nth-child(4),#ciao-v233-tables-overlay .cw233-standing-table td:nth-child(4),
+  #ciao-v233-tables-overlay .cw233-standing-table th:nth-child(5),#ciao-v233-tables-overlay .cw233-standing-table td:nth-child(5),
+  #ciao-v233-tables-overlay .cw233-standing-table th:nth-child(6),#ciao-v233-tables-overlay .cw233-standing-table td:nth-child(6),
+  #ciao-v233-tables-overlay .cw233-standing-table th:nth-child(8),#ciao-v233-tables-overlay .cw233-standing-table td:nth-child(8),
+  #ciao-v233-tables-overlay .cw233-standing-table th:nth-child(9),#ciao-v233-tables-overlay .cw233-standing-table td:nth-child(9){width:32px!important}
+  #ciao-v233-tables-overlay .cw233-standing-table th:nth-child(7),#ciao-v233-tables-overlay .cw233-standing-table td:nth-child(7){width:42px!important}
+  #ciao-v233-tables-overlay .cw233-standing-team{gap:5px!important}
+  #ciao-v233-tables-overlay .cw233-standing-team img,#ciao-v233-tables-overlay .cw233-table-logo{width:24px!important;height:24px!important;min-width:24px!important;min-height:24px!important;flex-basis:24px!important}
+  #ciao-v233-tables-overlay .cw233-standing-team strong{font-size:10px!important}
 }
 @media(max-width:419px){
   #ciao-v233-tables-overlay .cw233-standing-table,
@@ -30,7 +40,7 @@ const CSS = `
 
 /* Reserve image geometry before crest decoding so standings do not hop vertically. */
 #ciao-v233-tables-overlay .cw233-standing-logo,
-#ciao-v233-tables-overlay .cw233-standing-team img{width:30px!important;height:30px!important;min-width:30px!important;min-height:30px!important;object-fit:contain}
+#ciao-v233-tables-overlay .cw233-standing-team img{width:30px;height:30px;min-width:30px;min-height:30px;object-fit:contain}
 `;
 
 function clean(value) { return String(value ?? '').trim(); }
