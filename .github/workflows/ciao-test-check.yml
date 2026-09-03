@@ -61,8 +61,17 @@ jobs:
         run: node scripts/probe-round5-deployment.mjs
 
       - name: Probe deployed Round 18 Match Center
-        if: github.event_name == 'push'
-        run: node scripts/probe-round18-match-center.mjs
+        shell: bash
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            if node scripts/probe-round18-match-center.mjs; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 6 ]; then
+              exit 1
+            fi
+            sleep 10
+          done
 
       - name: Upload v23.2 API contract observation
         if: github.event_name == 'push'
@@ -119,7 +128,7 @@ jobs:
           retention-days: 7
 
       - name: Upload Round 18 Match Center deployment observation
-        if: github.event_name == 'push'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ciao-v23-3-round18-match-center
