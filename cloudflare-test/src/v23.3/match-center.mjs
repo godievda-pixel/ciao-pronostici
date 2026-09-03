@@ -14,6 +14,14 @@ export function patchMatchCenterOverlay(overlay, state) {
   return Core.patchMatchCenterOverlay(overlay, state);
 }
 
+export function prepareCanonicalMatchCenterPayload(payload = {}) {
+  if (payload?.competition === 'serie_a') return payload;
+  const initialMatch = payload?.initialMatch;
+  if (!initialMatch || typeof initialMatch !== 'object' || Array.isArray(initialMatch)) return payload;
+  const { coverage: _bootstrapCoverage, ...bootstrap } = initialMatch;
+  return { ...payload, initialMatch:bootstrap };
+}
+
 let routedApi = null;
 let actionDocument = null;
 
@@ -50,11 +58,11 @@ function installActionRouter(documentRef, api) {
     if (kind === 'retry') {
       const state = api.getState?.() || {};
       if (!state?.competition || !state?.matchId) return;
-      void api.openCanonicalMatchCenter?.({
+      void api.openCanonicalMatchCenter?.(prepareCanonicalMatchCenterPayload({
         competition:state.competition,
         matchId:state.matchId,
         initialMatch:state.match || null,
-      });
+      }));
     }
   }, true);
 }
@@ -73,5 +81,5 @@ export function installCanonicalMatchCenter(
 export function openCanonicalMatchCenter(payload) {
   if (!routedApi && typeof document !== 'undefined') installCanonicalMatchCenter(document);
   if (!routedApi) throw new Error('Match Center UI is not installed');
-  return routedApi.openCanonicalMatchCenter(payload);
+  return routedApi.openCanonicalMatchCenter(prepareCanonicalMatchCenterPayload(payload));
 }
