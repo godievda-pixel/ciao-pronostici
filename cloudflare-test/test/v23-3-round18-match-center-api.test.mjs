@@ -77,7 +77,7 @@ test('Round 18 Match Center base endpoint returns lightweight base plus explicit
   }
 });
 
-test('Round 18 Match Center section endpoint returns exactly one canonical section with coverage', async () => {
+test('Round 18 Match Center section endpoint returns exactly one canonical section with full coverage', async () => {
   const mock = installBsdFetch(richEvent());
   try {
     const response = await worker.fetch(request('competition=ucl&match_id=ucl%3A77&section=stats'), { BSD_API_KEY:'test' }, {});
@@ -87,7 +87,15 @@ test('Round 18 Match Center section endpoint returns exactly one canonical secti
     assert.equal(payload.data.competition, 'ucl');
     assert.equal(payload.data.matchId, 'ucl:77');
     assert.equal(payload.data.section, 'stats');
-    assert.equal(payload.data.coverage.stats, true);
+    assert.deepEqual(payload.data.coverage, {
+      overview:true,
+      stats:true,
+      events:true,
+      lineups:true,
+      players:true,
+      momentum:false,
+      shotmap:false,
+    });
     assert.equal(payload.data.data.home.xg, 1.42);
     assert.equal(payload.data.data.away.shotsOnTarget, 3);
     assert.equal('events' in payload.data, false);
