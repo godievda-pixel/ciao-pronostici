@@ -163,14 +163,6 @@ async function syncSerieARounds(documentRef, attempt = 0) {
   renderSerieARounds(shell, schedule);
 }
 
-function compactTableSelectors(documentRef) {
-  for (const button of documentRef.querySelectorAll?.('#ciao-v233-tables-overlay .cw233-table-selector') || []) {
-    const competition = button.dataset?.cw233TablesCompetition || button.dataset?.cw233TableSelect;
-    const label = compactTableLabel(competition);
-    if (label && button.textContent !== label) button.textContent = label;
-  }
-}
-
 function hideOverlay(documentRef, id) {
   const overlay = documentRef.getElementById?.(id);
   if (!overlay) return;
@@ -187,7 +179,6 @@ function handleBottomNavPointerdown(event, documentRef) {
 }
 
 function applyDom(documentRef) {
-  compactTableSelectors(documentRef);
   void syncSerieARounds(documentRef);
 }
 
