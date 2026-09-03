@@ -266,9 +266,12 @@ test('canonical match links resolve external schedule and profile cards to compe
   if (profileResolved?.initialMatch) assert.equal(profileResolved.initialMatch.matchId, 'uel:2002');
 });
 
-test('Serie A canonical Match Center delegates to the existing stable openMatchCenter bridge', () => {
+test('Serie A legacy openMatchCenter bridge now routes into the canonical v23.3 Match Center', () => {
   const patched = applyHomeV233SourcePatch('predict = __cw231HomeHtml;');
-  assert.match(patched, /ciao-v233-open-serie-a-match/);
-  assert.match(patched, /openMatchCenter/);
-  assert.match(patched, /legacyId/);
+  assert.match(patched, /__cw233LegacyOpenMatchCenter/);
+  assert.match(patched, /CiaoV233MatchCenter/);
+  assert.match(patched, /openCanonicalMatchCenter/);
+  assert.match(patched, /competition:\s*['"]serie_a['"]/);
+  assert.match(patched, /serie_a:\$\{legacyId\}/);
+  assert.doesNotMatch(patched, /ciao-v233-open-serie-a-match/);
 });
