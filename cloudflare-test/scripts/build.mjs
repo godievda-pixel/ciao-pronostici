@@ -67,10 +67,13 @@ export function applyFavoriteHtmlSourcePatch(input) {
   const favoriteId = Number(favoriteTeam?.id) || 0;
   const favoriteName = String(favoriteTeam?.name || '').trim().toLowerCase();
   const now = Date.now() - 120000;
+  const homeState = globalThis.CiaoV233Home?.state?.() || null;
+  const currentMatches = homeState?.hydrated && Array.isArray(homeState?.matches)
+    ? homeState.matches
+    : [];
 
-  const match = __cw231RawScheduleMatches()
-    .map(CiaoV23Today.normalizeMatch)
-    .filter(item => item.matchId && Date.parse(item.kickoffAt) >= now)
+  const match = currentMatches
+    .filter(item => item?.matchId && Date.parse(item?.kickoffAt || '') >= now)
     .filter(item => {
       const homeId = Number(item.homeTeam?.id) || 0;
       const awayId = Number(item.awayTeam?.id) || 0;
