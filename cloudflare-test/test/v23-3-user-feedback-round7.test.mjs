@@ -187,3 +187,8 @@ test('round7 mobile standings keep every stat visible through a horizontal viewp
   assert.match(source, /nth-child\(4\)[^}]*display:table-cell!important/);
   assert.match(source, /nth-child\(7\)[^}]*display:table-cell!important/);
 });
+
+test('round7 keeps the bottom navigation above every full-height overlay', async () => {
+  const source = await readFile(new URL('../src/v23.3/round7-regression-fixes.mjs', import.meta.url), 'utf8');
+  assert.match(source, /#ciao-miniapp-root\s+\.nav\{[^}]*z-index:(?:[6-9]\d|\d{3,})!important/);
+});
