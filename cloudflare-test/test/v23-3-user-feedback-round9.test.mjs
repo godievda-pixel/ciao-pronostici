@@ -39,22 +39,15 @@ test('BSD adapter drops provider round 636 qualification fixtures before the Mat
   assert.equal(rows[0].round, 6);
 });
 
-test('UEFA tabs make the selected last round visible instead of leaving it off-screen', async () => {
+test('Round 9 no longer owns UEFA scrolling or removes the Favorite Club nearest-match card', async () => {
   const source = await readFile(new URL('../src/v23.3/round9-regression-fixes.mjs', import.meta.url), 'utf8');
-  assert.match(source, /scrollIntoView/);
-  assert.match(source, /aria-selected=["']true["']/);
-  assert.match(source, /scroll-padding-inline/);
+  assert.doesNotMatch(source, /scrollIntoView/);
+  assert.doesNotMatch(source, /pruneFavoriteNearest/);
+  assert.doesNotMatch(source, /nth-child\(2\).*display:none/s);
+  assert.match(source, /Round 10/);
 });
 
-test('favorite club legacy nearest-match mini-card is removed, not merely rebound to new data', async () => {
-  const source = await readFile(new URL('../src/v23.3/round9-regression-fixes.mjs', import.meta.url), 'utf8');
-  assert.match(source, /Ближайший матч/);
-  assert.match(source, /remove\(\)/);
-  assert.match(source, /cw211-favorite-body/);
-  assert.match(source, /nth-child\(2\).*display:none/s);
-});
-
-test('Serie A legacy screen gets the same compact tournament header as other competitions and hides the old Ciao hero', async () => {
+test('Serie A legacy screen keeps the compact tournament header and hides the old Ciao hero', async () => {
   const source = await readFile(new URL('../src/v23.3/round9-regression-fixes.mjs', import.meta.url), 'utf8');
   assert.match(source, /cw233-serie-a-competition-head/);
   assert.match(source, />Матчи</);
@@ -64,17 +57,7 @@ test('Serie A legacy screen gets the same compact tournament header as other com
   assert.match(source, /legacy-hero/);
 });
 
-test('Tables Round 9 premium layer is explicitly tournament-aware and keeps real crest images preferred over initials', async () => {
-  const source = await readFile(new URL('../src/v23.3/round9-regression-fixes.mjs', import.meta.url), 'utf8');
-  assert.match(source, /data-cw233-theme=['"]serie-a['"]/);
-  assert.match(source, /data-cw233-theme=['"]champions['"]/);
-  assert.match(source, /data-cw233-theme=['"]europa['"]/);
-  assert.match(source, /data-cw233-theme=['"]conference['"]/);
-  assert.match(source, /cw233-table-logo/);
-  assert.match(source, /crestUrl|logo_url|logoUrl/);
-});
-
-test('Round 9 runtime is enabled from the v23.3 entry point', async () => {
+test('Round 9 runtime remains enabled as the Serie A legacy-header bridge', async () => {
   const source = await readFile(new URL('../src/v23.3/index.mjs', import.meta.url), 'utf8');
   assert.match(source, /round9-regression-fixes\.mjs/);
   assert.match(source, /round9RegressionFixes:\s*'enabled'/);
