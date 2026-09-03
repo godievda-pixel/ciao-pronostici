@@ -1,3 +1,7 @@
+const EVENT_STYLE = `<style data-cw233-mc-events-parity-style>
+.cw233-mc-events{display:grid;gap:9px}.cw233-mc-events-timeline{display:grid;gap:0;padding:3px 13px;border:1px solid var(--mc-border);border-radius:17px;background:rgba(255,255,255,.025)}.cw233-mc-event{display:grid;grid-template-columns:42px 22px minmax(0,1fr);align-items:start;gap:8px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.06)}.cw233-mc-event:last-child{border-bottom:0}.cw233-mc-event-minute{padding-top:2px;font-size:10px;font-weight:850;color:var(--mc-muted)}.cw233-mc-event-icon{display:grid;place-items:center;min-width:22px;height:22px;border-radius:7px;background:rgba(255,255,255,.055);font-size:10px;font-weight:900;color:var(--mc-text)}.cw233-mc-event.is-home .cw233-mc-event-icon{color:color-mix(in srgb,var(--mc-accent) 62%,#fff)}.cw233-mc-event.is-away .cw233-mc-event-icon{color:color-mix(in srgb,var(--mc-accent-2) 62%,#fff)}.cw233-mc-event-text{min-width:0;font-size:10px;line-height:1.35;color:var(--mc-text)}.cw233-mc-event-text small{display:block;margin-bottom:2px;font-size:8px;font-weight:800;color:var(--mc-muted)}.cw233-mc-event-text strong{display:block;font-size:10px;font-weight:850}.cw233-mc-event-text strong em{margin-left:7px;font-style:normal;color:var(--mc-muted)}.cw233-mc-event-text span{display:block;margin-top:2px;font-size:9px;color:var(--mc-muted)}.cw233-mc-events-empty{padding:24px 12px;text-align:center;font-size:10px;color:var(--mc-muted)}
+</style>`;
+
 function esc(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -24,13 +28,13 @@ function sortEvents(events) {
   return (Array.isArray(events) ? events : [])
     .map((event, index) => ({ event:event && typeof event === 'object' ? event : {}, index }))
     .sort((a, b) => {
-      const minuteA = finite(a.event.minute) ?? Number.MAX_SAFE_INTEGER;
-      const minuteB = finite(b.event.minute) ?? Number.MAX_SAFE_INTEGER;
-      if (minuteA !== minuteB) return minuteA - minuteB;
+      const minuteA = finite(a.event.minute) ?? -1;
+      const minuteB = finite(b.event.minute) ?? -1;
+      if (minuteA !== minuteB) return minuteB - minuteA;
       const addedA = finite(a.event.addedTime ?? a.event.added_time) ?? 0;
       const addedB = finite(b.event.addedTime ?? b.event.added_time) ?? 0;
-      if (addedA !== addedB) return addedA - addedB;
-      return a.index - b.index;
+      if (addedA !== addedB) return addedB - addedA;
+      return b.index - a.index;
     })
     .map(item => item.event);
 }
@@ -92,9 +96,9 @@ function renderEvent(event) {
   const sideClass = side === 'home' ? 'is-home' : side === 'away' ? 'is-away' : 'is-neutral';
   const clock = eventClock(event);
   return `<article class="cw233-mc-event ${sideClass}" data-cw233-mc-event="${esc(type)}">
-    <time>${esc(clock)}</time>
+    <time class="cw233-mc-event-minute">${esc(clock)}</time>
     <span class="cw233-mc-event-icon" aria-hidden="true">${esc(eventIcon(type))}</span>
-    <div class="cw233-mc-event-copy"><small>${esc(typeLabel(type))}</small>${eventBody(event, type)}</div>
+    <div class="cw233-mc-event-text"><small>${esc(typeLabel(type))}</small>${eventBody(event, type)}</div>
   </article>`;
 }
 
@@ -106,8 +110,8 @@ export function renderMatchCenterEvents(section = [], context = {}) {
     ? events.map(renderEvent).join('')
     : '<div class="cw233-mc-events-empty">Событий матча пока нет.</div>';
 
-  return `<section class="cw233-mc-events" data-cw233-mc-events>
-    <header class="cw233-mc-section-heading"><span>${esc(homeName)}</span><b>Хронология</b><span>${esc(awayName)}</span></header>
+  return `${EVENT_STYLE}<section class="cw233-mc-events" data-cw233-mc-events>
+    <header class="cw233-mc-section-heading"><span>${esc(homeName)}</span><b>События</b><span>${esc(awayName)}</span></header>
     <div class="cw233-mc-events-timeline">${content}</div>
   </section>`;
 }
