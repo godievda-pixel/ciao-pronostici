@@ -94,6 +94,28 @@ test('Round 18 BSD adapter maps rich details into canonical sections', () => {
   assert.deepEqual(result.overview.shotmap, detailedEvent.shotmap);
 });
 
+test('Round 18 BSD adapter preserves nested overview_meta snake-case aliases', () => {
+  const event = {
+    overview_meta:{
+      venue:{ name:'Olimpico', city:'Roma' },
+      prediction:{ home_score:2, away_score:1 },
+      prediction_split:{ home:52, draw:28, away:20 },
+      momentum:[{ minute:25, home:57, away:43 }],
+      shot_map:[{ side:'home', x:67, y:42, xg:0.23 }],
+    },
+  };
+  const result = adaptBsdMatchCenterSections(event);
+
+  assert.equal(result.coverage.overview, true);
+  assert.equal(result.coverage.momentum, true);
+  assert.equal(result.coverage.shotmap, true);
+  assert.equal(result.overview.venue.name, 'Olimpico');
+  assert.equal(result.overview.prediction.home_score, 2);
+  assert.equal(result.overview.predictionSplit.home, 52);
+  assert.deepEqual(result.overview.momentum, event.overview_meta.momentum);
+  assert.deepEqual(result.overview.shotmap, event.overview_meta.shot_map);
+});
+
 test('Round 18 BSD adapter does not fabricate missing sections', () => {
   const result = adaptBsdMatchCenterSections({ venue:{ name:'Olimpico' } });
   assert.deepEqual(result.coverage, {
@@ -162,7 +184,7 @@ test('Round 18 BSD provider returns a canonical base with explicit coverage', as
   assert.equal(base.coverage.players, true);
 });
 
-test('Round 18 BSD provider returns one requested canonical section', async () => {
+test('Round 18 BSD provider returns one requested canonical section with full coverage', async () => {
   const stats = await fetchBsdMatchCenterSection({
     competition:'ucl',
     matchId:'ucl:77',
@@ -174,6 +196,15 @@ test('Round 18 BSD provider returns one requested canonical section', async () =
   assert.equal(stats.available, true);
   assert.equal(stats.data.home.xg, 1.42);
   assert.equal(stats.data.away.shotsOnTarget, 3);
+  assert.deepEqual(stats.coverage, {
+    overview:true,
+    stats:true,
+    events:true,
+    lineups:true,
+    players:true,
+    momentum:true,
+    shotmap:true,
+  });
 });
 
 test('Round 18 BSD provider keeps Italian eligibility on section fetches', async () => {
