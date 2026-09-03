@@ -133,18 +133,9 @@ function decorateMatchPanels(root) {
   for (const card of competition.querySelectorAll?.('.cw232-match-card') || []) decorateMatchCard(card);
 }
 
-function decorateTables(root) {
-  const hub = root.querySelector?.('#ciao-v233-tables-overlay .cw233-tables-hub');
-  if (!hub) return;
-  const competition = String(hub.dataset?.cw233TablesSelected || 'serie_a');
-  const theme = round8ThemeForCompetition(competition);
-  if (hub.dataset?.cw233Theme !== theme) hub.dataset.cw233Theme = theme;
-}
-
 export function applyRound8PremiumDom(root = globalThis.document) {
   if (!root?.querySelector) return false;
   decorateMatchPanels(root);
-  decorateTables(root);
   return true;
 }
 
@@ -173,7 +164,7 @@ export function installRound8PerformancePremium(documentRef = globalThis.documen
   const observer = typeof MutationObserver === 'function'
     ? new MutationObserver(refresh)
     : null;
-  observer?.observe?.(documentRef.body || documentRef.documentElement, { childList:true, subtree:true, attributes:true, attributeFilter:['hidden','aria-selected','data-cw233-tables-selected'] });
+  observer?.observe?.(documentRef.body || documentRef.documentElement, { childList:true, subtree:true, attributes:true, attributeFilter:['hidden','aria-selected'] });
   return Object.freeze({ refresh, disconnect:() => observer?.disconnect?.() });
 }
 
