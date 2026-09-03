@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import * as BsdAdapter from '../src/v23.3/bsd-match-center-adapter.mjs';
+import * as BsdAdapter from '../src/v23.3/bsd-serie-a-legacy-adapter.mjs';
+import { loadExternalLegacyMatchCenter } from '../src/v23.3/match-center.mjs';
 import { applyHomeV233SourcePatch } from '../scripts/home-v23-3-source-patch.mjs';
 
 const base = Object.freeze({
@@ -43,8 +44,6 @@ const sections = Object.freeze({
 
 test('Round 19 external Match Center exposes a Serie A legacy-compatible data adapter', () => {
   assert.equal(typeof BsdAdapter.toSerieALegacyMatchCenterData, 'function');
-  if (typeof BsdAdapter.toSerieALegacyMatchCenterData !== 'function') return;
-
   const legacy = BsdAdapter.toSerieALegacyMatchCenterData(base, sections);
   assert.equal(legacy.status, 'finished');
   assert.equal(legacy.match.home.name, 'Палермо');
@@ -66,6 +65,21 @@ test('Round 19 external Match Center exposes a Serie A legacy-compatible data ad
   assert.equal(legacy.player_stats.player_stats[0].minutes_played, 90);
 });
 
+test('Round 19 loader fetches all canonical sections then returns one legacy snapshot', async () => {
+  const seen = [];
+  const legacy = await loadExternalLegacyMatchCenter('coppa_italia', 'coppa_italia:600982', {
+    loadBase:async () => ({ match:base }),
+    loadSection:async (_competition, _matchId, section) => {
+      seen.push(section);
+      return { data:sections[section] };
+    },
+  });
+  assert.deepEqual(seen.sort(), ['events','lineups','overview','players','stats']);
+  assert.equal(legacy.match.home_score, 5);
+  assert.equal(legacy.stats.momentum.length, 2);
+  assert.equal(legacy.incidents.incidents.length, 1);
+});
+
 test('Round 19 build patch installs an external event bridge into the real legacy renderer', () => {
   const fixture = `
 const __cw231HomeHtml = () => '';
@@ -82,9 +96,24 @@ predict = __cw231HomeHtml;
   assert.match(patched, /matchCenterHtml\(matchData\)/);
   assert.match(patched, /bindMatchCenter\(\)/);
   assert.match(patched, /__cw233ExternalMatchContext/);
+  assert.match(patched, /textContent = 'Статы'/);
+});
+
+test('Round 19 production-shaped source patch owns external refresh and close lifecycle', () => {
+  const fixture = `
+const __cw231HomeHtml = () => '';
+let predict;
+function closeMatchCenter(){matchViewId=null;matchData=null;matchCenterTab='overview';root.classList.remove('match-center-open');tab=matchReturnTab;render()}
+async function refreshMatchCenter(){if(!matchViewId||matchLoading||document.hidden||String(matchData?.status??'').toLowerCase()==='finished')return;try{const next=await matchApi(matchViewId);patchMatchCenter(next)}catch(e){}}
+predict = __cw231HomeHtml;
+`;
+  const patched = applyHomeV233SourcePatch(fixture);
+  assert.match(patched, /function closeMatchCenter\(\)\{__cw233ExternalMatchContext=null;/);
+  assert.match(patched, /CiaoV233ExternalLegacyMatchCenter\?\.refresh/);
 });
 
 test('Round 19 wrapper must not suppress core click listeners', async () => {
   const source = await readFile(new URL('../src/v23.3/match-center.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /if \(type === 'click'\) return undefined/);
+  assert.match(source, /Core\.installCanonicalMatchCenter\(documentRef, options\)/);
 });
