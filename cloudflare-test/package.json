@@ -5,6 +5,7 @@
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "build": "node scripts/build.mjs",
+    "postbuild": "node scripts/deploy-round18-test.mjs",
     "inspect:api-contract": "node scripts/inspect-api-contract.mjs",
     "smoke:predictions": "node scripts/smoke-prediction-backend.mjs",
     "probe:predictions": "node scripts/probe-prediction-contract.mjs",
