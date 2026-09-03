@@ -1,93 +1,43 @@
 # Round 13 Prediction Rounds, Loading and Transitions Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Fix the five mobile regressions from the latest TEST screenshots: Serie A round navigation, duplicate UEFA locks, fake ranking participant during loading, one-frame Matches overlay transition artifact, and cropped tournament tabs in Tables.
+**Goal:** Fix the five mobile regressions from the latest TEST screenshots: Serie A round navigation, duplicate UEFA locks, fake ranking participant during loading, one-frame Matches transition artifact, and cropped tournament tabs in Tables.
 
-**Architecture:** Keep the existing v23.3 architecture. Fix data at the canonical prediction source so Serie A exposes the full schedule, reuse the existing round-navigation model for Serie A, keep one lock affordance per future round, make Ranking loading neutral until identity/ranking data is available, make Matches overlay transitions synchronous/opaque, and shorten only the Tables tournament labels while preserving full tournament titles elsewhere.
+**Implemented architecture:** Keep the existing v23.3 prediction backend authoritative. Do not change scoring, save, deadline, reconciliation, or existing UEFA server gates. A small Round 13 browser compatibility layer reads the already-available full Serie A calendar from `/api/v23.2/matches?competition=serie_a` only to render current/future round navigation; actual prediction cards and writes continue to come from the existing v23.3 prediction service. The same layer suppresses the duplicate CSS lock glyph, provides a neutral Ranking loading shell, synchronously hides stale Matches/Match Center overlays on bottom-nav pointerdown, and compacts only the Tables tournament labels.
 
-**Tech Stack:** JavaScript ES modules, Node test runner, Cloudflare Worker/Durable Objects, existing v23.2/v23.3 DOM runtimes.
+**Tech Stack:** JavaScript ES modules, Node test runner, Cloudflare Worker static assets, existing v23.2/v23.3 runtimes.
 
-**Spec:** User screenshots and requirements from 2026-09-03 Round 13.
+## Constraints
 
-## Global Constraints
-
-- TEST/develop only; do not touch `main` or Production.
+- TEST/develop only; `main` and Production untouched.
 - Preserve existing UEFA sequential round lock backend enforcement.
-- Preserve current Serie A crest enrichment and canonical match IDs.
+- Preserve Serie A canonical match IDs, crest enrichment, scoring and save path.
 - Preserve bottom navigation and TEST reset guards.
-- Use TDD: every production change requires a failing regression test first.
+- TDD: RED regressions first, then GREEN implementation.
 
----
+## Implemented tasks
 
-### Task 1: Serie A exposes round navigation and future rounds
+- [x] Add `round13-mobile-regressions.mjs` and load it from the unified v23.3 entry point.
+- [x] Build Serie A round navigation from the full v23.2 calendar with current round active and future rounds disabled/locked.
+- [x] Reserve Serie A round-nav geometry while calendar data arrives to avoid layout shift.
+- [x] Remove the CSS-generated second lock icon; keep one inline accessible `🔒` only.
+- [x] Add a neutral Ranking loading overlay containing skeleton geometry only — no fake participant, place or points.
+- [x] Hide stale Matches and Match Center overlays synchronously on bottom-nav pointerdown to prevent one-frame transition flashes.
+- [x] Keep Matches overlay background explicitly opaque during the legacy deferred controller transition.
+- [x] Shorten Tables selector labels to `Серия А`, `ЛЧ`, `ЛЕ`, `ЛК` while leaving full tournament titles in content/header views.
+- [x] Remove unnecessary Serie A round `scrollIntoView` so the new round strip cannot create an iPhone micro-jump.
+- [x] Add `v23-3-user-feedback-round13.test.mjs` covering the new compatibility layer.
 
-**Files:**
-- Modify: `cloudflare-test/src/v23.3/prediction-match-resolver.mjs`
-- Modify: `cloudflare-test/src/v23.3/prediction-service.mjs`
-- Modify: `cloudflare-test/src/v23.3/predictions-ui.mjs`
-- Test: `cloudflare-test/test/v23-3-user-feedback-round13.test.mjs`
+## Verification gate
 
-- [ ] Write tests proving full Serie A schedule survives state enrichment and that round tabs are rendered for Serie A.
-- [ ] Verify RED.
-- [ ] Merge stable selected-round data into the full schedule instead of discarding all other rounds.
-- [ ] Extend sequential round gate/navigation to Serie A while keeping existing UEFA behavior.
-- [ ] Verify targeted tests GREEN.
+Before merging to `develop`:
 
-### Task 2: One lock icon per future round
-
-**Files:**
-- Modify: `cloudflare-test/src/v23.3/predictions-ui.mjs`
-- Modify: `cloudflare-test/src/v23.3/round11-performance-themes.mjs`
-- Test: `cloudflare-test/test/v23-3-user-feedback-round13.test.mjs`
-
-- [ ] Write a regression test that fails while both inline `🔒` and CSS `::after` are present.
-- [ ] Verify RED.
-- [ ] Keep the lock in markup and remove the duplicate CSS-generated glyph.
-- [ ] Verify GREEN.
-
-### Task 3: Neutral Ranking loading screen
-
-**Files:**
-- Modify: `cloudflare-test/src/v23.3/ranking-ui.mjs`
-- Test: `cloudflare-test/test/v23-3-user-feedback-round13.test.mjs`
-
-- [ ] Write test proving first uncached load does not render the real participant hero with `me = null`.
-- [ ] Verify RED.
-- [ ] Add a neutral fixed-geometry loading hero/shell and swap to the participant hero only after cached or fetched ranking data exists.
-- [ ] Verify GREEN.
-
-### Task 4: Remove one-frame Matches transition artifact
-
-**Files:**
-- Modify: `cloudflare-test/src/v23.2/matches-ui.mjs`
-- Modify: `cloudflare-test/src/v23.3/match-center.mjs`
-- Test: `cloudflare-test/test/v23-3-user-feedback-round13.test.mjs`
-
-- [ ] Write tests proving nav transitions are not deferred and Match Center `open()` does not call `scrollTo(0,0)`.
-- [ ] Verify RED.
-- [ ] Make nav overlay state synchronous and keep the overlay background explicitly opaque during hub/competition swaps.
-- [ ] Remove forced Match Center scroll reset; preserve stable frame patching from Round 12.
-- [ ] Verify GREEN.
-
-### Task 5: Compact Tables tournament tabs
-
-**Files:**
-- Modify: `cloudflare-test/src/v23.3/tables-ui.mjs`
-- Test: `cloudflare-test/test/v23-3-user-feedback-round13.test.mjs`
-
-- [ ] Write render test proving table selector labels are `Серия А`, `ЛЧ`, `ЛЕ`, `ЛК`.
-- [ ] Verify RED.
-- [ ] Add table-specific short labels while preserving full competition titles in table content/header.
-- [ ] Verify GREEN.
-
-### Task 6: Full verification and TEST deployment
-
-- [ ] Run targeted Round 13 tests.
-- [ ] Run full `npm test`.
-- [ ] Run `npm run build`.
-- [ ] Run `npx wrangler deploy --dry-run`.
-- [ ] Run API/prediction/reset/BSD contracts.
-- [ ] Review diff for TEST-only scope.
-- [ ] Merge only to `develop` after GREEN.
-- [ ] Verify post-merge GitHub CI and live TEST probe.
+- [x] Full `npm test` on the exact implementation head.
+- [x] `npm run build`.
+- [x] `npx wrangler deploy --dry-run`.
+- [x] API / prediction / reset / BSD contract checks.
+- [ ] Cloudflare Git Integration deployment for the final documentation-adjusted head.
+- [ ] Final TEST-only diff review.
+- [ ] Merge only to `develop`.
+- [ ] Post-merge push CI and deployed TEST probe.
