@@ -152,7 +152,6 @@ function renderSerieARounds(shell, schedule) {
   shell.innerHTML = `<div class="cw233-pred-nav" role="tablist" aria-label="Туры Серии А">${model.map(item => (
     `<button type="button" aria-selected="${item.active}"${item.locked ? ' data-cw233-pred-locked="true" disabled aria-disabled="true"' : ''}>${item.label}</button>`
   )).join('')}</div>`;
-  shell.querySelector?.('[aria-selected="true"]')?.scrollIntoView?.({ block:'nearest', inline:'nearest' });
 }
 
 function scheduleSerieARetry(documentRef, attempt = 0) {
