@@ -27,15 +27,15 @@ test('Serie A round navigation uses the full schedule and locks every future rou
 
 test('Round 13 removes the CSS-generated second lock and keeps the markup lock only', async () => {
   const source = await readFile(new URL('../src/v23.3/round13-mobile-regressions.mjs', import.meta.url), 'utf8');
-  assert.match(source, /data-cw233-pred-locked=['"]true['"]::after/);
+  assert.match(source, /data-cw233-pred-locked=['"]true['"]\]::after/);
   assert.match(source, /content:none!important/);
   assert.doesNotMatch(source, /content:\s*['"]\s*🔒['"]/);
 });
 
 test('Ranking loading overlay is neutral and never contains a fake participant identity', async () => {
   const source = await readFile(new URL('../src/v23.3/round13-mobile-regressions.mjs', import.meta.url), 'utf8');
-  assert.match(source, /cw233-round13-ranking-loading/);
-  assert.match(source, /data-tab=['"]table['"]/);
+  assert.match(source, /ciao-v233-round13-ranking-loading/);
+  assert.match(source, /tab === 'table'/);
   const start = source.indexOf('function rankingLoadingHtml');
   const end = source.indexOf('\n}', start) + 2;
   const loading = source.slice(start, end);
