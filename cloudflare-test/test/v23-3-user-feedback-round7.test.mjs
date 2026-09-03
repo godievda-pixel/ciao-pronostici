@@ -179,3 +179,11 @@ test('round7 compatibility layer paints custom overlays through the bottom navig
   assert.match(source, /inset:0!important/);
   assert.match(source, /padding-bottom:calc\(104px \+ env\(safe-area-inset-bottom/);
 });
+
+test('round7 mobile standings keep every stat visible through a horizontal viewport instead of hiding columns', async () => {
+  const source = await readFile(new URL('../src/v23.3/round7-regression-fixes.mjs', import.meta.url), 'utf8');
+  assert.match(source, /cw233-standing-viewport[^}]*overflow-x:auto!important/);
+  assert.match(source, /cw233-standing-table[^}]*min-width:(?:6|7)\d\dpx!important/);
+  assert.match(source, /nth-child\(4\)[^}]*display:table-cell!important/);
+  assert.match(source, /nth-child\(7\)[^}]*display:table-cell!important/);
+});
