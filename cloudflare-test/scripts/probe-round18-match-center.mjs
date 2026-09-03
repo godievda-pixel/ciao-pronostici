@@ -33,7 +33,7 @@ const SECTION_MARKERS = Object.freeze([
 ]);
 
 export const ROUND18_DEPLOYMENT_MARKER = 'serie_a_legacy_parity_gate';
-export const ROUND18_BUILD_MARKER = 'round18-match-center-parity-r1';
+export const ROUND18_BUILD_MARKER = 'round18-match-center-parity-r2';
 
 function sourceText(value) {
   return String(value ?? '');
