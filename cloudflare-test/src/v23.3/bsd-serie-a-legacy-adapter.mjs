@@ -76,12 +76,17 @@ function legacyShotmap(shots) {
   }).filter(Boolean);
 }
 
+function named(value) {
+  const name = String(value || '').trim();
+  return name ? Object.freeze({ name }) : null;
+}
+
 function legacyIncident(item = {}) {
   const side = String(item?.side || '').toLowerCase();
   const player = String(item?.player || item?.player_name || '');
   const assist = String(item?.assist || item?.assist_name || '');
-  const playerIn = String(item?.playerIn || item?.player_in || item?.player_in_name || '');
-  const playerOut = String(item?.playerOut || item?.player_out || item?.player_out_name || '');
+  const playerIn = String(item?.playerIn || item?.player_in?.name || item?.player_in || item?.player_in_name || '');
+  const playerOut = String(item?.playerOut || item?.player_out?.name || item?.player_out || item?.player_out_name || '');
   return Object.freeze({
     type:String(item?.type || ''),
     minute:finite(item?.minute),
@@ -89,14 +94,14 @@ function legacyIncident(item = {}) {
     is_home:side === 'away' ? false : side === 'home' ? true : null,
     side,
     player_name:player,
-    player,
+    player:named(player),
     assist_name:assist,
-    assist,
+    assist:named(assist),
     reason:String(item?.reason || ''),
     player_in_name:playerIn,
     player_out_name:playerOut,
-    player_in:playerIn,
-    player_out:playerOut,
+    player_in:named(playerIn),
+    player_out:named(playerOut),
     home_score:finite(item?.homeScore ?? item?.home_score),
     away_score:finite(item?.awayScore ?? item?.away_score),
     text:String(item?.text || ''),
