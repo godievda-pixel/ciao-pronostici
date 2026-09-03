@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { adaptSerieALegacyMatchCenter } from '../src/v23.3/serie-a-match-center-adapter.mjs';
 import { evaluateSerieAParity } from '../src/v23.3/match-center-parity.mjs';
+import { readSerieALegacyMatchCenterData } from '../src/v23.3/serie-a-legacy-bridge.mjs';
 
 function richLegacyFixture() {
   return {
@@ -96,6 +97,21 @@ test('Round 18 adapts a rich Serie A legacy fixture into every canonical Match C
   assert.equal(canonical.lineups.home.formation, '3-5-2');
   assert.equal(canonical.players[0].rating, 8.4);
   assert.equal(canonical.players[0].keyPasses, 3);
+});
+
+test('Round 18 legacy bridge reads Match Center blocks without mutating or switching routing', () => {
+  const fixture = richLegacyFixture();
+  const wrapped = { data:{ match_center:fixture } };
+  const read = readSerieALegacyMatchCenterData(wrapped);
+
+  assert.equal(read.match, fixture.match);
+  assert.equal(read.overview_meta, fixture.overview_meta);
+  assert.equal(read.stats, fixture.stats);
+  assert.equal(read.incidents, fixture.incidents);
+  assert.equal(read.lineups, fixture.lineups);
+  assert.equal(read.player_stats, fixture.player_stats);
+  assert.equal(read.capabilities, fixture.capabilities);
+  assert.equal(Object.isFrozen(read), true);
 });
 
 test('Round 18 Serie A parity gate explicitly covers every legacy capability', () => {
