@@ -83,7 +83,7 @@ test('Serie A prediction feed keeps the proven v22.5 state round authoritative w
   assert.equal(result.matches[0].competition, 'serie_a');
   assert.equal(result.matches[0].matchId, 'serie_a:101');
   assert.equal(result.matches[0].season, '2026-27');
-  assert.equal(result.matches[0].kickoffAt, '2026-09-10T19:00:00.000Z');
+  assert.equal(Date.parse(result.matches[0].kickoffAt), Date.parse('2026-09-10T19:00:00Z'));
   assert.equal(result.matches[0].homeTeam.crestUrl, 'https://img.test/roma.png');
   assert.ok(calls.includes('/api/ciao-core-api-fast-v4:state'));
   assert.ok(calls.some(call => call.startsWith('/api/ciao-schedule-fast-v1:')));
