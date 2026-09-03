@@ -177,6 +177,7 @@ const MATCHES_CSS = `
 
 function ensureStyles(documentRef) { if (documentRef.getElementById(STYLE_ID)) return; const style = documentRef.createElement('style'); style.id = STYLE_ID; style.textContent = MATCHES_CSS; documentRef.head?.appendChild?.(style); }
 function ensureOverlay(documentRef) { let overlay = documentRef.getElementById(OVERLAY_ID); if (overlay) return overlay; overlay = documentRef.createElement('div'); overlay.id = OVERLAY_ID; overlay.className = 'cw232-matches-overlay'; overlay.hidden = true; overlay.setAttribute?.('aria-live', 'polite'); const mount = documentRef.getElementById('ciao-miniapp-root') || documentRef.body; mount?.appendChild?.(overlay); return overlay; }
+function clearMatchesAmbientTheme(overlay) { if (!overlay?.dataset) return; delete overlay.dataset.cw233Round10Theme; overlay.removeAttribute?.('data-cw233-round10-theme'); }
 function switchCoppaView(overlay, view) { if (!overlay?.querySelectorAll || !['matches','bracket'].includes(view)) return; for (const tab of overlay.querySelectorAll('[data-cw232-coppa-view]')) { const active = tab.dataset?.cw232CoppaView === view; tab.classList?.toggle?.('is-active', active); tab.setAttribute?.('aria-selected', active ? 'true' : 'false'); } for (const panel of overlay.querySelectorAll('[data-cw232-coppa-panel]')) panel.hidden = panel.dataset?.cw232CoppaPanel !== view; }
 function switchGroupView(overlay, key) { if (!overlay?.querySelectorAll || !key) return; for (const tab of overlay.querySelectorAll('[data-cw232-group-key]')) tab.setAttribute?.('aria-selected', tab.dataset?.cw232GroupKey === key ? 'true' : 'false'); for (const panel of overlay.querySelectorAll('[data-cw232-group-panel]')) panel.hidden = panel.dataset?.cw232GroupPanel !== key; }
 
@@ -184,14 +185,18 @@ export function installMatchesUi(documentRef = globalThis.document, { defer = fn
   if (!documentRef?.addEventListener || !documentRef?.createElement) return null;
   ensureStyles(documentRef); const overlay = ensureOverlay(documentRef);
   const controller = createMatchesUiController({ show(html){ overlay.innerHTML = html; overlay.hidden = false; if (typeof overlay.scrollTo === 'function') overlay.scrollTo(0,0); }, hide(){ overlay.hidden = true; overlay.innerHTML = ''; }, loadScreen });
-  const handleNav = nav => { defer(() => { if (nav?.dataset?.tab === 'calendar') controller.openHub(); else controller.close(); }); };
+  const handleNav = nav => {
+    const opensHub = nav?.dataset?.tab === 'calendar';
+    if (opensHub) clearMatchesAmbientTheme(overlay);
+    defer(() => { if (opensHub) controller.openHub(); else controller.close(); });
+  };
   const navButtons = documentRef.querySelectorAll?.('button[data-tab]') || [];
   for (const nav of navButtons) { if (!nav?.addEventListener || nav.dataset?.cw232NavBound === '1') continue; if (nav.dataset) nav.dataset.cw232NavBound = '1'; nav.addEventListener('click', () => handleNav(nav)); }
   documentRef.addEventListener('click', event => {
     const target = event?.target; if (!target?.closest) return;
     const nav = target.closest('button[data-tab]'); if (nav) { if (nav.dataset?.cw232NavBound !== '1') handleNav(nav); return; }
     const action = target.closest('[data-cw232-action]');
-    if (action?.dataset?.cw232Action === 'hub') { event.preventDefault?.(); event.stopPropagation?.(); controller.openHub(); return; }
+    if (action?.dataset?.cw232Action === 'hub') { event.preventDefault?.(); event.stopPropagation?.(); clearMatchesAmbientTheme(overlay); controller.openHub(); return; }
     if (action?.dataset?.cw232Action === 'retry') { event.preventDefault?.(); event.stopPropagation?.(); const competition = action.dataset?.cw232Competition; if (competition) void controller.openCompetition(competition); return; }
     if (action?.dataset?.cw232Action === 'coppa-view') { event.preventDefault?.(); event.stopPropagation?.(); switchCoppaView(overlay, action.dataset?.cw232CoppaView || 'matches'); return; }
     if (action?.dataset?.cw232Action === 'group-view') { event.preventDefault?.(); event.stopPropagation?.(); switchGroupView(overlay, action.dataset?.cw232GroupKey || ''); return; }
