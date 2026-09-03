@@ -8,12 +8,14 @@ async function source(path) {
 }
 
 test('Match Center keeps one stable frame while a Euro/Coppa snapshot resolves', async () => {
-  const code = await source('../src/v23.3/match-center.mjs');
-  assert.match(code, /function patchMatchCenterOverlay/);
-  assert.match(code, /cw233-mc-loading-board|data-cw233-mc-loading-frame/);
-  const stateStart = code.indexOf('onStateChange(state)');
-  const stateEnd = code.indexOf('});\n\n  async function open', stateStart);
-  const stateBranch = code.slice(stateStart, stateEnd);
+  const facade = await source('../src/v23.3/match-center.mjs');
+  const core = await source('../src/v23.3/match-center-core.mjs');
+  assert.match(facade, /function patchMatchCenterOverlay/);
+  assert.match(facade, /Core\.patchMatchCenterOverlay/);
+  assert.match(core, /cw233-mc-loading-board|data-cw233-mc-loading-frame/);
+  const stateStart = core.indexOf('onStateChange(state)');
+  const stateEnd = core.indexOf('});\n\n  async function open', stateStart);
+  const stateBranch = core.slice(stateStart, stateEnd);
   assert.doesNotMatch(stateBranch, /overlay\.innerHTML\s*=\s*renderMatchCenter\(state\)/);
   assert.doesNotMatch(stateBranch, /overlay\.scrollTo\(0,\s*0\)/);
 });
