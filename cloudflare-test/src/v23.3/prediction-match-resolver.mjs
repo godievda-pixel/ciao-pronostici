@@ -3,6 +3,7 @@ import { adaptSerieASchedule } from '../v23.2/serie-a-adapter.mjs';
 import { fetchBsdMatchSnapshot, fetchBsdMatches } from '../v23.2/bsd-provider.mjs';
 import { normalizeTeamAlias, russianTeamName } from '../v23.2/team-registry.mjs';
 import { predictionDeadlineForKickoff } from './competition-data.mjs';
+import { enrichSerieAMatchesWithCrests, fetchSerieACrestRegistry } from './serie-a-crest-source.mjs';
 
 const LEGACY_CORE_API = '/api/ciao-core-api-fast-v4';
 const LEGACY_SERIE_A_SCHEDULE = '/api/ciao-schedule-fast-v1';
@@ -175,7 +176,21 @@ function enrichSerieACrests(primarySchedule, crestSchedule) {
   });
 }
 
-async function loadSerieA({ request, env, adapt = adaptSerieASchedule }) {
+async function enrichSerieAWithBsd(schedule, env, fetchRegistry = fetchSerieACrestRegistry) {
+  const apiKey = text(env?.BSD_API_KEY);
+  if (!apiKey || !Array.isArray(schedule?.matches) || !schedule.matches.length) return schedule;
+  try {
+    const registry = await fetchRegistry({ apiKey });
+    return Object.freeze({
+      ...schedule,
+      matches:Object.freeze(enrichSerieAMatchesWithCrests(schedule.matches, registry)),
+    });
+  } catch {
+    return schedule;
+  }
+}
+
+async function loadSerieA({ request, env, adapt = adaptSerieASchedule, fetchRegistry = fetchSerieACrestRegistry }) {
   if (!env?.CIAO_WEB_API || typeof env.CIAO_WEB_API.fetch !== 'function') {
     throw new PredictionMatchError('match_resolution_failed', 502);
   }
@@ -191,6 +206,7 @@ async function loadSerieA({ request, env, adapt = adaptSerieASchedule }) {
     if (stableRound) {
       const adapted = adapt(stableRound);
       if (Array.isArray(adapted?.matches) && adapted.matches.length) {
+        let enriched = adapted;
         try {
           const schedulePayload = await fetchLegacySerieAJson({
             request,
@@ -198,10 +214,9 @@ async function loadSerieA({ request, env, adapt = adaptSerieASchedule }) {
             path:LEGACY_SERIE_A_SCHEDULE,
             body:{},
           });
-          return enrichSerieACrests(adapted, adapt(schedulePayload));
-        } catch {
-          return adapted;
-        }
+          enriched = enrichSerieACrests(adapted, adapt(schedulePayload));
+        } catch {}
+        return enrichSerieAWithBsd(enriched, env, fetchRegistry);
       }
     }
   } catch {}
@@ -212,7 +227,7 @@ async function loadSerieA({ request, env, adapt = adaptSerieASchedule }) {
     path:LEGACY_SERIE_A_SCHEDULE,
     body:{},
   });
-  return adapt(schedulePayload);
+  return enrichSerieAWithBsd(adapt(schedulePayload), env, fetchRegistry);
 }
 
 function assertActiveSeason(match, activeSeason) {
@@ -234,7 +249,7 @@ export async function resolveCanonicalPredictionMatch({
   try {
     let match;
     if (key === 'serie_a') {
-      const schedule = await loadSerieA({ request, env, adapt });
+      const schedule = await loadSerieA({ request, env, adapt, fetchRegistry:deps.fetchSerieACrestRegistry || fetchSerieACrestRegistry });
       match = (Array.isArray(schedule?.matches) ? schedule.matches : []).find(item => item?.matchId === id) || null;
     } else {
       const apiKey = text(env?.BSD_API_KEY);
@@ -258,6 +273,7 @@ async function listOne({ request, env, competition, deps, range }) {
       request,
       env,
       adapt: deps.adaptSerieASchedule || adaptSerieASchedule,
+      fetchRegistry:deps.fetchSerieACrestRegistry || fetchSerieACrestRegistry,
     });
     return Array.isArray(schedule?.matches) ? schedule.matches : [];
   }
