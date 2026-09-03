@@ -4,6 +4,8 @@ const TABLE_TITLES = Object.freeze({ serie_a:'Серия А', ucl:'Лига Че
 const RANKING_LABELS = Object.freeze({ overall:'Общий', serie_a:'Серия А', coppa_italia:'КИ', ucl:'ЛЧ', uel:'ЛЕ', uecl:'ЛК' });
 const RANKING_TITLES = Object.freeze({ overall:'Общий рейтинг', serie_a:'Серия А', coppa_italia:'Кубок Италии', ucl:'Лига Чемпионов', uel:'Лига Европы', uecl:'Лига Конференций' });
 
+export function tableSelectorLabel(key) { return TABLE_LABELS[key] || key || ''; }
+export function tableSectionTitle(key) { return TABLE_TITLES[key] || 'Таблицы'; }
 export function rankingSectionTitle(key) { return RANKING_TITLES[key] || 'Рейтинг'; }
 export function rankingSelectorLabel(key) { return RANKING_LABELS[key] || key || ''; }
 export function profileStatsFromRankingRow(row = null) {
@@ -33,12 +35,14 @@ function installStyles(documentRef) {
 function patchTableLabels(documentRef) {
   for (const button of documentRef.querySelectorAll?.('#ciao-v233-tables-overlay .cw233-table-selector') || []) {
     const key=button.dataset?.cw233TablesCompetition;
-    if (key && TABLE_LABELS[key] && button.textContent !== TABLE_LABELS[key]) button.textContent=TABLE_LABELS[key];
+    const label=tableSelectorLabel(key);
+    if (label && button.textContent !== label) button.textContent=label;
   }
   const hub=documentRef.querySelector?.('#ciao-v233-tables-overlay .cw233-tables-hub');
   const heading=hub?.querySelector?.('.cw233-tables-head p');
   const key=hub?.dataset?.cw233TablesSelected;
-  if (heading && key && TABLE_TITLES[key] && heading.textContent !== TABLE_TITLES[key]) heading.textContent=TABLE_TITLES[key];
+  const title=tableSectionTitle(key);
+  if (heading && key && heading.textContent !== title) heading.textContent=title;
 }
 
 function patchRanking(documentRef) {
@@ -51,7 +55,8 @@ function patchRanking(documentRef) {
   }
   const active=[...page.querySelectorAll?.('[data-cw233-rank-filter]') || []].find(b=>b.getAttribute?.('aria-selected')==='true')?.dataset?.cw233RankFilter || '';
   const heading=page.querySelector?.('.cw233-ranking-section-head h3');
-  if (heading && active && RANKING_TITLES[active] && heading.textContent !== RANKING_TITLES[active]) heading.textContent=RANKING_TITLES[active];
+  const title=rankingSectionTitle(active);
+  if (heading && active && heading.textContent !== title) heading.textContent=title;
 }
 
 export function primeTablesOverlay(documentRef = globalThis.document) {
