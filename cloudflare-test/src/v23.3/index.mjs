@@ -9,6 +9,7 @@ import './round6-polish-ui.mjs';
 import './round7-regression-fixes.mjs';
 import './round8-performance-premium.mjs';
 import './round9-regression-fixes.mjs';
+import './round10-regression-fixes.mjs';
 
 export const CiaoV233 = Object.freeze({
   version: '23.3',
@@ -23,6 +24,7 @@ export const CiaoV233 = Object.freeze({
   round7RegressionFixes: 'enabled',
   round8PerformancePremium: 'enabled',
   round9RegressionFixes: 'enabled',
+  round10RegressionFixes: 'enabled',
 });
 
 globalThis.CiaoV233 = CiaoV233;
