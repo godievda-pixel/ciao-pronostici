@@ -7,10 +7,14 @@ import {
   fetchBsdMatches,
   fetchBsdStandings,
 } from './v23.2/bsd-provider.mjs';
-import { normalizeTeamAlias, russianTeamName } from './v23.2/team-registry.mjs';
 import { createPredictionService } from './v23.3/prediction-service.mjs';
 import { assertSafeResetTarget } from './v23.3/reset-contract.mjs';
 import { predictionObjectName } from './v23.3/prediction-sql.mjs';
+import {
+  enrichSerieAMatchesWithCrests,
+  enrichSerieAStandingsWithCrests,
+  fetchSerieACrestRegistry,
+} from './v23.3/serie-a-crest-source.mjs';
 
 const TEST_BUILD = 'ciao-web-v23-3-user-feedback-r4-20260902';
 const V23_2_MATCHES = '/api/v23.2/matches';
@@ -103,44 +107,6 @@ function normalizeLegacySerieAStandings(payload) {
       goalDifference: numberOrNull(row?.goalDifference ?? row?.goal_difference ?? row?.goal_diff ?? row?.gd),
       points: numberOrNull(row?.points ?? row?.pts),
     })),
-  };
-}
-
-function normalizedTeamName(value) {
-  return normalizeTeamAlias(russianTeamName(String(value ?? '').trim()));
-}
-
-function serieACrestLookup(schedule) {
-  const byId = new Map();
-  const byName = new Map();
-  for (const match of Array.isArray(schedule?.matches) ? schedule.matches : []) {
-    for (const team of [match?.homeTeam, match?.awayTeam]) {
-      const crestUrl = String(team?.crestUrl || '').trim();
-      if (!crestUrl) continue;
-      const id = String(team?.id || '').trim();
-      const names = [team?.name, team?.rawName]
-        .map(normalizedTeamName)
-        .filter(Boolean);
-      if (id) byId.set(id, crestUrl);
-      for (const name of names) byName.set(name, crestUrl);
-    }
-  }
-  return { byId, byName };
-}
-
-function enrichSerieAStandingsCrests(standings, schedule) {
-  const lookup = serieACrestLookup(schedule);
-  return {
-    ...standings,
-    rows:(Array.isArray(standings?.rows) ? standings.rows : []).map(row => {
-      if (String(row?.team?.crestUrl || '').trim()) return row;
-      const id = String(row?.team?.id || '').trim();
-      const names = [row?.team?.name, row?.team?.rawName]
-        .map(normalizedTeamName)
-        .filter(Boolean);
-      const crestUrl = (id && lookup.byId.get(id)) || names.map(name => lookup.byName.get(name)).find(Boolean) || '';
-      return crestUrl ? { ...row, team:{ ...row.team, crestUrl } } : row;
-    }),
   };
 }
 
@@ -275,6 +241,14 @@ async function handleTestPredictionReset(request, env) {
   });
 }
 
+async function serieACrestRegistry(env) {
+  try {
+    return await fetchSerieACrestRegistry({ apiKey:String(env?.BSD_API_KEY || '') });
+  } catch {
+    return new Map();
+  }
+}
+
 async function handleSerieAMatches(request, env, initData) {
   const upstreamRequest = new Request(
     new URL(LEGACY_SERIE_A_SCHEDULE, request.url),
@@ -288,6 +262,7 @@ async function handleSerieAMatches(request, env, initData) {
     },
   );
 
+  const crestPromise = serieACrestRegistry(env);
   const upstream = await env.CIAO_WEB_API.fetch(upstreamRequest);
   let payload;
   try {
@@ -302,9 +277,18 @@ async function handleSerieAMatches(request, env, initData) {
     });
   }
 
+  const schedule = adaptSerieASchedule(payload);
+  const registry = await crestPromise;
   return Response.json({
     ok: true,
-    data: adaptSerieASchedule(payload),
+    data: {
+      ...schedule,
+      matches:Object.freeze(enrichSerieAMatchesWithCrests(schedule.matches, registry)),
+      rounds:Object.freeze(schedule.rounds.map(round => Object.freeze({
+        ...round,
+        matches:Object.freeze(enrichSerieAMatchesWithCrests(round.matches, registry)),
+      }))),
+    },
   });
 }
 
@@ -363,28 +347,6 @@ async function handleV23_2Matches(request, env, url) {
   });
 }
 
-async function fetchSerieAScheduleForCrests(request, env, initData) {
-  try {
-    const response = await env.CIAO_WEB_API.fetch(new Request(
-      new URL(LEGACY_SERIE_A_SCHEDULE, request.url),
-      {
-        method:'POST',
-        headers:{
-          'content-type':'application/json',
-          'x-telegram-init-data':initData,
-        },
-        body:'{}',
-      },
-    ));
-    if (!response.ok) return null;
-    const payload = await response.json();
-    if (!payload?.ok) return null;
-    return adaptSerieASchedule(payload);
-  } catch {
-    return null;
-  }
-}
-
 async function handleSerieAStandings(request, env, initData) {
   const upstreamRequest = new Request(
     new URL(LEGACY_CORE_API, request.url),
@@ -398,7 +360,7 @@ async function handleSerieAStandings(request, env, initData) {
     },
   );
 
-  const schedulePromise = fetchSerieAScheduleForCrests(request, env, initData);
+  const crestPromise = serieACrestRegistry(env);
   const upstream = await env.CIAO_WEB_API.fetch(upstreamRequest);
   let payload;
   try {
@@ -414,10 +376,10 @@ async function handleSerieAStandings(request, env, initData) {
   }
 
   const standings = normalizeLegacySerieAStandings(payload);
-  const schedule = await schedulePromise;
+  const registry = await crestPromise;
   return Response.json({
     ok: true,
-    data: schedule ? enrichSerieAStandingsCrests(standings, schedule) : standings,
+    data: enrichSerieAStandingsWithCrests(standings, registry),
   });
 }
 
