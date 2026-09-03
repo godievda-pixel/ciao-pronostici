@@ -180,6 +180,7 @@ test('v23.3 Tables mounts in miniapp root and capture navigation does not block 
     body: { appendChild: appendTo(bodyChildren) },
     createElement(tagName) {
       return {
+        ownerDocument: documentRef,
         tagName,
         id: '',
         className: '',
@@ -189,6 +190,7 @@ test('v23.3 Tables mounts in miniapp root and capture navigation does not block 
         dataset: {},
         setAttribute() {},
         scrollTo() {},
+        querySelector() { return null; },
       };
     },
     getElementById(id) { return nodes.get(id) || null; },

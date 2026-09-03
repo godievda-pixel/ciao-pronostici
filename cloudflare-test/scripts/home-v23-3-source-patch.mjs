@@ -1,12 +1,13 @@
 const SEASON_LABEL = 'SERIE A 2026/27';
+const ALL_CALCIO_LABEL = 'ВСЁ О КАЛЬЧО';
 const MARKER = 'cw233-home-multicompetition';
 
-function removeSeasonLabel(input) {
-  return String(input).split(SEASON_LABEL).join('');
+function replaceSeasonLabel(input) {
+  return String(input).replaceAll(SEASON_LABEL, ALL_CALCIO_LABEL);
 }
 
 export function applyHomeV233SourcePatch(input) {
-  let source = removeSeasonLabel(input);
+  let source = replaceSeasonLabel(input);
   if (source.includes(MARKER)) return source;
 
   const anchor = /predict\s*=\s*__cw231HomeHtml\s*;/;

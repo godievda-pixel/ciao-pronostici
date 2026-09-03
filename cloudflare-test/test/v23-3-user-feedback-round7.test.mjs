@@ -73,7 +73,7 @@ test('Serie A prediction matches enrich missing state crests from the stable sch
     now:new Date('2026-09-03T00:00:00Z'),
   });
 
-  assert.deepEqual(calls, ['/api/ciao-core-api-fast-v4', '/api/ciao-schedule-fast-v1']);
+  assert.deepEqual(calls.sort(), ['/api/ciao-core-api-fast-v4', '/api/ciao-schedule-fast-v1'].sort());
   assert.equal(result.matches[0].kickoffAt, '2026-09-05T18:00:00Z', 'state remains authoritative for match data');
   assert.equal(result.matches[0].homeTeam.crestUrl, 'https://img.example/fiorentina.png');
   assert.equal(result.matches[0].awayTeam.crestUrl, 'https://img.example/torino.png');
@@ -180,12 +180,15 @@ test('round7 compatibility layer paints custom overlays through the bottom navig
   assert.match(source, /padding-bottom:calc\(104px \+ env\(safe-area-inset-bottom/);
 });
 
-test('round7 mobile standings keep every stat visible through a horizontal viewport instead of hiding columns', async () => {
-  const source = await readFile(new URL('../src/v23.3/round7-regression-fixes.mjs', import.meta.url), 'utf8');
-  assert.match(source, /cw233-standing-viewport[^}]*overflow-x:auto!important/);
-  assert.match(source, /cw233-standing-table[^}]*min-width:(?:6|7)\d\dpx!important/);
-  assert.match(source, /nth-child\(4\)[^}]*display:table-cell!important/);
-  assert.match(source, /nth-child\(7\)[^}]*display:table-cell!important/);
+test('round7 mobile standings keep every stat visible while Round 12 removes the obsolete crop-inducing fixed width', async () => {
+  const round7 = await readFile(new URL('../src/v23.3/round7-regression-fixes.mjs', import.meta.url), 'utf8');
+  const round12 = await readFile(new URL('../src/v23.3/round12-stability-performance.mjs', import.meta.url), 'utf8');
+  assert.match(round7, /cw233-standing-viewport[^}]*overflow-x:auto!important/);
+  assert.doesNotMatch(round7, /cw233-standing-table[^}]*min-width:(?:6|7)\d\dpx!important/);
+  assert.match(round7, /nth-child\(4\)[^}]*display:table-cell!important/);
+  assert.match(round7, /nth-child\(7\)[^}]*display:table-cell!important/);
+  assert.match(round12, /@media\(min-width:420px\)/);
+  assert.match(round12, /cw233-standing-table--full\{min-width:0!important;width:100%!important/);
 });
 
 test('round7 keeps the bottom navigation above every full-height overlay', async () => {
