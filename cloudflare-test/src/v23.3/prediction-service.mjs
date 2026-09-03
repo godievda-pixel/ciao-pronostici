@@ -191,32 +191,41 @@ export function createPredictionService({ request, env, now = new Date(), deps =
     try {
       const authenticated = await user();
       const input = d.buildPredictionWritePayload(body);
-      const { stub } = activeStub(env);
-      let roundGate = new Map();
-      if (UEFA_COMPETITIONS.has(input.competition_key)) {
-        const canonical = await d.listCanonicalPredictionMatches({
-          request, env, competition:input.competition_key, now,
-        });
-        roundGate = await gateForCanonical(stub, canonical.matches || []);
-      }
+      const resolved = [];
 
-      const validated = [];
       for (const item of input.predictions) {
-        if (roundGate.get(text(item.match_id))?.locked) {
-          throw new PredictionServiceError('prediction_round_locked', 409);
-        }
         const match = await d.resolveCanonicalPredictionMatch({
           request, env, competition:input.competition_key, matchId:item.match_id,
         });
         const lockedAt = d.assertPredictionWritable({ match, activeSeason:env.PREDICTION_SEASON, now });
-        validated.push({
-          match_id:item.match_id,
-          competition:input.competition_key,
-          predicted_home:item.home_score,
-          predicted_away:item.away_score,
-          locked_at:lockedAt,
-        });
+        resolved.push({ item, match, lockedAt });
       }
+
+      let stub = null;
+      if (
+        UEFA_COMPETITIONS.has(input.competition_key)
+        && resolved.some(({ match }) => (numericRound(match) || 0) > 1)
+      ) {
+        const canonical = await d.listCanonicalPredictionMatches({
+          request, env, competition:input.competition_key, now,
+        });
+        stub = activeStub(env).stub;
+        const roundGate = await gateForCanonical(stub, canonical.matches || []);
+        for (const { item } of resolved) {
+          if (roundGate.get(text(item.match_id))?.locked) {
+            throw new PredictionServiceError('prediction_round_locked', 409);
+          }
+        }
+      }
+
+      if (!stub) stub = activeStub(env).stub;
+      const validated = resolved.map(({ item, lockedAt }) => ({
+        match_id:item.match_id,
+        competition:input.competition_key,
+        predicted_home:item.home_score,
+        predicted_away:item.away_score,
+        locked_at:lockedAt,
+      }));
       const payload = await internalJson(stub, '/write', {
         method:'POST',
         body:{ participant:participantFrom(authenticated), season:env.PREDICTION_SEASON, predictions:validated },
