@@ -1,6 +1,7 @@
 import { adaptBsdEvents } from './bsd-adapter.mjs';
 import { dedupeMatches } from './match-deduper.mjs';
 import { normalizeStandingRows } from '../v23.3/standing-normalizer.mjs';
+import { canonicalMatchCenterSnapshot } from '../v23.3/match-center-snapshot.mjs';
 
 const BSD_BASE = 'https://sports.bzzoiro.com/api/v2';
 const MAX_RANGE_DAYS = 370;
@@ -24,6 +25,10 @@ export class BsdUpstreamError extends Error {
 
 function text(value) {
   return String(value ?? '').trim();
+}
+
+function list(value) {
+  return Array.isArray(value) ? value : [];
 }
 
 function isoDate(value) {
@@ -212,6 +217,68 @@ function eventLeagueId(event) {
   );
 }
 
+function venueText(event = {}) {
+  const venue = event?.venue;
+  if (venue && typeof venue === 'object') return text(venue.name || venue.full_name);
+  return text(venue || event?.venue_name);
+}
+
+export function extractBsdMatchDetails(event = {}) {
+  return Object.freeze({
+    venue:venueText(event),
+    events:Object.freeze(list(event?.events || event?.match_events)),
+    statistics:Object.freeze(list(event?.statistics || event?.stats)),
+    lineups:Object.freeze(list(event?.lineups)),
+  });
+}
+
+async function fetchBsdEvent({
+  competition,
+  matchId,
+  apiKey,
+  fetchImpl = fetch,
+}) {
+  const sourceId = canonicalSourceId(competition, matchId);
+  const { league, season } = await resolveCompetitionContext(competition, apiKey, fetchImpl);
+  let event = null;
+
+  try {
+    event = await fetchJson(
+      buildUrl(`/events/${encodeURIComponent(sourceId)}/`),
+      apiKey,
+      fetchImpl,
+      'event',
+    );
+  } catch (error) {
+    if (!(error instanceof BsdUpstreamError) || error.status !== 404) throw error;
+    const events = await fetchAll('/events/', {
+      league_id: league.id,
+      season_id: season.id,
+    }, apiKey, fetchImpl, 'events');
+    event = events.find(row => text(row?.id ?? row?.event_id) === sourceId) || null;
+    if (!event) throw new BsdUpstreamError('event', 404, 'event_not_found');
+  }
+
+  const leagueId = eventLeagueId(event);
+  if (leagueId && leagueId !== text(league.id)) {
+    throw new BsdUpstreamError('event', 200, 'competition_mismatch');
+  }
+
+  return Object.freeze({ event, sourceId });
+}
+
+function canonicalBsdMatch(event, competition, sourceId) {
+  const adapted = adaptBsdEvents({ results:[event] }, competition);
+  const match = adapted[0];
+  if (!match) {
+    throw new BsdUpstreamError('event', 404, 'match_not_eligible');
+  }
+  if (match.matchId !== `${competition}:${sourceId}`) {
+    throw new BsdUpstreamError('event', 200, 'invalid_event');
+  }
+  return match;
+}
+
 export async function fetchBsdMatches({
   competition,
   from,
@@ -249,47 +316,15 @@ export async function fetchBsdStandings({
   return normalizeStandingRows(payload, competition);
 }
 
-export async function fetchBsdMatchSnapshot({
-  competition,
-  matchId,
-  apiKey,
-  fetchImpl = fetch,
-}) {
-  const sourceId = canonicalSourceId(competition, matchId);
-  const { league, season } = await resolveCompetitionContext(competition, apiKey, fetchImpl);
-  let event = null;
+export async function fetchBsdMatchSnapshot(args) {
+  const { event, sourceId } = await fetchBsdEvent(args);
+  return canonicalBsdMatch(event, args.competition, sourceId);
+}
 
-  try {
-    event = await fetchJson(
-      buildUrl(`/events/${encodeURIComponent(sourceId)}/`),
-      apiKey,
-      fetchImpl,
-      'event',
-    );
-  } catch (error) {
-    if (!(error instanceof BsdUpstreamError) || error.status !== 404) throw error;
-    const events = await fetchAll('/events/', {
-      league_id: league.id,
-      season_id: season.id,
-    }, apiKey, fetchImpl, 'events');
-    event = events.find(row => text(row?.id ?? row?.event_id) === sourceId) || null;
-    if (!event) throw new BsdUpstreamError('event', 404, 'event_not_found');
-  }
-
-  const leagueId = eventLeagueId(event);
-  if (leagueId && leagueId !== text(league.id)) {
-    throw new BsdUpstreamError('event', 200, 'competition_mismatch');
-  }
-
-  const adapted = adaptBsdEvents({ results: [event] }, competition);
-  const match = adapted[0];
-  if (!match) {
-    throw new BsdUpstreamError('event', 404, 'match_not_eligible');
-  }
-  if (match.matchId !== `${competition}:${sourceId}`) {
-    throw new BsdUpstreamError('event', 200, 'invalid_event');
-  }
-  return match;
+export async function fetchBsdMatchCenterSnapshot(args) {
+  const { event, sourceId } = await fetchBsdEvent(args);
+  const match = canonicalBsdMatch(event, args.competition, sourceId);
+  return canonicalMatchCenterSnapshot(match, extractBsdMatchDetails(event));
 }
 
 export { BSD_BASE };
