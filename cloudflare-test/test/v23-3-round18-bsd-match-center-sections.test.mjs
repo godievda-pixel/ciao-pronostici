@@ -207,6 +207,66 @@ test('Round 18 BSD provider returns one requested canonical section with full co
   });
 });
 
+test('Round 18 BSD provider loads Match Center data from documented event sub-resources', async () => {
+  const bare = providerEvent();
+  delete bare.statistics;
+  delete bare.stats;
+  delete bare.incidents;
+  delete bare.events;
+  delete bare.match_events;
+  delete bare.lineups;
+  delete bare.player_stats;
+  delete bare.players_stats;
+  delete bare.momentum;
+  delete bare.shotmap;
+  delete bare.shot_map;
+  delete bare.prediction_split;
+  delete bare.predictionSplit;
+
+  const fetchImpl = async url => {
+    const href = String(url);
+    if (href.includes('/leagues/?')) return jsonResponse({ results:[{ id:10, name:'UEFA Champions League' }] });
+    if (href.includes('/leagues/10/season/')) return jsonResponse({ id:20, name:'2026/27' });
+    if (href.includes('/events/77/stats/')) return jsonResponse({
+      event_id:77,
+      stats:{ home:detailedEvent.statistics.home, away:detailedEvent.statistics.away },
+      momentum:detailedEvent.momentum,
+      shotmap:detailedEvent.shotmap,
+    });
+    if (href.includes('/events/77/incidents/')) return jsonResponse({ event_id:77, incidents:detailedEvent.incidents });
+    if (href.includes('/events/77/lineups/')) return jsonResponse({ event_id:77, lineup_status:'confirmed', lineups:detailedEvent.lineups });
+    if (href.includes('/events/77/player-stats/')) return jsonResponse({ event_id:77, player_stats:detailedEvent.player_stats });
+    if (href.includes('/events/77/prediction/')) return jsonResponse({ event_id:77, home_score:2, away_score:1, home:0.61, draw:0.24, away:0.15 });
+    if (href.includes('/events/77/')) return jsonResponse(bare);
+    return jsonResponse({ results:[] });
+  };
+
+  const options = {
+    competition:'ucl',
+    matchId:'ucl:77',
+    apiKey:'test',
+    fetchImpl,
+  };
+  const overview = await fetchBsdMatchCenterSection({ ...options, section:'overview' });
+  const stats = await fetchBsdMatchCenterSection({ ...options, section:'stats' });
+  const events = await fetchBsdMatchCenterSection({ ...options, section:'events' });
+  const lineups = await fetchBsdMatchCenterSection({ ...options, section:'lineups' });
+  const players = await fetchBsdMatchCenterSection({ ...options, section:'players' });
+
+  assert.equal(overview.available, true);
+  assert.equal(overview.data.venue.name, 'San Siro');
+  assert.deepEqual(overview.data.momentum, detailedEvent.momentum);
+  assert.equal(overview.data.prediction.home_score, 2);
+  assert.equal(stats.available, true);
+  assert.equal(stats.data.home.xg, 1.42);
+  assert.equal(events.available, true);
+  assert.equal(events.data[0].player, 'Lautaro');
+  assert.equal(lineups.available, true);
+  assert.equal(lineups.data.home.formation, '3-5-2');
+  assert.equal(players.available, true);
+  assert.equal(players.data[0].rating, 7.8);
+});
+
 test('Round 18 BSD provider keeps Italian eligibility on section fetches', async () => {
   await assert.rejects(
     () => fetchBsdMatchCenterSection({
