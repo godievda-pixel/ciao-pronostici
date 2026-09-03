@@ -1,6 +1,6 @@
 import { COMPETITION_KEYS, getCompetitionConfig } from '../v23.2/competition-config.mjs';
 
-export const PREDICTION_SCHEMA_VERSION = '1';
+export const PREDICTION_SCHEMA_VERSION = '2';
 
 export const PREDICTION_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS schema_meta (
@@ -37,6 +37,12 @@ CREATE INDEX IF NOT EXISTS predictions_user_competition ON predictions(user_id, 
 CREATE INDEX IF NOT EXISTS predictions_competition_match ON predictions(competition, match_id);
 CREATE INDEX IF NOT EXISTS predictions_competition_points ON predictions(competition, points);
 CREATE INDEX IF NOT EXISTS predictions_scored_at ON predictions(scored_at);
+CREATE TABLE IF NOT EXISTS prediction_reconciled_matches (
+  match_id TEXT PRIMARY KEY,
+  result_fingerprint TEXT NOT NULL,
+  scored_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS prediction_reconciled_scored_at ON prediction_reconciled_matches(scored_at);
 CREATE TABLE IF NOT EXISTS ranking_snapshots (
   snapshot_id TEXT PRIMARY KEY,
   scope TEXT NOT NULL,
@@ -184,11 +190,21 @@ export function listUserPredictions(sql, { userId, competition } = {}) {
   return rows(sql.exec('SELECT * FROM predictions WHERE user_id = ? ORDER BY submitted_at, match_id', id)).map(normalizePredictionRow);
 }
 
+export function listReconciledMatchIds(sql, { competition } = {}) {
+  const key = text(competition);
+  if (key) getCompetitionConfig(key);
+  const source = key
+    ? rows(sql.exec('SELECT match_id FROM prediction_reconciled_matches WHERE match_id LIKE ? ORDER BY match_id', `${key}:%`))
+    : rows(sql.exec('SELECT match_id FROM prediction_reconciled_matches ORDER BY match_id'));
+  return Object.freeze(source.map(row => String(row.match_id)).filter(Boolean));
+}
+
 export function reconcileMatchPredictions(sql, { matchId, finalHome, finalAway, resultFingerprint, scoredAt, scorePrediction } = {}) {
   if (typeof scorePrediction !== 'function') throw new Error('scorePrediction is required');
   const id = text(matchId);
   const fingerprint = text(resultFingerprint);
-  if (!id || !fingerprint) throw new Error('Result identity is required');
+  const scoredAtIso = text(scoredAt);
+  if (!id || !fingerprint || !scoredAtIso) throw new Error('Result identity is required');
   const finalH = Number(finalHome);
   const finalA = Number(finalAway);
   if (!Number.isInteger(finalH) || !Number.isInteger(finalA)) throw new Error('Invalid final score');
@@ -200,10 +216,18 @@ export function reconcileMatchPredictions(sql, { matchId, finalHome, finalAway, 
     sql.exec(
       `UPDATE predictions SET points = ?, result_type = ?, final_home = ?, final_away = ?,
        result_fingerprint = ?, scored_at = ? WHERE prediction_id = ?`,
-      Number(scored.points), text(scored.resultType), finalH, finalA, fingerprint, scoredAt, String(row.prediction_id),
+      Number(scored.points), text(scored.resultType), finalH, finalA, fingerprint, scoredAtIso, String(row.prediction_id),
     );
     affectedCount += 1;
   }
+  sql.exec(
+    `INSERT INTO prediction_reconciled_matches (match_id, result_fingerprint, scored_at)
+     VALUES (?, ?, ?)
+     ON CONFLICT(match_id) DO UPDATE SET
+       result_fingerprint = excluded.result_fingerprint,
+       scored_at = excluded.scored_at`,
+    id, fingerprint, scoredAtIso,
+  );
   return Object.freeze({ affected: affectedCount, skipped });
 }
 
@@ -266,6 +290,7 @@ export function createRankingSnapshot(sql, { scope, periodKey, payload, nowIso, 
 
 export function resetPredictionDomain(sql) {
   const predictions = affected(sql.exec('DELETE FROM predictions'));
+  affected(sql.exec('DELETE FROM prediction_reconciled_matches'));
   const ranking = affected(sql.exec('DELETE FROM ranking_snapshots'));
   affected(sql.exec('DELETE FROM participants'));
   const caches = affected(sql.exec(`UPDATE schema_meta SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) WHERE key = 'prediction_cache_generation'`));
