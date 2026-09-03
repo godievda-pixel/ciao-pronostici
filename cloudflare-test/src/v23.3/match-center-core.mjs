@@ -356,7 +356,7 @@ export function createMatchCenterController({
     if (!shouldPoll()) return;
     timerId = setTimer(async () => {
       timerId = null;
-      await refresh();
+      await refreshLive();
     }, POLL_MS);
   }
 
@@ -456,6 +456,18 @@ export function createMatchCenterController({
     return getState();
   }
 
+  async function refreshLive() {
+    if (!state.open) return getState();
+    await refresh();
+    clearPoll();
+    if (!state.open) return getState();
+    if (typeof loadSection === 'function') {
+      await refreshSection(state.activeTab, { force:true });
+    }
+    schedulePoll();
+    return getState();
+  }
+
   async function open({ competition, matchId, initialMatch = null } = {}) {
     getCompetitionConfig(competition);
     if (!matchId) throw new Error('Match Center matchId is required');
@@ -507,7 +519,7 @@ export function createMatchCenterController({
       return;
     }
     if (String(state?.match?.status || '').toLowerCase() === 'live') {
-      void refresh();
+      void refreshLive();
     }
   };
   documentRef?.addEventListener?.('visibilitychange', visibilityHandler);
