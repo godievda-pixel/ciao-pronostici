@@ -30,6 +30,10 @@ function overviewSection() {
     form:{ home:['W', 'W', 'D', 'L', 'W'], away:['D', 'W', 'W', 'L', 'D'] },
     prediction:{ homeScore:2, awayScore:1 },
     predictionSplit:{ home:48, draw:27, away:25 },
+    summaryStats:{
+      home:{ xg:1.83, shots:14 },
+      away:{ xg:0.91, shots:9 },
+    },
     momentum:[
       { minute:15, home:62, away:38 },
       { minute:30, home:44, away:56 },
@@ -41,21 +45,22 @@ function overviewSection() {
   };
 }
 
-test('Round 18 overview restores legacy parity regions when data is covered', () => {
+test('Round 18 overview follows the approved compact Serie A regions when data is covered', () => {
   const html = renderMatchCenterOverview(overviewSection(), {
     match:baseMatch(),
     coverage:baseMatch().coverage,
   });
 
   assert.match(html, /data-cw233-mc-overview/);
-  assert.match(html, /data-cw233-mc-overview-region="form"/);
-  assert.match(html, /data-cw233-mc-overview-region="match-info"/);
-  assert.match(html, /data-cw233-mc-overview-region="predictions"/);
+  assert.match(html, /data-cw233-mc-overview-region="main"/);
   assert.match(html, /data-cw233-mc-overview-region="momentum"/);
   assert.match(html, /data-cw233-mc-overview-region="shotmap"/);
-  assert.match(html, /San Siro/);
-  assert.match(html, /Daniele Orsato/);
-  assert.match(html, /2:1/);
+  assert.match(html, /Главное/);
+  assert.match(html, /xG хозяев/);
+  assert.match(html, /23<\/strong><span>ударов/);
+  assert.doesNotMatch(html, /data-cw233-mc-overview-region="form"/);
+  assert.doesNotMatch(html, /data-cw233-mc-overview-region="match-info"/);
+  assert.doesNotMatch(html, /data-cw233-mc-overview-region="predictions"/);
 });
 
 test('Round 18 overview does not fabricate momentum or shot map when provider data is absent', () => {
@@ -68,10 +73,9 @@ test('Round 18 overview does not fabricate momentum or shot map when provider da
     coverage:{ ...baseMatch().coverage, momentum:false, shotmap:false },
   });
 
+  assert.match(html, /data-cw233-mc-overview-region="main"/);
   assert.doesNotMatch(html, /data-cw233-mc-overview-region="momentum"/);
   assert.doesNotMatch(html, /data-cw233-mc-overview-region="shotmap"/);
-  assert.match(html, /data-cw233-mc-overview-region="form"/);
-  assert.match(html, /data-cw233-mc-overview-region="match-info"/);
 });
 
 test('Round 18 opens the stable hero before starting the lazy overview request', async () => {
