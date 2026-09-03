@@ -185,7 +185,7 @@ export function resolvePredictionDisplayName(current, tgUser) {
   const telegramName = [text(tgUser?.first_name), text(tgUser?.last_name)].filter(Boolean).join(' ');
   if (telegramName) return telegramName;
   const username = text(current?.username || tgUser?.username).replace(/^@/, '');
-  return username ? `@${username}` : 'Участник';
+  return username ? `@${username}` : '';
 }
 function formatKickoff(value) {
   const date = new Date(value);
@@ -214,7 +214,10 @@ function heroHtml() {
   const tgUser = telegramUser();
   const name = resolvePredictionDisplayName(currentParticipant, tgUser);
   const username = text(currentParticipant?.username || tgUser?.username).replace(/^@/, '');
-  return `<div class="hero"><div class="hero-top"><div><h2>${esc(name)}</h2><p>${username ? `@${esc(username)}` : 'Прогнозы на все турниры'}</p></div></div></div>`;
+  const title = name
+    ? `<h2>${esc(name)}</h2>`
+    : '<h2 class="cw233-prediction-identity-loading" aria-label="Загрузка профиля"><span aria-hidden="true">&nbsp;</span></h2>';
+  return `<div class="hero"><div class="hero-top"><div>${title}<p>${username ? `@${esc(username)}` : 'Прогнозы на все турниры'}</p></div></div></div>`;
 }
 function tabsHtml() {
   return `<div class="cw231-prediction-tabs" role="tablist" aria-label="Прогнозы"><button type="button" data-cw233-mode="make" aria-selected="${activeMode === 'make'}">Сделать прогноз</button><button type="button" data-cw233-mode="mine" aria-selected="${activeMode === 'mine'}">Мои прогнозы</button></div>`;

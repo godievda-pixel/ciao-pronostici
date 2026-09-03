@@ -83,6 +83,29 @@ function renderCard(match, timeZone) {
   </article>`;
 }
 
+function renderHomeBootstrapCard() {
+  return `<article class="cw231-today-card cw233-home-bootstrap-card" aria-hidden="true">
+    <div class="cw231-today-card-top"><span class="cw231-today-competition">&nbsp;</span><time>&nbsp;</time></div>
+    <div class="cw231-today-match">
+      <div class="cw231-today-team"><span class="cw231-today-logo-placeholder"></span><b>&nbsp;</b></div>
+      <div class="cw231-today-score"><strong class="cw231-today-score-value">—</strong><span class="cw231-today-score-status">&nbsp;</span></div>
+      <div class="cw231-today-team away"><b>&nbsp;</b><span class="cw231-today-logo-placeholder"></span></div>
+    </div>
+    <div class="cw231-today-bottom"><span>&nbsp;</span><button type="button" tabindex="-1">&nbsp;</button></div>
+  </article>`;
+}
+
+export function renderHomeBootstrapSection() {
+  return `<section class="cw231-today cw231-today-premium cw233-home-view cw233-home-bootstrap" data-cw233-home aria-busy="true">
+    <div class="cw231-today-glow" aria-hidden="true"></div>
+    <div class="cw231-today-head">
+      <div class="cw231-today-heading"><h2>Кальчо сегодня</h2><p class="cw231-today-subtitle">Матчи и события дня · все турниры</p></div>
+      <time aria-hidden="true">&nbsp;</time>
+    </div>
+    <div class="cw231-today-list">${renderHomeBootstrapCard()}${renderHomeBootstrapCard()}</div>
+  </section>`;
+}
+
 export function renderHomeTodaySection(matches = [], { now = new Date(), timeZone } = {}) {
   const selected = selectHomeMatches(matches, { now, timeZone });
   const cards = selected.map(match => renderCard(match, timeZone)).join('');
@@ -166,7 +189,7 @@ export function createHomeRuntime({
 
   const state = () => snapshot();
   const html = () => {
-    if (!hydrated) return '';
+    if (!hydrated) return renderHomeBootstrapSection();
     return renderHomeTodaySection(flattenCompetitionFeeds(feeds), { now:validDate(now()), timeZone });
   };
 
