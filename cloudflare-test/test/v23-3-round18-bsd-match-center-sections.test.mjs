@@ -4,6 +4,10 @@ import {
   adaptBsdMatchCenterSections,
   extractBsdCoverage,
 } from '../src/v23.3/bsd-match-center-adapter.mjs';
+import {
+  fetchBsdMatchCenterBase,
+  fetchBsdMatchCenterSection,
+} from '../src/v23.2/bsd-provider.mjs';
 
 const detailedEvent = {
   id:77,
@@ -106,4 +110,84 @@ test('Round 18 BSD adapter does not fabricate missing sections', () => {
   assert.equal(result.events, null);
   assert.equal(result.lineups, null);
   assert.equal(result.players, null);
+});
+
+function jsonResponse(payload, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers:{ 'content-type':'application/json' },
+  });
+}
+
+function providerEvent(overrides = {}) {
+  return {
+    ...detailedEvent,
+    league:{ id:10, name:'UEFA Champions League' },
+    season:{ id:20, name:'2026/27' },
+    event_date:'2026-09-10T19:00:00Z',
+    status:'live',
+    minute:37,
+    round_name:'League Stage',
+    round_number:1,
+    home_score:1,
+    away_score:0,
+    home_team:{ id:501, name:'Inter', country_code:'ITA' },
+    away_team:{ id:502, name:'Arsenal', country_code:'ENG' },
+    ...overrides,
+  };
+}
+
+function bsdFetchFor(event) {
+  return async url => {
+    const href = String(url);
+    if (href.includes('/leagues/?')) return jsonResponse({ results:[{ id:10, name:'UEFA Champions League' }] });
+    if (href.includes('/leagues/10/season/')) return jsonResponse({ id:20, name:'2026/27' });
+    if (href.includes('/events/77/')) return jsonResponse(event);
+    return jsonResponse({ results:[] });
+  };
+}
+
+test('Round 18 BSD provider returns a canonical base with explicit coverage', async () => {
+  const base = await fetchBsdMatchCenterBase({
+    competition:'ucl',
+    matchId:'ucl:77',
+    apiKey:'test',
+    fetchImpl:bsdFetchFor(providerEvent()),
+  });
+  assert.equal(base.competition, 'ucl');
+  assert.equal(base.matchId, 'ucl:77');
+  assert.equal(base.homeTeam.name, 'Интер');
+  assert.equal(base.status, 'live');
+  assert.equal(base.coverage.stats, true);
+  assert.equal(base.coverage.players, true);
+});
+
+test('Round 18 BSD provider returns one requested canonical section', async () => {
+  const stats = await fetchBsdMatchCenterSection({
+    competition:'ucl',
+    matchId:'ucl:77',
+    section:'stats',
+    apiKey:'test',
+    fetchImpl:bsdFetchFor(providerEvent()),
+  });
+  assert.equal(stats.section, 'stats');
+  assert.equal(stats.available, true);
+  assert.equal(stats.data.home.xg, 1.42);
+  assert.equal(stats.data.away.shotsOnTarget, 3);
+});
+
+test('Round 18 BSD provider keeps Italian eligibility on section fetches', async () => {
+  await assert.rejects(
+    () => fetchBsdMatchCenterSection({
+      competition:'ucl',
+      matchId:'ucl:77',
+      section:'overview',
+      apiKey:'test',
+      fetchImpl:bsdFetchFor(providerEvent({
+        home_team:{ id:501, name:'Barcelona', country_code:'ESP' },
+        away_team:{ id:502, name:'Arsenal', country_code:'ENG' },
+      })),
+    }),
+    error => error?.code === 'match_not_eligible',
+  );
 });
