@@ -47,7 +47,7 @@ function passingSources() {
       export function evaluateSerieAParity() {}
     `,
     bridge:`export function readSerieALegacyMatchCenterData() {}`,
-    deployment:`export const ROUND18_BUILD_MARKER = 'round18-match-center-parity-r1';`,
+    deployment:`export const ROUND18_BUILD_MARKER = 'round18-match-center-parity-r2';`,
   };
 }
 
@@ -58,7 +58,7 @@ test('Round 18 deployment probe has an explicit legacy Serie A parity-gate marke
 test('Round 18 build exposes a unique deployment identity and ships the full browser graph', async () => {
   const deploymentSource = await readFile(new URL('../src/v23.3/round18-deployment-marker.mjs', import.meta.url), 'utf8');
   assert.match(deploymentSource, /ROUND18_BUILD_MARKER/);
-  assert.match(deploymentSource, /round18-match-center-parity-r1/);
+  assert.match(deploymentSource, /round18-match-center-parity-r2/);
 
   const { copyV233Modules } = await import('../scripts/build.mjs');
   const files = await copyV233Modules();
