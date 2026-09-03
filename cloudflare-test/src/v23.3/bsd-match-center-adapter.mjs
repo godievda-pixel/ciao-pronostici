@@ -19,6 +19,12 @@ function hasOwn(source, key) {
   return Boolean(source && Object.prototype.hasOwnProperty.call(source, key));
 }
 
+function finite(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
 function firstObject(...values) {
   return values.map(object).find(Boolean) || null;
 }
@@ -88,27 +94,90 @@ function playerStatsSource(event = {}) {
   return firstArraySource(event.player_stats, event.players_stats);
 }
 
+function normalizeMomentum(value) {
+  return list(value).map(point => {
+    if (!point || typeof point !== 'object') return null;
+    const minute = finite(point.minute ?? point.m);
+    const home = finite(point.home);
+    const away = finite(point.away);
+    if (home !== null && away !== null) return point;
+
+    const signed = finite(point.v);
+    if (signed === null) return null;
+    const homeShare = Math.max(0, Math.min(100, 50 + signed / 2));
+    return Object.freeze({
+      minute,
+      home:homeShare,
+      away:100 - homeShare,
+    });
+  }).filter(Boolean);
+}
+
+function normalizeShotmap(value) {
+  return list(value).map(shot => {
+    if (!shot || typeof shot !== 'object') return null;
+    const position = object(shot.pos);
+    const x = finite(shot.x ?? position?.x);
+    const y = finite(shot.y ?? position?.y);
+    if (x === null || y === null) return null;
+
+    if (!position) return shot;
+
+    const explicitSide = String(shot.side ?? '').trim().toLowerCase();
+    const side = explicitSide === 'away'
+      ? 'away'
+      : explicitSide === 'home'
+        ? 'home'
+        : shot.home === false || shot.is_home === false
+          ? 'away'
+          : 'home';
+    return Object.freeze({
+      side,
+      x,
+      y,
+      xg:finite(shot.xg),
+    });
+  }).filter(Boolean);
+}
+
+function predictionSplitFromModel(prediction) {
+  const result = firstObject(
+    prediction?.markets?.match_result,
+    prediction?.markets?.matchResult,
+    prediction?.match_result,
+    prediction?.matchResult,
+  );
+  if (!result) return null;
+
+  const home = finite(result.prob_home ?? result.probHome);
+  const draw = finite(result.prob_draw ?? result.probDraw);
+  const away = finite(result.prob_away ?? result.probAway);
+  if (home === null && draw === null && away === null) return null;
+  return Object.freeze({ home, draw, away });
+}
+
 function overviewInput(event = {}) {
   const overviewMeta = object(event.overview_meta) || {};
   const venue = firstObject(event.venue, overviewMeta.venue) || {};
   const referee = firstObject(event.referee, event.main_referee, overviewMeta.referee);
   const form = firstObject(event.form, overviewMeta.form) || {};
-  const momentum = firstPresent(event, ['momentum']) ?? overviewMeta.momentum ?? null;
-  const shotmap = firstPresent(event, ['shotmap','shot_map'])
+  const rawMomentum = firstPresent(event, ['momentum']) ?? overviewMeta.momentum ?? null;
+  const rawShotmap = firstPresent(event, ['shotmap','shot_map'])
     ?? overviewMeta.shotmap
     ?? overviewMeta.shot_map
     ?? null;
-  const predictionSplit = firstPresent(event, ['prediction_split','predictionSplit'])
+  const prediction = firstObject(event.prediction, overviewMeta.prediction);
+  const explicitPredictionSplit = firstPresent(event, ['prediction_split','predictionSplit'])
     ?? firstPresent(overviewMeta, ['prediction_split','predictionSplit'])
     ?? null;
   return {
     venue,
     referee,
     form,
-    prediction:firstObject(event.prediction, overviewMeta.prediction),
-    predictionSplit,
-    momentum,
-    shotmap,
+    prediction,
+    predictionSplit:explicitPredictionSplit ?? predictionSplitFromModel(prediction),
+    momentum:normalizeMomentum(rawMomentum),
+    shotmap:normalizeShotmap(rawShotmap),
   };
 }
 
@@ -170,6 +239,7 @@ function hasOverview(event = {}) {
     || object(event.main_referee)
     || object(event.form)
     || object(event.overview_meta)
+    || object(event.prediction)
     || hasOwn(event, 'prediction_split')
     || hasOwn(event, 'predictionSplit')
     || hasOwn(event, 'momentum')
