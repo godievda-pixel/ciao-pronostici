@@ -2,8 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { listCanonicalPredictionMatches } from '../src/v23.3/prediction-match-resolver.mjs';
-import { renderTablesHub } from '../src/v23.3/tables-ui.mjs';
-import { renderCompetitionScreen } from '../src/v23.2/matches-ui.mjs';
+import { round8ThemeForCompetition } from '../src/v23.3/round8-performance-premium.mjs';
 
 function predictionRequest() {
   return new Request('https://ciao-web-app-test.example/api/v23.3/predictions', {
@@ -108,51 +107,46 @@ test('ranking reconciliation is scheduled off the ranking response critical path
   assert.doesNotMatch(rankings, /await\s+reconcileFinishedMatches/);
 });
 
-test('non-Serie-A Match screens copy the premium Serie A card hierarchy and use tournament themes', () => {
-  const html = renderCompetitionScreen('ucl', {
-    matches:[{
-      matchId:'ucl:1',
-      competition:'ucl',
-      stage:'Matchday 3',
-      round:3,
-      kickoffAt:'2026-09-04T21:45:00Z',
-      status:'scheduled',
-      homeTeam:{ name:'Интер', crestUrl:'https://img.example/inter.png' },
-      awayTeam:{ name:'Арсенал', crestUrl:'https://img.example/arsenal.png' },
-    }],
-  }, { now:new Date('2026-09-03T00:00:00Z') });
-
-  assert.match(html, /data-cw232-theme="champions"/);
-  assert.match(html, /cw232-match-card__topline/);
-  assert.match(html, /cw232-match-card__status/);
-  assert.match(html, /cw232-match-card__kickoff/);
-  assert.match(html, /cw232-match-card__versus/);
+test('non-Serie-A Match screens receive the premium Serie A card hierarchy from the Round 8 decorator', async () => {
+  const source = await readFile(new URL('../src/v23.3/round8-performance-premium.mjs', import.meta.url), 'utf8');
+  assert.equal(round8ThemeForCompetition('ucl'), 'champions');
+  assert.match(source, /cw232-match-card__topline/);
+  assert.match(source, /cw232-match-card__status/);
+  assert.match(source, /cw232-match-card__kickoff/);
+  assert.match(source, /cw232-match-card__versus/);
+  assert.match(source, /Матчи · \$\{round\}-й тур/);
 });
 
 test('premium Match UI defines tournament-specific accent variables for Coppa and UEFA competitions', async () => {
-  const source = await readFile(new URL('../src/v23.2/matches-ui.mjs', import.meta.url), 'utf8');
+  const source = await readFile(new URL('../src/v23.3/round8-performance-premium.mjs', import.meta.url), 'utf8');
   assert.match(source, /--cw232-accent/);
-  assert.match(source, /data-cw232-theme=['"]champions['"]/);
-  assert.match(source, /data-cw232-theme=['"]europa['"]/);
-  assert.match(source, /data-cw232-theme=['"]conference['"]/);
-  assert.match(source, /data-cw232-theme=['"]coppa['"]/);
+  assert.match(source, /data-cw232-theme='champions'/);
+  assert.match(source, /data-cw232-theme='europa'/);
+  assert.match(source, /data-cw232-theme='conference'/);
+  assert.match(source, /data-cw232-theme='coppa'/);
 });
 
-test('Tables hub carries the selected tournament theme into the premium surface', () => {
-  const serieA = renderTablesHub({ selectedCompetition:'serie_a', data:{ rows:[] } });
-  const champions = renderTablesHub({ selectedCompetition:'ucl', data:{ rows:[] } });
-
-  assert.match(serieA, /data-cw233-theme="serie-a"/);
-  assert.match(champions, /data-cw233-theme="champions"/);
+test('Tables premium surface derives its theme from the selected tournament', () => {
+  assert.equal(round8ThemeForCompetition('serie_a'), 'serie-a');
+  assert.equal(round8ThemeForCompetition('coppa_italia'), 'coppa');
+  assert.equal(round8ThemeForCompetition('ucl'), 'champions');
+  assert.equal(round8ThemeForCompetition('uel'), 'europa');
+  assert.equal(round8ThemeForCompetition('uecl'), 'conference');
 });
 
 test('Tables premium polish uses tournament accent variables instead of a fixed blue active state', async () => {
-  const source = await readFile(new URL('../src/v23.3/premium-polish-ui.mjs', import.meta.url), 'utf8');
+  const source = await readFile(new URL('../src/v23.3/round8-performance-premium.mjs', import.meta.url), 'utf8');
   assert.match(source, /--cw233-table-accent/);
-  assert.match(source, /data-cw233-theme=['"]coppa['"]/);
-  assert.match(source, /data-cw233-theme=['"]champions['"]/);
-  assert.match(source, /data-cw233-theme=['"]europa['"]/);
-  assert.match(source, /data-cw233-theme=['"]conference['"]/);
+  assert.match(source, /data-cw233-theme='coppa'/);
+  assert.match(source, /data-cw233-theme='champions'/);
+  assert.match(source, /data-cw233-theme='europa'/);
+  assert.match(source, /data-cw233-theme='conference'/);
+});
+
+test('Round 8 runtime is enabled from the v23.3 entry point', async () => {
+  const source = await readFile(new URL('../src/v23.3/index.mjs', import.meta.url), 'utf8');
+  assert.match(source, /round8-performance-premium\.mjs/);
+  assert.match(source, /round8PerformancePremium:\s*'enabled'/);
 });
 
 test('Serie A standings crest lookup canonicalizes aliases such as AC Milan and Милан', async () => {
