@@ -570,7 +570,7 @@ async function handleV23_3MatchCenter(request, env, url) {
           provider:'bsd-v2',
           matchId,
           section,
-          coverage:canonicalCoverage({ [section]:result.available }),
+          coverage:canonicalCoverage(result.coverage),
           available:result.available,
           data:result.data,
         },
