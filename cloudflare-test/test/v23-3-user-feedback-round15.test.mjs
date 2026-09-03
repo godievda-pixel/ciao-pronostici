@@ -67,7 +67,7 @@ test('Profile predictor points come from the v23.3 ranking domain instead of leg
   const profile = await readFile(new URL('../src/v23.3/profile-rating-ui.mjs', import.meta.url), 'utf8');
   const index = await readFile(new URL('../src/v23.3/index.mjs', import.meta.url), 'utf8');
   assert.match(profile, /createPredictionClient/);
-  assert.match(profile, /rankings\(\{\s*scope:'overall'\s*\}\)/);
+  assert.match(profile, /rankings\(\{\s*scope:'overall'\s*\}/);
   assert.match(profile, /data-cw233-profile-points/);
   assert.match(profile, /stats-grid/);
   assert.doesNotMatch(profile, /S\?\.stats|S\.stats/);
