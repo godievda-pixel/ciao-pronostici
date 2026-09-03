@@ -1,19 +1,18 @@
 const SEASON_LABEL = 'SERIE A 2026/27';
 const ALL_CALCIO_LABEL = 'ВСЁ О КАЛЬЧО';
 const MARKER = 'cw233-home-multicompetition';
+const EXTERNAL_MARKER = 'cw233-external-serie-a-legacy-runtime-r19';
 
 function replaceSeasonLabel(input) {
   return String(input).replaceAll(SEASON_LABEL, ALL_CALCIO_LABEL);
 }
 
-export function applyHomeV233SourcePatch(input) {
-  let source = replaceSeasonLabel(input);
+function applyHomePatch(input) {
+  let source = String(input);
   if (source.includes(MARKER)) return source;
 
   const anchor = /predict\s*=\s*__cw231HomeHtml\s*;/;
-  if (!anchor.test(source)) {
-    throw new Error('v23.3 Home anchor missing');
-  }
+  if (!anchor.test(source)) throw new Error('v23.3 Home anchor missing');
 
   const replacement = `/* ${MARKER} */
 const __cw233LegacyHomeHtml = __cw231HomeHtml;
@@ -53,5 +52,56 @@ predict = __cw231HomeHtml;`;
 
   source = source.replace(anchor, replacement);
   if (!source.includes(MARKER)) throw new Error('v23.3 Home source patch did not apply');
+  return source;
+}
+
+function applyExternalLegacyPatch(input) {
+  let source = String(input);
+  if (source.includes(EXTERNAL_MARKER)) return source;
+
+  const anchor = /predict\s*=\s*__cw231HomeHtml\s*;/;
+  if (!anchor.test(source)) throw new Error('v23.3 external legacy anchor missing');
+
+  const bridge = `/* ${EXTERNAL_MARKER} */
+let __cw233ExternalMatchContext = null;
+globalThis.addEventListener?.('ciao-v233-open-external-legacy-match', event => {
+  const detail = event?.detail || {};
+  if (!detail?.data) return;
+  __cw233ExternalMatchContext = {
+    competition:String(detail.competition || ''),
+    matchId:String(detail.matchId || ''),
+  };
+  matchReturnTab = tab;
+  matchViewId = -1;
+  matchCenterTab = 'overview';
+  matchData = detail.data;
+  root.classList.add('match-center-open');
+  const canonicalOverlay = document.getElementById?.('ciao-v233-match-center-overlay');
+  if (canonicalOverlay) canonicalOverlay.hidden = true;
+  main.innerHTML = matchCenterHtml(matchData);
+  const compactStatsTab = root.querySelector?.('[data-mc-tab="stats"]');
+  if (compactStatsTab) compactStatsTab.textContent = 'Статы';
+  bindMatchCenter();
+  main.scrollTop = 0;
+});
+predict = __cw231HomeHtml;`;
+  source = source.replace(anchor, bridge);
+
+  const closeBefore = "function closeMatchCenter(){matchViewId=null;matchData=null;matchCenterTab='overview';root.classList.remove('match-center-open');tab=matchReturnTab;render()}";
+  const closeAfter = "function closeMatchCenter(){__cw233ExternalMatchContext=null;matchViewId=null;matchData=null;matchCenterTab='overview';root.classList.remove('match-center-open');tab=matchReturnTab;render()}";
+  if (source.includes(closeBefore)) source = source.replace(closeBefore, closeAfter);
+
+  const refreshBefore = "async function refreshMatchCenter(){if(!matchViewId||matchLoading||document.hidden||String(matchData?.status??'').toLowerCase()==='finished')return;try{const next=await matchApi(matchViewId);patchMatchCenter(next)}catch(e){}}";
+  const refreshAfter = "async function refreshMatchCenter(){if(!matchViewId||matchLoading||document.hidden||String(matchData?.status??'').toLowerCase()==='finished')return;try{const next=__cw233ExternalMatchContext?await globalThis.CiaoV233ExternalLegacyMatchCenter?.refresh?.(__cw233ExternalMatchContext):await matchApi(matchViewId);if(next)patchMatchCenter(next)}catch(e){}}";
+  if (source.includes(refreshBefore)) source = source.replace(refreshBefore, refreshAfter);
+
+  if (!source.includes(EXTERNAL_MARKER)) throw new Error('v23.3 external legacy source patch did not apply');
+  return source;
+}
+
+export function applyHomeV233SourcePatch(input) {
+  let source = replaceSeasonLabel(input);
+  source = applyHomePatch(source);
+  source = applyExternalLegacyPatch(source);
   return source;
 }
