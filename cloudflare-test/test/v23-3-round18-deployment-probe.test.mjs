@@ -65,12 +65,15 @@ test('Round 18 deployment probe fails closed when parity marker or legacy delega
   assert.ok(result.missing.includes('serieALegacyDelegated'));
 });
 
-test('Round 18 TEST workflow runs the deployment probe only after build and only on push', async () => {
+test('Round 18 TEST workflow probes the deployed PR branch after build with bounded retry', async () => {
   const workflow = await readFile(new URL('../../.github/workflows/ciao-test-check.yml', import.meta.url), 'utf8');
   const buildAt = workflow.indexOf('Build TEST artifact');
   const probeAt = workflow.indexOf('Probe deployed Round 18 Match Center');
+  const probeBlock = workflow.slice(probeAt, probeAt + 700);
 
   assert.ok(probeAt > buildAt);
-  assert.match(workflow.slice(probeAt, probeAt + 240), /if: github\.event_name == 'push'/);
-  assert.match(workflow.slice(probeAt, probeAt + 320), /node scripts\/probe-round18-match-center\.mjs/);
+  assert.doesNotMatch(probeBlock, /if: github\.event_name == 'push'/);
+  assert.match(probeBlock, /for attempt in 1 2 3 4 5 6/);
+  assert.match(probeBlock, /node scripts\/probe-round18-match-center\.mjs/);
+  assert.match(probeBlock, /sleep 10/);
 });
