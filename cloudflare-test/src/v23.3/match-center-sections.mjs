@@ -168,6 +168,7 @@ export function canonicalOverviewSection(input = {}) {
     }),
     prediction:source.prediction || null,
     predictionSplit:source.predictionSplit ?? source.prediction_split ?? null,
+    summaryStats:source.summaryStats ? canonicalStatsSection(source.summaryStats) : null,
     momentum:source.momentum ?? null,
     shotmap:source.shotmap ?? null,
   });
