@@ -3,6 +3,7 @@ import {
   upsertParticipant,
   upsertPrediction,
   listUserPredictions,
+  listReconciledMatchIds,
   reconcileMatchPredictions,
   queryRanking,
   queryRankingMe,
@@ -31,7 +32,6 @@ function transaction(storage, fn) {
   if (typeof storage?.transactionSync === 'function') {
     return storage.transactionSync(fn);
   }
-  // Lightweight test doubles do not always expose transactionSync.
   return fn();
 }
 
@@ -76,11 +76,7 @@ export class PredictionLeague {
     try {
       if (url.pathname === '/participant' && request.method === 'POST') {
         const body = await bodyOf(request);
-        if (
-          !body
-          || body.season !== this.env.PREDICTION_SEASON
-          || !body.participant
-        ) {
+        if (!body || body.season !== this.env.PREDICTION_SEASON || !body.participant) {
           return json({ ok: false, error: 'invalid_participant_payload' }, 400);
         }
         const participant = transaction(this.state.storage, () => (
@@ -92,9 +88,7 @@ export class PredictionLeague {
       if (url.pathname === '/participants' && request.method === 'POST') {
         const body = await bodyOf(request);
         const participants = normalizedParticipantBatch(body, this.env.PREDICTION_SEASON);
-        if (!participants) {
-          return json({ ok:false, error:'invalid_participants_payload' }, 400);
-        }
+        if (!participants) return json({ ok:false, error:'invalid_participants_payload' }, 400);
         const timestamp = nowIso();
         const saved = transaction(this.state.storage, () => (
           participants.map(participant => upsertParticipant(this.sql, participant, timestamp))
@@ -104,12 +98,7 @@ export class PredictionLeague {
 
       if (url.pathname === '/write' && request.method === 'POST') {
         const body = await bodyOf(request);
-        if (
-          !body
-          || body.season !== this.env.PREDICTION_SEASON
-          || !body.participant
-          || !Array.isArray(body.predictions)
-        ) {
+        if (!body || body.season !== this.env.PREDICTION_SEASON || !body.participant || !Array.isArray(body.predictions)) {
           return json({ ok: false, error: 'invalid_write_payload' }, 400);
         }
 
@@ -129,6 +118,11 @@ export class PredictionLeague {
         const userId = url.searchParams.get('user_id') || '';
         const competition = url.searchParams.get('competition') || 'all';
         return json({ ok: true, predictions: listUserPredictions(this.sql, { userId, competition }) });
+      }
+
+      if (url.pathname === '/reconciled' && request.method === 'GET') {
+        const competition = url.searchParams.get('competition') || '';
+        return json({ ok:true, match_ids:listReconciledMatchIds(this.sql, { competition }) });
       }
 
       if (url.pathname === '/rankings' && request.method === 'GET') {
@@ -165,12 +159,7 @@ export class PredictionLeague {
 
       if (url.pathname === '/reset' && request.method === 'POST') {
         const body = await bodyOf(request);
-        if (
-          !body
-          || body.environment !== 'test'
-          || body.season !== this.env.PREDICTION_SEASON
-          || this.env.CIAO_ENV !== 'test'
-        ) {
+        if (!body || body.environment !== 'test' || body.season !== this.env.PREDICTION_SEASON || this.env.CIAO_ENV !== 'test') {
           return json({ ok: false, error: 'reset_forbidden' }, 403);
         }
         const result = transaction(this.state.storage, () => resetPredictionDomain(this.sql));
