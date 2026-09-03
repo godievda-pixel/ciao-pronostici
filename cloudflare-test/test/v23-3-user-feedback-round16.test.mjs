@@ -12,7 +12,8 @@ test('Round 16 Matches hub handoff is immediate and has no animated background e
   const runtimeSource = await source('../src/v23.3/round16-runtime.mjs');
   assert.match(runtimeSource, /#ciao-v232-matches-overlay\{transition:none!important;/);
   assert.doesNotMatch(runtimeSource, /transition\s*:\s*background/i);
-  assert.match(runtimeSource, /data-cw232-action=\\"hub\\"/);
+  assert.match(runtimeSource, /data-cw232-action=["']hub["']/);
+  assert.match(runtimeSource, /matches\.style\.transition=['"]none['"]/);
 });
 
 test('Round 16 Ranking uses compact selector labels and full tournament section titles', () => {
@@ -53,7 +54,8 @@ test('Round 16 Tables has no selector horizontal scroll and owns pointerdown pri
   const sourceText = await source('../src/v23.3/round16-runtime.mjs');
   assert.match(sourceText, /function\s+primeTablesOverlay/);
   assert.match(sourceText, /addEventListener\(['"]pointerdown['"]/);
-  assert.match(sourceText, /dataset\?\.tab\s*===\s*['"]seriea['"]/);
+  assert.match(sourceText, /const\s+tab=nav\.dataset\?\.tab/);
+  assert.match(sourceText, /if\s*\(tab\s*===\s*['"]seriea['"]\)\s*primeTablesOverlay/);
   assert.match(sourceText, /cw233-table-selectors-viewport\{overflow:hidden!important/);
 });
 
