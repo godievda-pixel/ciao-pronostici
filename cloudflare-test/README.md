@@ -83,6 +83,6 @@ curl -X POST \
   https://ciao-web-app-test.ciao-web.workers.dev/api/v23.3/test/predictions/reset
 ```
 
-A successful TEST reset must report all four stages as `ok: true`: `predictions`, `points`, `ranking`, and `caches`. Immediately re-run `/healthz`, the unauthenticated prediction guard, and one authenticated persistence round-trip after cleanup.
+A successful TEST reset must report all five stages as `ok: true`: `predictions`, `points`, `ranking`, `profiles`, and `caches`. Immediately re-run `/healthz`, the unauthenticated prediction guard, and one authenticated persistence round-trip after cleanup.
 
 Never point this reset command at Production. The v23.3 reset contract keeps `canExecuteProductionReset: false` even after TEST reset verification.
