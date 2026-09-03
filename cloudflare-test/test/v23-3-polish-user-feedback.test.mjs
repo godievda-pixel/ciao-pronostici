@@ -41,13 +41,16 @@ test('premium polish visually removes redundant tournament captions', async () =
   assert.match(source, /grid-template-areas:\"title arrow\"/);
 });
 
-test('premium tables keep row polish while round7 restores all mobile stats through horizontal scrolling', async () => {
+test('premium tables keep row polish while adaptive mobile rules expose every stat without the old crop width', async () => {
   const premium = await readFile(new URL('../src/v23.3/premium-polish-ui.mjs', import.meta.url), 'utf8');
   const round7 = await readFile(new URL('../src/v23.3/round7-regression-fixes.mjs', import.meta.url), 'utf8');
+  const round12 = await readFile(new URL('../src/v23.3/round12-stability-performance.mjs', import.meta.url), 'utf8');
   assert.match(premium, /border-spacing:0 8px!important/);
   assert.match(premium, /hydrateTableLogos/);
   assert.match(round7, /cw233-standing-viewport[^}]*overflow-x:auto!important/);
-  assert.match(round7, /cw233-standing-table[^}]*min-width:660px!important/);
+  assert.doesNotMatch(round7, /cw233-standing-table[^}]*min-width:660px!important/);
   assert.match(round7, /nth-child\(4\)[^}]*display:table-cell!important/);
   assert.match(round7, /nth-child\(7\)[^}]*display:table-cell!important/);
+  assert.match(round12, /@media\(min-width:420px\)/);
+  assert.match(round12, /cw233-standing-table--full\{min-width:0!important;width:100%!important/);
 });
