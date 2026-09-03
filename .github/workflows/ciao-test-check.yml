@@ -60,6 +60,10 @@ jobs:
         if: github.event_name == 'push'
         run: node scripts/probe-round5-deployment.mjs
 
+      - name: Probe deployed Round 18 Match Center
+        if: github.event_name == 'push'
+        run: node scripts/probe-round18-match-center.mjs
+
       - name: Upload v23.2 API contract observation
         if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
@@ -111,6 +115,15 @@ jobs:
         with:
           name: ciao-v23-3-round5-test-deployment
           path: cloudflare-test/artifacts/v23-3-round5-live.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload Round 18 Match Center deployment observation
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ciao-v23-3-round18-match-center
+          path: cloudflare-test/artifacts/v23-3-round18-match-center.json
           if-no-files-found: error
           retention-days: 7
 
