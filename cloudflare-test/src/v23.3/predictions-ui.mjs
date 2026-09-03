@@ -52,9 +52,10 @@ function numericRound(match) {
 }
 function stageLabel(value) { const raw = text(value) || 'Стадия'; return COPPA_STAGE_LABELS[raw] || raw; }
 function stageOrder(value) { const index = COPPA_STAGE_ORDER.indexOf(text(value)); return index < 0 ? Number.MAX_SAFE_INTEGER : index; }
-function themeFor(value) {
+export function predictionThemeFor(value) {
   return ({ all:'serie-a', serie_a:'serie-a', coppa_italia:'coppa', ucl:'champions', uel:'europa', uecl:'conference' })[text(value)] || 'serie-a';
 }
+const themeFor = predictionThemeFor;
 
 export async function loadPredictionCompetitionsProgressively({ competitions = PREDICTION_COMPETITIONS, load, onUpdate = () => {} } = {}) {
   if (typeof load !== 'function') throw new Error('prediction competition loader required');
@@ -285,6 +286,123 @@ function setHtmlIfChanged(node, html) {
   return true;
 }
 
+function syncAttributes(target, source) {
+  if (!target?.attributes || !source?.attributes) return;
+  for (const attribute of [...target.attributes]) {
+    if (!source.hasAttribute(attribute.name)) target.removeAttribute(attribute.name);
+  }
+  for (const attribute of [...source.attributes]) {
+    if (target.getAttribute(attribute.name) !== attribute.value) target.setAttribute(attribute.name, attribute.value);
+  }
+}
+
+function predictionFocusState(page, documentRef) {
+  const activeElement = documentRef?.activeElement;
+  if (!activeElement || !page?.contains?.(activeElement)) return null;
+  const card = activeElement.closest?.('[data-cw233-pred-card]');
+  return Object.freeze({
+    matchId:text(card?.dataset?.cw233PredCard),
+    delta:text(activeElement?.dataset?.cw233Delta),
+    nav:text(activeElement?.dataset?.cw233PredNav),
+    mode:text(activeElement?.dataset?.cw233Mode),
+    filter:text(activeElement?.dataset?.cw233Filter),
+  });
+}
+
+function selectorValue(value) {
+  return String(value ?? '').replaceAll('\\', '\\\\').replaceAll('"', '\\"');
+}
+
+function restorePredictionFocus(page, focusState) {
+  if (!page || !focusState) return;
+  let selector = '';
+  if (focusState.matchId && focusState.delta) selector = `[data-cw233-pred-card="${selectorValue(focusState.matchId)}"] [data-cw233-delta="${selectorValue(focusState.delta)}"]`;
+  else if (focusState.nav) selector = `[data-cw233-pred-nav="${selectorValue(focusState.nav)}"]`;
+  else if (focusState.mode) selector = `[data-cw233-mode="${selectorValue(focusState.mode)}"]`;
+  else if (focusState.filter) selector = `[data-cw233-filter="${selectorValue(focusState.filter)}"]`;
+  else if (focusState.matchId) selector = `[data-cw233-pred-card="${selectorValue(focusState.matchId)}"]`;
+  if (!selector) return;
+  page.querySelector?.(selector)?.focus?.({ preventScroll:true });
+}
+
+function patchPredictionCardNode(current, incoming) {
+  if (!current || !incoming) return;
+  syncAttributes(current, incoming);
+  if (current.innerHTML !== incoming.innerHTML) current.innerHTML = incoming.innerHTML;
+}
+
+function patchPredictionStructure(body, incomingRoot) {
+  const currentHeadings = [...(body?.querySelectorAll?.('.section-title h3') || [])];
+  const incomingHeadings = [...(incomingRoot?.querySelectorAll?.('.section-title h3') || [])];
+  if (currentHeadings.length !== incomingHeadings.length) return false;
+  for (let i = 0; i < currentHeadings.length; i += 1) currentHeadings[i].textContent = incomingHeadings[i].textContent;
+
+  const currentNav = [...(body?.querySelectorAll?.('.cw233-pred-nav [data-cw233-pred-nav]') || [])];
+  const incomingNav = [...(incomingRoot?.querySelectorAll?.('.cw233-pred-nav [data-cw233-pred-nav]') || [])];
+  if (currentNav.length !== incomingNav.length) return false;
+  for (let i = 0; i < currentNav.length; i += 1) {
+    syncAttributes(currentNav[i], incomingNav[i]);
+    if (currentNav[i].innerHTML !== incomingNav[i].innerHTML) currentNav[i].innerHTML = incomingNav[i].innerHTML;
+  }
+  return true;
+}
+
+export function reconcilePredictionBody(body, bodyHtml, { page = null, documentRef = globalThis.document } = {}) {
+  if (!body) return false;
+  const nextHtml = String(bodyHtml ?? '');
+  if (body.innerHTML === nextHtml) return false;
+  const doc = body.ownerDocument || documentRef;
+  if (!doc?.createElement) {
+    body.innerHTML = nextHtml;
+    return true;
+  }
+
+  const scrollTop = body.scrollTop || 0;
+  const filters = page?.querySelector?.('.cw233-pred-filters');
+  const filtersScrollLeft = filters?.scrollLeft || 0;
+  const navigation = body.querySelector?.('.cw233-pred-nav');
+  const navScrollLeft = navigation?.scrollLeft || 0;
+  const focusState = predictionFocusState(page, documentRef);
+
+  const template = doc.createElement('template');
+  template.innerHTML = nextHtml;
+  const incomingRoot = template.content;
+  const currentCards = new Map(
+    [...(body.querySelectorAll?.('[data-cw233-pred-card]') || [])]
+      .map(card => [text(card?.dataset?.cw233PredCard), card])
+      .filter(([key]) => key),
+  );
+  const incomingCards = [...(incomingRoot.querySelectorAll?.('[data-cw233-pred-card]') || [])];
+  const currentKeys = [...currentCards.keys()];
+  const incomingKeys = incomingCards.map(card => text(card?.dataset?.cw233PredCard)).filter(Boolean);
+  const sameKeys = currentKeys.length > 0
+    && currentKeys.length === incomingKeys.length
+    && currentKeys.every((key, index) => key === incomingKeys[index]);
+
+  let reconciledInPlace = false;
+  if (sameKeys && patchPredictionStructure(body, incomingRoot)) {
+    for (const incoming of incomingCards) patchPredictionCardNode(currentCards.get(text(incoming?.dataset?.cw233PredCard)), incoming);
+    reconciledInPlace = true;
+  } else {
+    for (const incoming of incomingCards) {
+      const key = text(incoming?.dataset?.cw233PredCard);
+      const current = currentCards.get(key);
+      if (!current) continue;
+      patchPredictionCardNode(current, incoming);
+      incoming.replaceWith(current);
+    }
+    body.replaceChildren(...incomingRoot.childNodes);
+  }
+
+  body.scrollTop = scrollTop;
+  const nextFilters = page?.querySelector?.('.cw233-pred-filters');
+  if (nextFilters) nextFilters.scrollLeft = filtersScrollLeft;
+  const nextNavigation = body.querySelector?.('.cw233-pred-nav');
+  if (nextNavigation) nextNavigation.scrollLeft = navScrollLeft;
+  restorePredictionFocus(page, focusState);
+  return !reconciledInPlace || incomingCards.length > 0;
+}
+
 function ensurePredictionShell(main = contentNode()) {
   if (!main) return null;
   let page = main.querySelector('.cw233-prediction-page');
@@ -292,6 +410,7 @@ function ensurePredictionShell(main = contentNode()) {
   page = document.createElement('div');
   page.className = 'cw233-prediction-page';
   page.dataset.cw233Round11Theme = themeFor(activeFilter);
+  page.dataset.cw233PredictionTheme = predictionThemeFor(activeFilter);
   page.innerHTML = `<div class="cw233-prediction-hero-slot"></div><div class="cw233-prediction-tabs-slot"></div><div class="cw233-prediction-filters-slot"></div><div class="cw233-prediction-body-slot"></div><div class="cw233-prediction-save-slot"></div>`;
   main.replaceChildren(page);
   setHtmlIfChanged(page.querySelector('.cw233-prediction-tabs-slot'), tabsHtml());
@@ -305,6 +424,7 @@ function dispatchThemeRefresh() {
 
 function updatePredictionChrome(page) {
   page.dataset.cw233Round11Theme = themeFor(activeFilter);
+  page.dataset.cw233PredictionTheme = predictionThemeFor(activeFilter);
   setHtmlIfChanged(page.querySelector('.cw233-prediction-hero-slot'), heroHtml());
   const tabsSlot = page.querySelector('.cw233-prediction-tabs-slot');
   if (!tabsSlot?.querySelector?.('[data-cw233-mode]')) setHtmlIfChanged(tabsSlot, tabsHtml());
@@ -323,13 +443,8 @@ function render() {
   const writable = activeMode === 'make' && selected.some(match => match?.state === 'open');
   updatePredictionChrome(page);
   const body = page.querySelector('.cw233-prediction-body-slot');
-  const roundScrollLeft = body?.querySelector?.('.cw233-pred-nav')?.scrollLeft || 0;
   const bodyHtml = activeMode === 'mine' ? mineBody(selected) : makeBody(selected);
-  const bodyChanged = setHtmlIfChanged(body, bodyHtml);
-  if (bodyChanged && roundScrollLeft) {
-    const navigation = body?.querySelector?.('.cw233-pred-nav');
-    if (navigation) navigation.scrollLeft = roundScrollLeft;
-  }
+  reconcilePredictionBody(body, bodyHtml, { page, documentRef:document });
   setHtmlIfChanged(page.querySelector('.cw233-prediction-save-slot'), writable ? '<div class="savebar"><button type="button" class="save" data-cw233-save-all>Сохранить прогнозы</button></div>' : '');
   dispatchThemeRefresh();
 }
