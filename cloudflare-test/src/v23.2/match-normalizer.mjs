@@ -46,6 +46,9 @@ const COUNTRY_CODES = Object.freeze({
 });
 
 const ITALIAN_ONLY_COMPETITIONS = new Set(['ucl', 'uel', 'uecl']);
+const UEFA_LEAGUE_ROUND_LIMIT = Object.freeze({ ucl:8, uel:8, uecl:6 });
+const UEFA_QUALIFICATION_STAGE = /(?:qualif(?:ication|ying)?|preliminary|предваритель|квалификац)/i;
+const UEFA_LEAGUE_STAGE = /(?:league\s+(?:stage|phase)|этап\s+лиги)/i;
 
 function text(value) {
   return String(value ?? '').trim();
@@ -112,8 +115,26 @@ export function normalizeMatch(raw, competition) {
   });
 }
 
+export function isUefaQualificationMatch(match = {}) {
+  const competition = text(match?.competition);
+  if (!ITALIAN_ONLY_COMPETITIONS.has(competition)) return false;
+  const stage = text(match?.stage);
+  if (UEFA_QUALIFICATION_STAGE.test(stage)) return true;
+
+  const round = Number(match?.round);
+  if (!Number.isFinite(round) || round <= 0) return false;
+  // BSD occasionally exposes qualification phase identifiers as huge round numbers
+  // (for example 636), which must never become user-facing matchday tabs.
+  if (round >= 100) return true;
+
+  const limit = UEFA_LEAGUE_ROUND_LIMIT[competition];
+  if (UEFA_LEAGUE_STAGE.test(stage) && Number.isFinite(limit) && round > limit) return true;
+  return false;
+}
+
 export function shouldIncludeMatch(match) {
   getCompetitionConfig(match.competition);
+  if (isUefaQualificationMatch(match)) return false;
   if (!ITALIAN_ONLY_COMPETITIONS.has(match.competition)) return true;
   return isItalianTeam(match.homeTeam) || isItalianTeam(match.awayTeam);
 }
