@@ -169,6 +169,7 @@ export class PredictionLeague {
             predictions: { ok: true, affected: result.predictions },
             points: { ok: true, affected: result.points },
             ranking: { ok: true, affected: result.ranking },
+            profiles: { ok: true, affected: result.profiles },
             caches: { ok: true, affected: result.caches },
           },
         });
