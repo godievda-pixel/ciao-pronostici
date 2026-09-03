@@ -1,4 +1,5 @@
 const STYLE_ID = 'cw233-legacy-match-center-theme';
+export const LEGACY_MATCH_CENTER_THEME_BUILD = 'r20-single-renderer';
 
 export const LEGACY_MATCH_CENTER_THEME_KEYS = Object.freeze({
   coppa_italia:'coppa_italia',
