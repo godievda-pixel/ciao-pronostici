@@ -300,9 +300,15 @@ export function patchTablesHub(overlay, html) {
   const holder = documentRef?.createElement?.('div');
   if (!holder) return false;
   holder.innerHTML = html;
-  const next = holder.querySelector?.('.cw233-tables-hub');
-  if (!next) return false;
   const current = overlay.querySelector?.('.cw233-tables-hub');
+  const next = holder.querySelector?.('.cw233-tables-hub');
+  if (!next) {
+    if (!current) {
+      overlay.innerHTML = html;
+      return true;
+    }
+    return false;
+  }
   if (!current) {
     overlay.innerHTML = html;
     return true;
