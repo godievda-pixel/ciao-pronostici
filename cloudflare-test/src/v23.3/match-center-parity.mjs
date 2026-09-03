@@ -1,3 +1,5 @@
+export const SERIE_A_LEGACY_PARITY_GATE = 'serie_a_legacy_parity_gate';
+
 const PARITY_KEYS = Object.freeze([
   'hero',
   'form',
