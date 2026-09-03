@@ -2,6 +2,7 @@ import { createPredictionClient } from './prediction-client.mjs';
 
 export const USER_FEEDBACK_ROUND4_BUILD = '2026-09-02-r4';
 export const USER_FEEDBACK_ROUND6_BUILD = '2026-09-02-r6';
+export const USER_FEEDBACK_ROUND7_BUILD = '2026-09-03-r7';
 
 export const PREDICTION_FILTERS = Object.freeze([
   { key:'all', label:'Все' },
@@ -10,11 +11,10 @@ export const PREDICTION_FILTERS = Object.freeze([
   { key:'ucl', label:'ЛЧ' },
   { key:'uel', label:'ЛЕ' },
   { key:'uecl', label:'ЛК' },
-  { key:'unfilled', label:'Не заполнено' },
 ]);
 
 const PREDICTION_COMPETITIONS = Object.freeze(
-  PREDICTION_FILTERS.map(item => item.key).filter(key => !['all', 'unfilled'].includes(key)),
+  PREDICTION_FILTERS.map(item => item.key).filter(key => key !== 'all'),
 );
 const UEFA_COMPETITIONS = new Set(['ucl','uel','uecl']);
 const COPPA_STAGE_ORDER = Object.freeze([
@@ -81,17 +81,22 @@ export async function loadPredictionCompetitionsProgressively({
   const keys = [...new Set((Array.isArray(competitions) ? competitions : []).map(text).filter(Boolean))];
   const byMatch = new Map();
   const errors = {};
+  let participant = null;
   let pending = keys.length;
 
   const snapshot = () => Object.freeze({
     matches:Object.freeze(sortMatches([...byMatch.values()])),
     errors:Object.freeze({ ...errors }),
+    participant:participant ? Object.freeze({ ...participant }) : null,
     pending,
   });
 
   await Promise.all(keys.map(async competition => {
     try {
       const data = await load(competition);
+      if (!participant && data?.participant && typeof data.participant === 'object') {
+        participant = data.participant;
+      }
       for (const match of Array.isArray(data?.matches) ? data.matches : []) {
         const id = text(match?.matchId);
         if (id) byMatch.set(id, match);
@@ -116,7 +121,6 @@ export function predictionRowsForMode(matches = [], mode = 'make') {
 export function filterPredictionMatches(matches = [], filter = 'all') {
   const rows = Array.isArray(matches) ? matches : [];
   if (filter === 'all') return [...rows];
-  if (filter === 'unfilled') return rows.filter(match => match?.state === 'open' && !match?.prediction);
   return rows.filter(match => match?.competition === filter);
 }
 
@@ -205,6 +209,7 @@ const activeNavigation = new Map();
 let matches = [];
 let activeFilter = 'all';
 let activeMode = 'make';
+let currentParticipant = null;
 let client = null;
 let pageActive = false;
 let loadingMatches = false;
@@ -242,7 +247,7 @@ function team(match, side) { return match?.[`${side}Team`] || match?.[side] || {
 function teamName(match, side) { return text(team(match, side)?.name) || '—'; }
 function teamLogo(match, side) {
   const item = team(match, side);
-  const src = text(item?.crestUrl || item?.logo_url || item?.logoUrl);
+  const src = text(item?.crestUrl || item?.logo_url || item?.logoUrl || item?.logo || item?.crest_url || item?.team_logo || item?.team_logo_url);
   return src
     ? `<img class="logo" src="${esc(src)}" alt="" loading="eager" decoding="sync">`
     : '<span class="logo" aria-hidden="true"></span>';
@@ -257,8 +262,8 @@ function scoreFor(match) {
 
 function heroHtml() {
   const tgUser = telegramUser();
-  const name = resolvePredictionDisplayName(null, tgUser);
-  const username = text(tgUser?.username).replace(/^@/, '');
+  const name = resolvePredictionDisplayName(currentParticipant, tgUser);
+  const username = text(currentParticipant?.username || tgUser?.username).replace(/^@/, '');
   return `<div class="hero"><div class="hero-top"><div><h2>${esc(name)}</h2><p>${username ? `@${esc(username)}` : 'Прогнозы на все турниры'}</p></div></div></div>`;
 }
 
@@ -270,8 +275,7 @@ function tabsHtml() {
 }
 
 function filtersHtml() {
-  const allowed = activeMode === 'mine' ? PREDICTION_FILTERS.filter(item => item.key !== 'unfilled') : PREDICTION_FILTERS;
-  return `<div class="cw231-filters" role="tablist" aria-label="Турниры">${allowed.map(filter => (
+  return `<div class="cw231-filters cw233-pred-filters" role="tablist" aria-label="Турниры">${PREDICTION_FILTERS.map(filter => (
     `<button type="button" data-cw233-filter="${filter.key}" aria-selected="${filter.key === activeFilter}">${filter.label}</button>`
   )).join('')}</div>`;
 }
@@ -353,9 +357,15 @@ function render() {
   if (!pageActive) return;
   const main = contentNode();
   if (!main) return;
+  const filterScrollLeft = main.querySelector('.cw233-pred-filters')?.scrollLeft || 0;
+  const roundScrollLeft = main.querySelector('.cw233-pred-nav')?.scrollLeft || 0;
   const modeRows = predictionRowsForMode(matches, activeMode);
   const selected = filterPredictionMatches(modeRows, activeFilter);
   main.innerHTML = `${heroHtml()}${tabsHtml()}${filtersHtml()}${activeMode === 'mine' ? mineBody(selected) : makeBody(selected)}${activeMode === 'make' && modeRows.length ? '<div class="savebar"><button type="button" class="save" data-cw233-save-all>Сохранить прогнозы</button></div>' : ''}`;
+  const filters = main.querySelector('.cw233-pred-filters');
+  const navigation = main.querySelector('.cw233-pred-nav');
+  if (filters) filters.scrollLeft = filterScrollLeft;
+  if (navigation) navigation.scrollLeft = roundScrollLeft;
 }
 
 async function reloadMatches(generation = loadGeneration) {
@@ -364,6 +374,7 @@ async function reloadMatches(generation = loadGeneration) {
     onUpdate(state) {
       if (!pageActive || generation !== loadGeneration) return;
       matches = [...state.matches];
+      currentParticipant = state.participant || currentParticipant;
       loadingMatches = state.pending > 0 && predictionRowsForMode(matches, activeMode).length === 0;
       loadingFailed = false;
       render();
@@ -371,6 +382,7 @@ async function reloadMatches(generation = loadGeneration) {
   });
   if (!pageActive || generation !== loadGeneration) return finalState;
   matches = [...finalState.matches];
+  currentParticipant = finalState.participant || currentParticipant;
   loadingMatches = false;
   loadingFailed = matches.length === 0 && Object.keys(finalState.errors).length === PREDICTION_COMPETITIONS.length;
   render();
@@ -433,6 +445,18 @@ async function saveDrafts() {
 export function installPredictionsUi() {
   if (typeof document === 'undefined') return null;
   document.addEventListener('click', event => {
+    const homePredict = event.target?.closest?.('[data-cw231-action="predict"]');
+    if (homePredict) {
+      event.preventDefault();
+      activeMode = 'make';
+      const cardCompetition = text(homePredict.closest?.('[data-cw233-competition]')?.dataset?.cw233Competition);
+      activeFilter = PREDICTION_COMPETITIONS.includes(cardCompetition) ? cardCompetition : 'all';
+      const nav = document.querySelector('#ciao-miniapp-root .nav button[data-tab="mine"]');
+      if (nav) nav.click();
+      else void open();
+      return;
+    }
+
     const nav = event.target?.closest?.('.nav button[data-tab]');
     if (nav?.dataset?.tab === 'mine') {
       void open();
@@ -447,7 +471,6 @@ export function installPredictionsUi() {
     const mode = event.target?.closest?.('[data-cw233-mode]');
     if (mode) {
       activeMode = mode.dataset.cw233Mode === 'mine' ? 'mine' : 'make';
-      if (activeMode === 'mine' && activeFilter === 'unfilled') activeFilter = 'all';
       render();
       return;
     }

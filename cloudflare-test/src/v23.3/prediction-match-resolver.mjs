@@ -132,6 +132,39 @@ async function fetchLegacySerieAJson({ request, env, path, body }) {
   return payload;
 }
 
+function sameTeam(left = {}, right = {}) {
+  const leftId = text(left?.id);
+  const rightId = text(right?.id);
+  if (leftId && rightId) return leftId === rightId;
+  const leftName = text(left?.rawName || left?.name).toLowerCase();
+  const rightName = text(right?.rawName || right?.name).toLowerCase();
+  return Boolean(leftName && rightName && leftName === rightName);
+}
+
+function mergeTeamCrest(primary = {}, source = {}) {
+  if (text(primary?.crestUrl) || !text(source?.crestUrl) || !sameTeam(primary, source)) return primary;
+  return Object.freeze({ ...primary, crestUrl:source.crestUrl });
+}
+
+function enrichSerieACrests(primarySchedule, crestSchedule) {
+  const primary = Array.isArray(primarySchedule?.matches) ? primarySchedule.matches : [];
+  const crestMatches = Array.isArray(crestSchedule?.matches) ? crestSchedule.matches : [];
+  if (!primary.length || !crestMatches.length) return primarySchedule;
+  const byId = new Map(crestMatches.map(match => [text(match?.matchId), match]));
+  return Object.freeze({
+    ...primarySchedule,
+    matches:Object.freeze(primary.map(match => {
+      const source = byId.get(text(match?.matchId));
+      if (!source) return match;
+      return Object.freeze({
+        ...match,
+        homeTeam:mergeTeamCrest(match.homeTeam, source.homeTeam),
+        awayTeam:mergeTeamCrest(match.awayTeam, source.awayTeam),
+      });
+    })),
+  });
+}
+
 async function loadSerieA({ request, env, adapt = adaptSerieASchedule }) {
   if (!env?.CIAO_WEB_API || typeof env.CIAO_WEB_API.fetch !== 'function') {
     throw new PredictionMatchError('match_resolution_failed', 502);
@@ -147,7 +180,19 @@ async function loadSerieA({ request, env, adapt = adaptSerieASchedule }) {
     const stableRound = stateSchedule(statePayload);
     if (stableRound) {
       const adapted = adapt(stableRound);
-      if (Array.isArray(adapted?.matches) && adapted.matches.length) return adapted;
+      if (Array.isArray(adapted?.matches) && adapted.matches.length) {
+        try {
+          const schedulePayload = await fetchLegacySerieAJson({
+            request,
+            env,
+            path:LEGACY_SERIE_A_SCHEDULE,
+            body:{},
+          });
+          return enrichSerieACrests(adapted, adapt(schedulePayload));
+        } catch {
+          return adapted;
+        }
+      }
     }
   } catch {}
 

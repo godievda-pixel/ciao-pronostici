@@ -4,6 +4,7 @@ export const USER_FEEDBACK_ROUND3_BUILD = '2026-09-02-r3';
 export const USER_FEEDBACK_ROUND4_BUILD = '2026-09-02-r4';
 export const USER_FEEDBACK_ROUND5_BUILD = '2026-09-02-r5';
 export const USER_FEEDBACK_ROUND6_BUILD = '2026-09-02-r6';
+export const USER_FEEDBACK_ROUND7_BUILD = '2026-09-03-r7';
 
 export const RANKING_FILTERS = Object.freeze([
   {key:'overall',label:'Общий'},
@@ -48,7 +49,7 @@ let rows = [];
 let me = null;
 let pageActive = false;
 
-const RANKING_STYLE_ID = 'cw233-ranking-round5-style';
+const RANKING_STYLE_ID = 'cw233-ranking-round7-style';
 
 function text(value) { return String(value ?? '').trim(); }
 function esc(value) {
@@ -66,7 +67,13 @@ function ensureRankingPremiumStyle() {
   style.id = RANKING_STYLE_ID;
   style.textContent = `
     .cw233-ranking-page .cw233-ranking-list{display:grid!important;gap:8px!important;padding:0!important}
-    .cw233-ranking-page .cw233-ranking-row{display:grid!important;grid-template-columns:34px 36px minmax(0,1fr) 58px!important;column-gap:10px!important;align-items:center!important;min-height:62px!important;width:100%!important;padding:10px 11px!important;box-sizing:border-box!important}
+    .cw233-ranking-page .cw233-ranking-row{display:grid!important;grid-template-columns:34px 36px minmax(0,1fr) 58px!important;column-gap:10px!important;align-items:center!important;min-height:62px!important;width:100%!important;padding:10px 11px!important;box-sizing:border-box!important;border:1px solid transparent!important;transition:border-color .2s ease,box-shadow .2s ease,background .2s ease}
+    .cw233-ranking-page .cw233-ranking-row.is-podium-1{border-color:rgba(255,209,82,.72)!important;background:linear-gradient(90deg,rgba(255,196,46,.20),rgba(255,196,46,.055) 48%,rgba(255,196,46,.13))!important;box-shadow:inset 3px 0 0 #ffd052,0 0 24px rgba(255,195,39,.10)!important}
+    .cw233-ranking-page .cw233-ranking-row.is-podium-2{border-color:rgba(210,222,245,.55)!important;background:linear-gradient(90deg,rgba(199,213,240,.16),rgba(199,213,240,.04) 48%,rgba(199,213,240,.10))!important;box-shadow:inset 3px 0 0 #d9e3f5!important}
+    .cw233-ranking-page .cw233-ranking-row.is-podium-3{border-color:rgba(211,139,83,.55)!important;background:linear-gradient(90deg,rgba(190,111,58,.17),rgba(190,111,58,.04) 48%,rgba(190,111,58,.10))!important;box-shadow:inset 3px 0 0 #d18a58!important}
+    .cw233-ranking-page .cw233-ranking-row.is-podium-1 .cw233-ranking-position{background:linear-gradient(145deg,#7a5a14,#d5a72e)!important;border-color:rgba(255,224,130,.70)!important}
+    .cw233-ranking-page .cw233-ranking-row.is-podium-2 .cw233-ranking-position{background:linear-gradient(145deg,#53627a,#aab9d1)!important;border-color:rgba(232,240,255,.55)!important}
+    .cw233-ranking-page .cw233-ranking-row.is-podium-3 .cw233-ranking-position{background:linear-gradient(145deg,#75472d,#b56d43)!important;border-color:rgba(236,166,117,.55)!important}
     .cw233-ranking-page .cw233-ranking-position{display:grid!important;place-items:center!important;width:34px!important;height:34px!important;min-width:34px!important}
     .cw233-ranking-page .cw233-ranking-position-value{display:block!important;width:100%!important;text-align:center!important;font-size:11px!important;font-weight:950!important;line-height:1!important;font-variant-numeric:tabular-nums!important}
     .cw233-ranking-page .cw233-ranking-person{display:grid!important;align-content:center!important;gap:3px!important;min-width:0!important;overflow:hidden!important}
@@ -90,12 +97,17 @@ export function resolveRankingDisplayName(current, tgUser) {
 }
 
 export function resolveCurrentRankingRow(rankingRows = [], tgUser = {}) {
-  const id = text(tgUser?.id);
-  if (!id) return null;
-  const wanted = `telegram:${id}`;
-  const index = (Array.isArray(rankingRows) ? rankingRows : []).findIndex(row => text(row?.user_id) === wanted);
+  const list = Array.isArray(rankingRows) ? rankingRows : [];
+  let index = list.findIndex(row => row?.is_current === true);
+  if (index < 0) {
+    const id = text(tgUser?.id);
+    if (id) {
+      const wanted = `telegram:${id}`;
+      index = list.findIndex(row => text(row?.user_id) === wanted);
+    }
+  }
   if (index < 0) return null;
-  return Object.freeze({ position:index + 1, ...rankingRows[index] });
+  return Object.freeze({ position:index + 1, ...list[index] });
 }
 
 function initials(value) {
@@ -133,7 +145,7 @@ function rankingHtml() {
     const name = text(row.display_name) || 'Участник';
     const username = text(row.username).replace(/^@/, '');
     const points = Number(row.points) || 0;
-    return `<div class="cw233-ranking-row${isMe ? ' is-me' : ''}"><div class="cw233-ranking-position${podiumClass(row.position)}"><span class="cw233-ranking-position-value">${row.position}</span></div><div class="cw233-ranking-avatar">${esc(initials(name))}</div><div class="cw233-ranking-person"><div class="cw233-ranking-name">${esc(name)}</div>${username ? `<span class="cw233-ranking-username">@${esc(username)}</span>` : ''}</div><div class="cw233-ranking-points"><strong class="cw233-ranking-points-value">${points}</strong><span class="cw233-ranking-points-unit">${esc(rankingPointsUnit(points))}</span></div></div>`;
+    return `<div class="cw233-ranking-row${podiumClass(row.position)}${isMe ? ' is-me' : ''}"><div class="cw233-ranking-position${podiumClass(row.position)}"><span class="cw233-ranking-position-value">${row.position}</span></div><div class="cw233-ranking-avatar">${esc(initials(name))}</div><div class="cw233-ranking-person"><div class="cw233-ranking-name">${esc(name)}</div>${username ? `<span class="cw233-ranking-username">@${esc(username)}</span>` : ''}</div><div class="cw233-ranking-points"><strong class="cw233-ranking-points-value">${points}</strong><span class="cw233-ranking-points-unit">${esc(rankingPointsUnit(points))}</span></div></div>`;
   }).join('')}</div></div></div>`;
 }
 
@@ -151,8 +163,7 @@ async function load() {
       : await client.rankings({ scope:'competition', competition:active });
     if (!pageActive) return;
     rows = Array.isArray(ranking) ? ranking : [];
-    const current = resolveCurrentRankingRow(rows, telegramUser());
-    if (current) me = current;
+    me = resolveCurrentRankingRow(rows, telegramUser());
     render();
   } catch (error) {
     const main = contentNode();

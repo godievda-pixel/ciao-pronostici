@@ -162,6 +162,7 @@ export function createPredictionService({ request, env, now = new Date(), deps =
       const byMatch = new Map((stored.predictions || []).map(row => [row.match_id, row]));
       return {
         ...canonical,
+        participant: participantFrom(authenticated),
         matches: canonical.matches.map(match => ({
           ...match,
           prediction: byMatch.get(match.matchId) || null,
@@ -204,7 +205,11 @@ export function createPredictionService({ request, env, now = new Date(), deps =
       const params = new URLSearchParams({ scope });
       if (scope === 'competition') params.set('competition', competition);
       const payload = await internalJson(stub, `/rankings?${params}`);
-      return Array.isArray(payload.ranking) ? payload.ranking : [];
+      const ranking = Array.isArray(payload.ranking) ? payload.ranking : [];
+      return ranking.map(row => ({
+        ...row,
+        is_current: text(row?.user_id) === authenticated.userId,
+      }));
     } catch (error) { throw mapError(error); }
   }
 

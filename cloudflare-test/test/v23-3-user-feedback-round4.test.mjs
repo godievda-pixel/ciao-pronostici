@@ -68,7 +68,7 @@ test('prediction UI exposes progressive competition loading so one slow provider
   assert.deepEqual(snapshots.at(-1), ['serie_a', 'ucl']);
 });
 
-test('all standings use the compact v22.5 five-column layout: #, team, played, goal difference, points', () => {
+test('all standings expose the full football stat line: #, team, played, W, D, L, goals, GD and points', () => {
   const row = {
     position:1,
     team:{ id:'65', name:'Рома', crestUrl:'https://img.test/roma.png' },
@@ -76,14 +76,19 @@ test('all standings use the compact v22.5 five-column layout: #, team, played, g
     wins:2,
     draws:0,
     losses:0,
+    goalsFor:6,
+    goalsAgainst:2,
     goalDifference:4,
     points:6,
   };
 
   for (const competition of ['serie_a', 'ucl', 'uel', 'uecl']) {
     const html = renderTablesHub({ selectedCompetition:competition, data:{ rows:[row] } });
-    assert.match(html, /<th>#<\/th><th>Команда<\/th><th>И<\/th><th>РМ<\/th><th>О<\/th>/);
-    assert.doesNotMatch(html, /<th>В<\/th>|<th>Н<\/th>|<th>П<\/th>/);
+    assert.match(html, /<th>#<\/th><th>Команда<\/th><th>И<\/th><th>В<\/th><th>Н<\/th><th>П<\/th><th>Г<\/th><th>РМ<\/th><th>О<\/th>/);
+    assert.match(html, /data-cw233-stat="wins">2<\/td>/);
+    assert.match(html, /data-cw233-stat="draws">0<\/td>/);
+    assert.match(html, /data-cw233-stat="losses">0<\/td>/);
+    assert.match(html, /data-cw233-stat="goals">6:2<\/td>/);
     assert.match(html, /cw233-standing-goal-difference/);
   }
 });

@@ -31,7 +31,8 @@ function standingTeam(row = {}) {
   const id = text(source?.id ?? row?.team_id);
   const name = text(source?.name ?? row?.team_name);
   const crestUrl = text(
-    source?.logo
+    source?.crestUrl
+      || source?.logo
       || source?.logo_url
       || source?.logoUrl
       || source?.team_logo

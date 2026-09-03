@@ -18,9 +18,9 @@ test('prediction browser source contains no persistence fallback or legacy save 
   assert.match(source, /\/api\/v23\.3\/predictions/);
 });
 
-test('prediction filters contain all five competitions plus all and unfilled', () => {
+test('prediction filters contain only all plus the five real tournaments', () => {
   assert.deepEqual(PREDICTION_FILTERS.map(x => x.key), [
-    'all','serie_a','coppa_italia','ucl','uel','uecl','unfilled',
+    'all','serie_a','coppa_italia','ucl','uel','uecl',
   ]);
 });
 
@@ -34,14 +34,15 @@ test('all available grouping is chronological and stable', () => {
   assert.deepEqual(groups[0].matches.map(x => x.matchId), ['ucl:1','uel:1']);
 });
 
-test('unfilled filter returns only open matches without an authoritative prediction', () => {
+test('prediction filtering is tournament-only and rejects the retired unfilled pseudo-filter', () => {
   const rows = [
     { matchId:'ucl:1', competition:'ucl', state:'open', prediction:null },
     { matchId:'ucl:2', competition:'ucl', state:'open', prediction:{prediction_id:'p2'} },
     { matchId:'uel:1', competition:'uel', state:'locked', prediction:null },
   ];
-  assert.deepEqual(filterPredictionMatches(rows, 'unfilled').map(x => x.matchId), ['ucl:1']);
+  assert.deepEqual(filterPredictionMatches(rows, 'unfilled'), []);
   assert.deepEqual(filterPredictionMatches(rows, 'ucl').map(x => x.matchId), ['ucl:1','ucl:2']);
+  assert.deepEqual(filterPredictionMatches(rows, 'all').map(x => x.matchId), ['ucl:1','ucl:2','uel:1']);
 });
 
 test('card state labels open saved locked and finished predictions', () => {

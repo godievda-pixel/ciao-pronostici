@@ -6,6 +6,7 @@ import './predictions-ui.mjs';
 import './ranking-ui.mjs';
 import './premium-polish-ui.mjs';
 import './round6-polish-ui.mjs';
+import './round7-regression-fixes.mjs';
 
 export const CiaoV233 = Object.freeze({
   version: '23.3',
@@ -17,6 +18,7 @@ export const CiaoV233 = Object.freeze({
   ranking: 'enabled',
   premiumPolish: 'enabled',
   round6Polish: 'enabled',
+  round7RegressionFixes: 'enabled',
 });
 
 globalThis.CiaoV233 = CiaoV233;
