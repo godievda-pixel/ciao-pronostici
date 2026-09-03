@@ -347,6 +347,7 @@ export async function fetchBsdMatchCenterSection(args) {
   return Object.freeze({
     section,
     available,
+    coverage:sections.coverage,
     data:available ? sections[section] : null,
   });
 }
