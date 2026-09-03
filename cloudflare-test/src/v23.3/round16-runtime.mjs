@@ -54,14 +54,15 @@ function patchRanking(documentRef) {
   if (heading && active && RANKING_TITLES[active] && heading.textContent !== RANKING_TITLES[active]) heading.textContent=RANKING_TITLES[active];
 }
 
-function revealTablesSynchronously(documentRef) {
-  const overlay=documentRef.getElementById?.('ciao-v233-tables-overlay');
-  if (!overlay) return;
+export function primeTablesOverlay(documentRef = globalThis.document) {
+  const overlay=documentRef?.getElementById?.('ciao-v233-tables-overlay');
+  if (!overlay) return false;
   overlay.hidden=false;
   overlay.style.visibility='visible';
   overlay.style.display='block';
   overlay.scrollTop=0;
   patchTableLabels(documentRef);
+  return true;
 }
 
 function hideStaleOverlays(documentRef, activeTab) {
@@ -98,7 +99,7 @@ export function installRound16Runtime(documentRef = globalThis.document) {
     if (nav) {
       const tab=nav.dataset?.tab;
       hideStaleOverlays(documentRef,tab);
-      if (tab === 'table') revealTablesSynchronously(documentRef);
+      if (tab === 'seriea') primeTablesOverlay(documentRef);
     }
     stabilizeTournamentBack(documentRef,event);
     patchTableLabels(documentRef);
