@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import {
   BASE_BUILD,
   PINNED_BASE_URL,
   RECOVERY_BASE_URL,
   loadBaseHtml,
-} from '../scripts/build.mjs';
+} from '../scripts/test-baseline.mjs';
 
 const validBase = `<!doctype html><html><head><meta name="build" content="${BASE_BUILD}"></head><body></body></html>`;
 
@@ -35,4 +36,9 @@ test('TEST baseline recovery rejects a successful response without the expected 
     () => loadBaseHtml({ fetchImpl, includeLegacyBase:false }),
     /base build marker missing/,
   );
+});
+
+test('npm build uses the TEST baseline wrapper instead of the mutable Production base directly', async () => {
+  const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.equal(pkg.scripts.build, 'node scripts/build-with-test-baseline.mjs');
 });
