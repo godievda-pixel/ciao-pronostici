@@ -64,6 +64,32 @@ function applyExternalLegacyPatch(input) {
 
   const bridge = `/* ${EXTERNAL_MARKER} */
 let __cw233ExternalMatchContext = null;
+const __cw233ExternalLegacyRefreshBase = refreshMatchCenter;
+refreshMatchCenter = async function(){
+  if (!__cw233ExternalMatchContext) return __cw233ExternalLegacyRefreshBase();
+  if (!matchViewId || matchLoading || document.hidden || String(matchData?.status ?? '').toLowerCase() === 'finished') return;
+  const y = main?.scrollTop ?? 0;
+  const activeTab = matchCenterTab;
+  try {
+    const next = await globalThis.CiaoV233ExternalLegacyMatchCenter?.refresh?.(__cw233ExternalMatchContext);
+    if (next) {
+      patchMatchCenter(next);
+      matchCenterTab = activeTab;
+      const host = main?.querySelector?.('[data-mc-tab-content]');
+      if (host && host.dataset.mcTabContent === activeTab) host.innerHTML = matchTabContent(next, activeTab);
+    }
+  } catch (_error) {
+  } finally {
+    matchCenterTab = activeTab;
+    if (main) main.scrollTop = y;
+    requestAnimationFrame?.(()=>{ if (main) main.scrollTop = y; });
+  }
+};
+const __cw233ExternalLegacyCloseBase = closeMatchCenter;
+closeMatchCenter = function(){
+  __cw233ExternalMatchContext = null;
+  return __cw233ExternalLegacyCloseBase();
+};
 globalThis.addEventListener?.('ciao-v233-open-external-legacy-match', event => {
   const detail = event?.detail || {};
   if (!detail?.data) return;
