@@ -1,4 +1,5 @@
 import { createPredictionClient } from './prediction-client.mjs';
+import { rememberMatchBootstrap } from './match-bootstrap-cache.mjs';
 
 export const USER_FEEDBACK_ROUND4_BUILD = '2026-09-02-r4';
 export const USER_FEEDBACK_ROUND6_BUILD = '2026-09-02-r6';
@@ -225,15 +226,22 @@ function tabsHtml() {
 function filtersHtml() {
   return `<div class="cw231-filters cw233-pred-filters" role="tablist" aria-label="Турниры">${PREDICTION_FILTERS.map(filter => `<button type="button" data-cw233-filter="${filter.key}" aria-selected="${filter.key === activeFilter}">${filter.label}</button>`).join('')}</div>`;
 }
+function canonicalMatchAttributes(match) {
+  const competition = text(match?.competition);
+  const matchId = text(match?.matchId);
+  if (!competition || !matchId) return '';
+  rememberMatchBootstrap(match);
+  return ` data-cw233-competition="${esc(competition)}" data-cw233-match="${esc(matchId)}"`;
+}
 function makeMatchHtml(match) {
   const state = predictionCardState(match); const score = scoreFor(match); const dirty = drafts.has(match.matchId); const hydrating = match?.state === 'hydrating';
   const disabled = hydrating ? ' disabled aria-disabled="true"' : '';
-  return `<div class="match${hydrating ? ' cw233-prediction-bootstrap' : ''}" data-cw233-pred-card="${esc(match.matchId)}"><div class="match-head"><div class="teams"><div class="team">${teamLogo(match,'home')}<span class="team-name">${esc(teamName(match,'home'))}</span></div><span class="dash">—</span><div class="team away"><span class="team-name">${esc(teamName(match,'away'))}</span>${teamLogo(match,'away')}</div></div></div><div class="score"><div class="score-side"><button type="button" data-cw233-delta="h:-1"${disabled}>−</button><div class="score-value" data-cw233-score="h">${score.h}</div><button type="button" data-cw233-delta="h:1"${disabled}>+</button></div><span class="colon">:</span><div class="score-side"><button type="button" data-cw233-delta="a:-1"${disabled}>−</button><div class="score-value" data-cw233-score="a">${score.a}</div><button type="button" data-cw233-delta="a:1"${disabled}>+</button></div></div><div class="meta"><span>${esc(formatKickoff(match.kickoffAt))}</span><span data-cw233-state class="${dirty ? '' : state.kind === 'saved' ? 'saved' : ''}">${dirty ? 'не сохранён' : esc(state.label)}</span></div></div>`;
+  return `<div class="match${hydrating ? ' cw233-prediction-bootstrap' : ''}" data-cw233-pred-card="${esc(match.matchId)}"${canonicalMatchAttributes(match)}><div class="match-head"><div class="teams"><div class="team">${teamLogo(match,'home')}<span class="team-name">${esc(teamName(match,'home'))}</span></div><span class="dash">—</span><div class="team away"><span class="team-name">${esc(teamName(match,'away'))}</span>${teamLogo(match,'away')}</div></div></div><div class="score"><div class="score-side"><button type="button" data-cw233-delta="h:-1"${disabled}>−</button><div class="score-value" data-cw233-score="h">${score.h}</div><button type="button" data-cw233-delta="h:1"${disabled}>+</button></div><span class="colon">:</span><div class="score-side"><button type="button" data-cw233-delta="a:-1"${disabled}>−</button><div class="score-value" data-cw233-score="a">${score.a}</div><button type="button" data-cw233-delta="a:1"${disabled}>+</button></div></div><div class="meta"><span>${esc(formatKickoff(match.kickoffAt))}</span><span data-cw233-state class="${dirty ? '' : state.kind === 'saved' ? 'saved' : ''}">${dirty ? 'не сохранён' : esc(state.label)}</span></div></div>`;
 }
 function mineMatchHtml(match) {
   const prediction = match?.prediction; const points = prediction?.points == null ? '' : ` · +${Number(prediction.points)}`;
   const finalScore = match?.state === 'finished' && Number.isInteger(Number(match?.homeScore)) && Number.isInteger(Number(match?.awayScore)) ? `ИТОГ · ${Number(match.homeScore)}:${Number(match.awayScore)}` : '';
-  return `<div class="mine-match" data-cw233-pred-card="${esc(match.matchId)}"><div class="mine-main"><div class="mine-pair"><div class="mine-team">${teamLogo(match,'home')}<span>${esc(teamName(match,'home'))}</span></div><span class="mine-dash">—</span><div class="mine-team away"><span>${esc(teamName(match,'away'))}</span>${teamLogo(match,'away')}</div></div><div class="mine-meta"><span>${esc(formatKickoff(match.kickoffAt))}</span><span class="mine-live">${esc(finalScore)}</span></div></div><div class="mine-prediction ${prediction?.points != null ? 'has-points' : ''}">${prediction ? `${Number(prediction.predicted_home)}:${Number(prediction.predicted_away)}${points}` : '—'}</div></div>`;
+  return `<div class="mine-match" data-cw233-pred-card="${esc(match.matchId)}"${canonicalMatchAttributes(match)}><div class="mine-main"><div class="mine-pair"><div class="mine-team">${teamLogo(match,'home')}<span>${esc(teamName(match,'home'))}</span></div><span class="mine-dash">—</span><div class="mine-team away"><span>${esc(teamName(match,'away'))}</span>${teamLogo(match,'away')}</div></div><div class="mine-meta"><span>${esc(formatKickoff(match.kickoffAt))}</span><span class="mine-live">${esc(finalScore)}</span></div></div><div class="mine-prediction ${prediction?.points != null ? 'has-points' : ''}">${prediction ? `${Number(prediction.predicted_home)}:${Number(prediction.predicted_away)}${points}` : '—'}</div></div>`;
 }
 function loadingBody() { return `<div class="cw233-prediction-loading" aria-label="Загрузка матчей">${Array.from({ length:6 }, () => '<span></span>').join('')}</div>`; }
 function navigationHtml(groups, selectedKey) {
@@ -337,7 +345,6 @@ export function updatePredictionCard(card, match) {
   if (state) { state.textContent = drafts.has(match.matchId) ? 'не сохранён' : predictionCardState(match).label; state.classList?.remove?.('saved'); }
   return true;
 }
-
 function homeBootstrapMatches() {
   const state = globalThis.CiaoV233Home?.state?.();
   if (!state?.hydrated || !Array.isArray(state?.matches)) return [];
