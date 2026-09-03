@@ -42,3 +42,10 @@ test('npm build uses the TEST baseline wrapper instead of the mutable Production
   const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
   assert.equal(pkg.scripts.build, 'node scripts/build-with-test-baseline.mjs');
 });
+
+test('API contract inspector reuses the TEST baseline loader instead of the retired Production v23.1 URL', async () => {
+  const source = await readFile(new URL('../scripts/inspect-api-contract.mjs', import.meta.url), 'utf8');
+  assert.match(source, /from '\.\/test-baseline\.mjs'/);
+  assert.match(source, /loadBaseHtml\(\{\s*includeLegacyBase:false\s*\}\)/);
+  assert.doesNotMatch(source, /ciao-web-app\.ciao-web\.workers\.dev\/releases\/v23\.1/);
+});
