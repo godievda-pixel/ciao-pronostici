@@ -15,13 +15,15 @@ test('prediction object identity is environment and season scoped', () => {
   assert.throws(() => predictionObjectName({ environment: 'production', season: '2026-27' }), /TEST prediction backend/i);
 });
 
-test('SQLite schema contains the four approved tables and uniqueness rules', () => {
-  assert.equal(PREDICTION_SCHEMA_VERSION, '1');
+test('SQLite schema contains the approved prediction tables, reconciliation markers and uniqueness rules', () => {
+  assert.equal(PREDICTION_SCHEMA_VERSION, '2');
   assert.match(PREDICTION_SCHEMA_SQL, /CREATE TABLE IF NOT EXISTS schema_meta/i);
   assert.match(PREDICTION_SCHEMA_SQL, /CREATE TABLE IF NOT EXISTS participants/i);
   assert.match(PREDICTION_SCHEMA_SQL, /CREATE TABLE IF NOT EXISTS predictions/i);
+  assert.match(PREDICTION_SCHEMA_SQL, /CREATE TABLE IF NOT EXISTS prediction_reconciled_matches/i);
   assert.match(PREDICTION_SCHEMA_SQL, /CREATE TABLE IF NOT EXISTS ranking_snapshots/i);
   assert.match(PREDICTION_SCHEMA_SQL, /UNIQUE\s*\(\s*user_id\s*,\s*match_id\s*\)/i);
+  assert.match(PREDICTION_SCHEMA_SQL, /prediction_reconciled_matches[^;]*match_id TEXT PRIMARY KEY/is);
   assert.match(PREDICTION_SCHEMA_SQL, /predicted_home[^;]*CHECK[^;]*BETWEEN 0 AND 20/is);
   assert.match(PREDICTION_SCHEMA_SQL, /predicted_away[^;]*CHECK[^;]*BETWEEN 0 AND 20/is);
 });
@@ -43,7 +45,8 @@ test('schema initialization is TEST-only and seeds stable metadata', () => {
   };
   initializePredictionSchema(sql, { environment: 'test', season: '2026-27' });
   assert.equal(calls.some(item => item.query.includes('CREATE TABLE IF NOT EXISTS predictions')), true);
-  assert.equal(calls.some(item => item.params.includes('schema_version') && item.params.includes('1')), true);
+  assert.equal(calls.some(item => item.query.includes('prediction_reconciled_matches')), true);
+  assert.equal(calls.some(item => item.params.includes('schema_version') && item.params.includes('2')), true);
   assert.equal(calls.some(item => item.params.includes('environment') && item.params.includes('test')), true);
   assert.equal(calls.some(item => item.params.includes('season') && item.params.includes('2026-27')), true);
   assert.equal(calls.some(item => item.params.includes('prediction_cache_generation') && item.params.includes('0')), true);
