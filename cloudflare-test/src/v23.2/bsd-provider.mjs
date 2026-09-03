@@ -281,8 +281,12 @@ export async function fetchBsdMatchSnapshot({
     throw new BsdUpstreamError('event', 200, 'competition_mismatch');
   }
 
-  const [match] = adaptBsdEvents({ results: [event] }, competition);
-  if (!match || match.matchId !== `${competition}:${sourceId}`) {
+  const adapted = adaptBsdEvents({ results: [event] }, competition);
+  const match = adapted[0];
+  if (!match) {
+    throw new BsdUpstreamError('event', 404, 'match_not_eligible');
+  }
+  if (match.matchId !== `${competition}:${sourceId}`) {
     throw new BsdUpstreamError('event', 200, 'invalid_event');
   }
   return match;
