@@ -180,6 +180,7 @@ test('v23.3 Tables mounts in miniapp root and capture navigation does not block 
     body: { appendChild: appendTo(bodyChildren) },
     createElement(tagName) {
       return {
+        ownerDocument: documentRef,
         tagName,
         id: '',
         className: '',
