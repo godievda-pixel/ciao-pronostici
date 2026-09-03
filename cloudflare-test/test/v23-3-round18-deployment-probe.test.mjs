@@ -69,7 +69,8 @@ test('Round 18 TEST workflow probes the deployed PR branch after build with boun
   const workflow = await readFile(new URL('../../.github/workflows/ciao-test-check.yml', import.meta.url), 'utf8');
   const buildAt = workflow.indexOf('Build TEST artifact');
   const probeAt = workflow.indexOf('Probe deployed Round 18 Match Center');
-  const probeBlock = workflow.slice(probeAt, probeAt + 700);
+  const nextStepAt = workflow.indexOf('\n      - name:', probeAt + 1);
+  const probeBlock = workflow.slice(probeAt, nextStepAt === -1 ? workflow.length : nextStepAt);
 
   assert.ok(probeAt > buildAt);
   assert.doesNotMatch(probeBlock, /if: github\.event_name == 'push'/);
