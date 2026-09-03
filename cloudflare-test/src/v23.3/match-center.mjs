@@ -1,6 +1,11 @@
 import * as Core from './match-center-core.mjs';
+import { loadMatchCenterBase, loadMatchCenterSection } from './data-client.mjs';
+import { toSerieALegacyMatchCenterData } from './bsd-serie-a-legacy-adapter.mjs';
 
 export * from './match-center-core.mjs';
+
+const EXTERNAL_SECTIONS = Object.freeze(['overview', 'stats', 'events', 'lineups', 'players']);
+const EXTERNAL_EVENT = 'ciao-v233-open-external-legacy-match';
 
 export function createMatchCenterController(options) {
   return Core.createMatchCenterController(options);
@@ -22,50 +27,64 @@ export function prepareCanonicalMatchCenterPayload(payload = {}) {
   return { ...payload, initialMatch:bootstrap };
 }
 
+function baseMatch(payload) {
+  if (payload?.match && typeof payload.match === 'object') return payload.match;
+  if (payload?.data?.match && typeof payload.data.match === 'object') return payload.data.match;
+  return payload && typeof payload === 'object' ? payload : null;
+}
+
+function sectionData(payload) {
+  if (payload && Object.prototype.hasOwnProperty.call(payload, 'data')) return payload.data;
+  return payload ?? null;
+}
+
+export async function loadExternalLegacyMatchCenter(
+  competition,
+  matchId,
+  {
+    initialMatch = null,
+    loadBase = loadMatchCenterBase,
+    loadSection = loadMatchCenterSection,
+    force = false,
+  } = {},
+) {
+  const basePayload = await loadBase(competition, matchId, { force });
+  const base = baseMatch(basePayload) || initialMatch;
+  if (!base) throw new Error('external_match_center_base_missing');
+
+  const pairs = await Promise.all(EXTERNAL_SECTIONS.map(async section => {
+    try {
+      const payload = await loadSection(competition, matchId, section, {
+        force,
+        status:base?.status || null,
+      });
+      return [section, sectionData(payload)];
+    } catch (_error) {
+      return [section, null];
+    }
+  }));
+
+  return toSerieALegacyMatchCenterData(base, Object.fromEntries(pairs));
+}
+
+function dispatchExternalLegacy(data, context, target = globalThis) {
+  const CustomEventCtor = target?.CustomEvent || globalThis.CustomEvent;
+  if (typeof target?.dispatchEvent !== 'function' || typeof CustomEventCtor !== 'function') {
+    throw new Error('external_legacy_match_center_bridge_unavailable');
+  }
+  target.dispatchEvent(new CustomEventCtor(EXTERNAL_EVENT, {
+    detail:Object.freeze({
+      competition:String(context?.competition || ''),
+      matchId:String(context?.matchId || ''),
+      data,
+    }),
+  }));
+  return data;
+}
+
 let routedApi = null;
-let actionDocument = null;
-
-function routedDocument(documentRef) {
-  if (typeof Proxy !== 'function') return documentRef;
-  return new Proxy(documentRef, {
-    get(target, property) {
-      if (property === 'addEventListener') {
-        return (type, listener, options) => {
-          if (type === 'click') return undefined;
-          return target.addEventListener?.(type, listener, options);
-        };
-      }
-      const value = target[property];
-      return typeof value === 'function' ? value.bind(target) : value;
-    },
-  });
-}
-
-function installActionRouter(documentRef, api) {
-  if (!documentRef?.addEventListener || actionDocument === documentRef) return;
-  actionDocument = documentRef;
-  documentRef.addEventListener('click', event => {
-    const action = event?.target?.closest?.('[data-cw233-mc-action]');
-    if (!action) return;
-    event.preventDefault?.();
-    event.stopPropagation?.();
-    event.stopImmediatePropagation?.();
-    const kind = action.dataset?.cw233McAction;
-    if (kind === 'close') {
-      api.close?.();
-      return;
-    }
-    if (kind === 'retry') {
-      const state = api.getState?.() || {};
-      if (!state?.competition || !state?.matchId) return;
-      void api.openCanonicalMatchCenter?.(prepareCanonicalMatchCenterPayload({
-        competition:state.competition,
-        matchId:state.matchId,
-        initialMatch:state.match || null,
-      }));
-    }
-  }, true);
-}
+let externalPending = null;
+let externalContext = null;
 
 export function installCanonicalMatchCenter(
   documentRef = globalThis.document,
@@ -73,13 +92,49 @@ export function installCanonicalMatchCenter(
 ) {
   if (!documentRef?.createElement || !documentRef?.addEventListener) return null;
   if (routedApi) return routedApi;
-  routedApi = Core.installCanonicalMatchCenter(routedDocument(documentRef), options);
-  if (routedApi) installActionRouter(documentRef, routedApi);
+  // Keep the real core document listeners intact. The previous proxy swallowed
+  // every click event, which made the canonical tabs non-interactive.
+  routedApi = Core.installCanonicalMatchCenter(documentRef, options);
   return routedApi;
 }
 
-export function openCanonicalMatchCenter(payload) {
-  if (!routedApi && typeof document !== 'undefined') installCanonicalMatchCenter(document);
-  if (!routedApi) throw new Error('Match Center UI is not installed');
-  return routedApi.openCanonicalMatchCenter(prepareCanonicalMatchCenterPayload(payload));
+export async function openExternalLegacyMatchCenter(payload = {}) {
+  const prepared = prepareCanonicalMatchCenterPayload(payload);
+  const competition = String(prepared?.competition || '');
+  const matchId = String(prepared?.matchId || '');
+  if (!competition || !matchId) throw new Error('external_match_center_target_missing');
+
+  const context = Object.freeze({ competition, matchId, initialMatch:prepared?.initialMatch || null });
+  externalContext = context;
+  const token = Symbol('external-match-center');
+  const pending = loadExternalLegacyMatchCenter(competition, matchId, {
+    initialMatch:context.initialMatch,
+  }).then(data => {
+    if (externalPending?.token !== token) return data;
+    return dispatchExternalLegacy(data, context);
+  }).finally(() => {
+    if (externalPending?.token === token) externalPending = null;
+  });
+  externalPending = Object.freeze({ token, promise:pending });
+  return pending;
 }
+
+export async function refreshExternalLegacyMatchCenter(context = externalContext) {
+  const competition = String(context?.competition || '');
+  const matchId = String(context?.matchId || '');
+  if (!competition || !matchId) return null;
+  return loadExternalLegacyMatchCenter(competition, matchId, {
+    initialMatch:context?.initialMatch || null,
+    force:true,
+  });
+}
+
+export function openCanonicalMatchCenter(payload) {
+  if (payload?.competition === 'serie_a') return Core.openCanonicalMatchCenter(payload);
+  return openExternalLegacyMatchCenter(payload);
+}
+
+globalThis.CiaoV233ExternalLegacyMatchCenter = Object.freeze({
+  open:openExternalLegacyMatchCenter,
+  refresh:refreshExternalLegacyMatchCenter,
+});
