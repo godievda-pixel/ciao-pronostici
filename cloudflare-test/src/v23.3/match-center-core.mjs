@@ -3,6 +3,8 @@ import { loadMatchCenterSection, loadMatchCenterSnapshot } from './data-client.m
 import { renderMatchCenterOverview } from './match-center-overview.mjs';
 import { renderMatchCenterStats } from './match-center-stats.mjs';
 import { renderMatchCenterEvents } from './match-center-events.mjs';
+import { renderMatchCenterLineups } from './match-center-lineups.mjs';
+import { renderMatchCenterPlayers } from './match-center-players.mjs';
 import { matchCenterTheme, matchCenterThemeStyle } from './match-center-theme.mjs';
 
 const OVERLAY_ID = 'ciao-v233-match-center-overlay';
@@ -231,6 +233,18 @@ function sectionView(state, match) {
     return {
       status:'ready',
       html:renderMatchCenterEvents(section, { match, coverage:coverage || {} }),
+    };
+  }
+  if (activeTab === 'lineups' && section) {
+    return {
+      status:'ready',
+      html:renderMatchCenterLineups(section, { match, coverage:coverage || {} }),
+    };
+  }
+  if (activeTab === 'players' && section) {
+    return {
+      status:'ready',
+      html:renderMatchCenterPlayers(section, { match, coverage:coverage || {} }),
     };
   }
   if (activeTab === 'overview' && !section) {
