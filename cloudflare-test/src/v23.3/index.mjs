@@ -4,6 +4,7 @@ import './tables-ui.mjs';
 import './serie-a-legacy-bridge.mjs';
 import './predictions-ui.mjs';
 import './ranking-ui.mjs';
+import './profile-rating-ui.mjs';
 import './premium-polish-ui.mjs';
 import './round6-polish-ui.mjs';
 import './round7-regression-fixes.mjs';
@@ -22,6 +23,7 @@ export const CiaoV233 = Object.freeze({
   matchCenter: 'enabled',
   predictions: 'enabled',
   ranking: 'enabled',
+  profileRating: 'enabled',
   premiumPolish: 'enabled',
   round6Polish: 'enabled',
   round7RegressionFixes: 'enabled',
