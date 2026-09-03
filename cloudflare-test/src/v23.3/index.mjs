@@ -14,6 +14,7 @@ import './round10-regression-fixes.mjs';
 import './round11-performance-themes.mjs';
 import './round12-stability-performance.mjs';
 import './round13-mobile-regressions.mjs';
+import './round16-runtime.mjs';
 
 export const CiaoV233 = Object.freeze({
   version: '23.3',
@@ -33,6 +34,7 @@ export const CiaoV233 = Object.freeze({
   round11PerformanceThemes: 'enabled',
   round12StabilityPerformance: 'enabled',
   round13MobileRegressions: 'enabled',
+  round16Runtime: 'enabled',
 });
 
 globalThis.CiaoV233 = CiaoV233;
