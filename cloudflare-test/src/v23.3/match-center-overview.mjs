@@ -7,10 +7,6 @@ function esc(value) {
     .replaceAll("'", '&#39;');
 }
 
-function text(value) {
-  return String(value ?? '').trim();
-}
-
 function list(value) {
   return Array.isArray(value) ? value : [];
 }
@@ -21,68 +17,47 @@ function finite(value) {
   return Number.isFinite(number) ? number : null;
 }
 
-function scoreOf(prediction = {}) {
-  const home = finite(prediction?.homeScore ?? prediction?.home_score ?? prediction?.pred_home_score);
-  const away = finite(prediction?.awayScore ?? prediction?.away_score ?? prediction?.pred_away_score);
-  return home === null || away === null ? '' : `${home}:${away}`;
+function fmt(value, digits = 2) {
+  const number = finite(value);
+  if (number === null) return '—';
+  return Number.isInteger(number) ? String(number) : number.toFixed(digits).replace(/0+$/, '').replace(/\.$/, '');
 }
 
-function formHtml(form = {}, match = {}) {
-  const home = list(form?.home).map(text).filter(Boolean);
-  const away = list(form?.away).map(text).filter(Boolean);
-  if (!home.length && !away.length) return '';
-  const chips = values => values.map(value => {
-    const result = value.slice(0, 1).toUpperCase();
-    const key = result === 'W' ? 'win' : result === 'L' ? 'loss' : 'draw';
-    return `<span class="cw233-mc-form-chip is-${key}">${esc(result || '—')}</span>`;
-  }).join('');
-  return `<section class="cw233-mc-overview-card" data-cw233-mc-overview-region="form">
-    <div class="cw233-mc-overview-title"><span>Форма команд</span><b>Последние матчи</b></div>
-    <div class="cw233-mc-form-row"><strong>${esc(match?.homeTeam?.name || 'Хозяева')}</strong><div>${chips(home)}</div></div>
-    <div class="cw233-mc-form-row"><strong>${esc(match?.awayTeam?.name || 'Гости')}</strong><div>${chips(away)}</div></div>
-  </section>`;
+function overviewStyles() {
+  return `<style data-cw233-mc-overview-parity-style>
+    .cw233-mc-key-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+    .cw233-mc-key{min-width:0;padding:13px 8px;border-radius:13px;background:rgba(255,255,255,.045);text-align:center}
+    .cw233-mc-key strong{display:block;font-size:18px;line-height:1;color:var(--mc-text);font-weight:900}
+    .cw233-mc-key span{display:block;margin-top:6px;font-size:9px;line-height:1.2;color:var(--mc-muted);font-weight:700}
+    .cw233-mc-chart-pad{padding:0 3px 2px}
+    .cw233-mc-momentum-chart{height:96px;display:flex;align-items:center;gap:1px;position:relative;padding:7px 0}
+    .cw233-mc-momentum-chart::after{content:'';position:absolute;left:0;right:0;top:50%;height:1px;background:rgba(255,255,255,.12)}
+    .cw233-mc-momentum-bar{flex:1;height:100%;position:relative;min-width:1px}
+    .cw233-mc-momentum-bar i{position:absolute;left:0;right:0;height:var(--mc-momentum-height);max-height:45%;min-height:2px;border-radius:2px;opacity:.88;background:var(--mc-accent)}
+    .cw233-mc-momentum-bar.is-home i{bottom:50%}
+    .cw233-mc-momentum-bar.is-away i{top:50%;background:var(--mc-accent-2);opacity:.68}
+  </style>`;
 }
 
-function matchInfoHtml(section = {}) {
-  const venue = section?.venue && typeof section.venue === 'object' ? section.venue : {};
-  const referee = section?.referee && typeof section.referee === 'object' ? section.referee : null;
-  const venueName = text(venue?.name);
-  const city = text(venue?.city);
-  const capacity = finite(venue?.capacity);
-  const refereeName = text(referee?.name);
-  if (!venueName && !city && capacity === null && !refereeName) return '';
-  const venueLine = [venueName, city].filter(Boolean).join(' · ');
-  return `<section class="cw233-mc-overview-card" data-cw233-mc-overview-region="match-info">
-    <div class="cw233-mc-overview-title"><span>О матче</span><b>Детали встречи</b></div>
-    <div class="cw233-mc-info-grid">
-      ${venueLine ? `<div><span>Стадион</span><strong>${esc(venueLine)}</strong></div>` : ''}
-      ${capacity !== null ? `<div><span>Вместимость</span><strong>${esc(new Intl.NumberFormat('ru-RU').format(capacity))}</strong></div>` : ''}
-      ${refereeName ? `<div><span>Судья</span><strong>${esc(refereeName)}</strong></div>` : ''}
+function summaryStatsHtml(summary = {}) {
+  const home = summary?.home && typeof summary.home === 'object' ? summary.home : {};
+  const away = summary?.away && typeof summary.away === 'object' ? summary.away : {};
+  const homeXg = finite(home.xg);
+  const awayXg = finite(away.xg);
+  const homeShots = finite(home.shots);
+  const awayShots = finite(away.shots);
+  const hasAny = [homeXg, awayXg, homeShots, awayShots].some(value => value !== null);
+  if (!hasAny) return '';
+  const totalShots = homeShots === null && awayShots === null
+    ? null
+    : (homeShots || 0) + (awayShots || 0);
+  return `<section class="cw233-mc-overview-card" data-cw233-mc-overview-region="main">
+    <div class="cw233-mc-overview-title"><span>Главное</span><b>Матч в цифрах</b></div>
+    <div class="cw233-mc-key-grid">
+      <div class="cw233-mc-key"><strong>${esc(fmt(homeXg))}</strong><span>xG хозяев</span></div>
+      <div class="cw233-mc-key"><strong>${esc(fmt(totalShots, 0))}</strong><span>ударов</span></div>
+      <div class="cw233-mc-key"><strong>${esc(fmt(awayXg))}</strong><span>xG гостей</span></div>
     </div>
-  </section>`;
-}
-
-function predictionSplitEntries(split) {
-  if (!split || typeof split !== 'object') return [];
-  const home = finite(split.home ?? split.homeWin ?? split.home_win);
-  const draw = finite(split.draw);
-  const away = finite(split.away ?? split.awayWin ?? split.away_win);
-  return [
-    ['П1', home],
-    ['X', draw],
-    ['П2', away],
-  ].filter(([, value]) => value !== null);
-}
-
-function predictionsHtml(section = {}) {
-  const prediction = section?.prediction && typeof section.prediction === 'object' ? section.prediction : null;
-  const score = prediction ? scoreOf(prediction) : '';
-  const split = predictionSplitEntries(section?.predictionSplit);
-  if (!prediction && !split.length) return '';
-  return `<section class="cw233-mc-overview-card" data-cw233-mc-overview-region="predictions">
-    <div class="cw233-mc-overview-title"><span>Прогнозы</span><b>Перед матчем</b></div>
-    ${prediction ? `<div class="cw233-mc-user-prediction"><span>Ваш прогноз</span><strong>${esc(score || 'Сохранён')}</strong></div>` : ''}
-    ${split.length ? `<div class="cw233-mc-prediction-split">${split.map(([label, value]) => `<div><span>${label}</span><div class="cw233-mc-share-track"><i style="--mc-share:${Math.max(0, Math.min(100, value))}%"></i></div><b>${esc(value)}%</b></div>`).join('')}</div>` : ''}
   </section>`;
 }
 
@@ -93,21 +68,22 @@ function momentumPoints(value) {
     const home = finite(point?.home);
     const away = finite(point?.away);
     if (home === null || away === null) return null;
-    return { minute, home:Math.max(0, home), away:Math.max(0, away) };
+    return { minute, signed:home - away };
   }).filter(Boolean);
 }
 
 function momentumHtml(value, covered) {
   const points = covered ? momentumPoints(value) : [];
   if (!points.length) return '';
+  const max = Math.max(1, ...points.map(point => Math.abs(point.signed)));
   return `<section class="cw233-mc-overview-card" data-cw233-mc-overview-region="momentum">
-    <div class="cw233-mc-overview-title"><span>Давление</span><b>Ход матча</b></div>
-    <div class="cw233-mc-momentum">${points.map(point => {
-      const total = point.home + point.away || 1;
-      const home = Math.round(point.home / total * 100);
-      const away = 100 - home;
-      return `<div class="cw233-mc-momentum-row"><span>${point.minute === null ? '—' : `${point.minute}′`}</span><div><i class="home" style="--mc-momentum:${home}%"></i><i class="away" style="--mc-momentum:${away}%"></i></div></div>`;
-    }).join('')}</div>
+    <div class="cw233-mc-overview-title"><span>Давление</span><b>по минутам</b></div>
+    <div class="cw233-mc-chart-pad"><div class="cw233-mc-momentum-chart" aria-label="Давление по ходу матча">${points.map(point => {
+      const height = Math.max(2, Math.abs(point.signed) / max * 44);
+      const side = point.signed >= 0 ? 'is-home' : 'is-away';
+      const minute = point.minute === null ? '' : ` data-minute="${esc(point.minute)}"`;
+      return `<span class="cw233-mc-momentum-bar ${side}"${minute}><i style="--mc-momentum-height:${height.toFixed(2)}%"></i></span>`;
+    }).join('')}</div></div>
   </section>`;
 }
 
@@ -117,7 +93,7 @@ function shotPoints(value) {
     const x = finite(shot?.x);
     const y = finite(shot?.y);
     if (x === null || y === null) return null;
-    const side = text(shot?.side).toLowerCase() === 'away' ? 'away' : 'home';
+    const side = String(shot?.side ?? '').trim().toLowerCase() === 'away' ? 'away' : 'home';
     const xg = finite(shot?.xg);
     return {
       side,
@@ -132,7 +108,7 @@ function shotmapHtml(value, covered) {
   const shots = covered ? shotPoints(value) : [];
   if (!shots.length) return '';
   return `<section class="cw233-mc-overview-card" data-cw233-mc-overview-region="shotmap">
-    <div class="cw233-mc-overview-title"><span>Карта ударов</span><b>${shots.length} ${shots.length === 1 ? 'удар' : 'ударов'}</b></div>
+    <div class="cw233-mc-overview-title"><span>Карта ударов</span><b>точки · xG</b></div>
     <div class="cw233-mc-shotmap" aria-label="Карта ударов">${shots.map(shot => `<i class="${shot.side}" style="--mc-shot-x:${shot.x}%;--mc-shot-y:${shot.y}%;--mc-shot-size:${shot.xg === null ? 8 : Math.max(7, Math.min(18, 7 + shot.xg * 22))}px" title="${shot.xg === null ? '' : `xG ${esc(shot.xg)}`}"></i>`).join('')}</div>
   </section>`;
 }
@@ -141,12 +117,10 @@ export function renderMatchCenterOverview(section = {}, context = {}) {
   const source = section && typeof section === 'object' ? section : {};
   const coverage = context?.coverage && typeof context.coverage === 'object' ? context.coverage : {};
   const blocks = [
-    formHtml(source.form, context?.match || {}),
-    matchInfoHtml(source),
-    predictionsHtml(source),
+    summaryStatsHtml(source.summaryStats),
     momentumHtml(source.momentum, coverage.momentum === true),
     shotmapHtml(source.shotmap, coverage.shotmap === true),
   ].filter(Boolean);
 
-  return `<div class="cw233-mc-overview" data-cw233-mc-overview>${blocks.join('')}</div>`;
+  return `${overviewStyles()}<div class="cw233-mc-overview" data-cw233-mc-overview>${blocks.join('')}</div>`;
 }
