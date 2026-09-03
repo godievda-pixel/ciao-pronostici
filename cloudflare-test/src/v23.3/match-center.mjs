@@ -1,6 +1,6 @@
 import * as Core from './match-center-core.mjs';
 import { loadMatchCenterBase, loadMatchCenterSection } from './data-client.mjs';
-import { toSerieALegacyMatchCenterData } from './bsd-serie-a-legacy-adapter.mjs';
+import { toSerieALegacyMatchCenterData } from './bsd-serie-a-cw20-adapter.mjs';
 
 export * from './match-center-core.mjs';
 
