@@ -69,25 +69,42 @@ const CSS = `
   box-shadow:0 8px 18px rgba(0,0,0,.18),inset 0 1px 0 rgba(255,255,255,.04)!important
 }
 .cw233-prediction-page .cw233-pred-filters button[aria-selected='true'],
+.cw233-prediction-page .cw231-prediction-tabs button[aria-selected='true'],
+.cw233-prediction-page .cw233-pred-nav button[aria-selected='true'],
 .cw233-ranking-page .cw233-ranking-filters button[aria-selected='true'],
 #ciao-v233-tables-overlay .cw233-table-selector.is-active{
   background:linear-gradient(145deg,var(--r11a),var(--r11b))!important;
   border-color:rgba(255,255,255,.16)!important;
   box-shadow:0 8px 18px rgba(0,0,0,.20),inset 0 1px 0 rgba(255,255,255,.16)!important
 }
+.cw233-prediction-page [data-cw233-delta]{
+  border-color:var(--r11line)!important;
+  background:linear-gradient(145deg,color-mix(in srgb,var(--r11a) 24%,#172650),color-mix(in srgb,var(--r11b) 18%,#101a38))!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06)!important
+}
+.cw233-prediction-page .savebar .save{
+  background:linear-gradient(145deg,var(--r11a),var(--r11b))!important;
+  border-color:rgba(255,255,255,.14)!important;
+  box-shadow:0 10px 22px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.15)!important
+}
 .cw233-prediction-page .match,.cw233-prediction-page .mine-card,
 .cw233-ranking-page .card,#ciao-v233-tables-overlay .cw233-standing-table tbody td{
   border-color:var(--r11line)!important;
   box-shadow:0 8px 18px rgba(0,0,0,.13)!important
 }
+.cw233-prediction-page .match{
+  background:radial-gradient(circle at 92% 8%,var(--r11soft),transparent 48%),linear-gradient(145deg,rgba(24,42,91,.90),rgba(12,24,55,.94))!important
+}
 
 /* Stable geometry prevents the header/filters/savebar from shifting while data refreshes. */
 .cw233-prediction-page{min-height:calc(100dvh - 76px);padding-bottom:92px}
-.cw233-prediction-page>.hero{min-height:89px;box-sizing:border-box}
+.cw233-prediction-page>.cw233-prediction-hero-slot>.hero,.cw233-prediction-page>.hero{min-height:89px;box-sizing:border-box}
 .cw233-prediction-page .cw231-prediction-tabs{min-height:52px}
 .cw233-prediction-page .cw233-pred-filters{min-height:45px}
+.cw233-prediction-page .cw233-prediction-body-slot{min-height:320px}
 .cw233-prediction-page .match{min-height:138px;contain:layout paint}
 .cw233-prediction-page [data-cw233-pred-card] .logo{width:30px!important;height:30px!important;min-width:30px!important;min-height:30px!important;object-fit:contain}
+.cw233-prediction-page .cw233-prediction-save-slot{min-height:66px}
 .cw233-prediction-page .savebar{min-height:66px}
 .cw233-ranking-page{min-height:calc(100dvh - 76px);padding-bottom:86px}
 .cw233-ranking-page>.hero{min-height:101px;box-sizing:border-box}
@@ -99,8 +116,6 @@ const CSS = `
 .cw233-prediction-page [data-cw233-pred-locked='true']::after{content:' 🔒';font-size:10px}
 .cw233-prediction-page .cw233-pred-round-locked{min-height:132px;display:grid;place-items:center;text-align:center;padding:22px;border:1px solid var(--r11line);border-radius:18px;background:rgba(7,14,34,.72);color:#9eb0df;font-size:12px;font-weight:750}
 `;
-
-function clean(value) { return String(value ?? '').trim(); }
 
 function currentPredictionTheme(documentRef) {
   const selected = documentRef.querySelector?.('.cw233-prediction-page [data-cw233-filter][aria-selected="true"]');
@@ -119,7 +134,11 @@ export function applyRound11Themes(documentRef = globalThis.document) {
   const ranking = documentRef.querySelector('.cw233-ranking-page');
   if (ranking) ranking.dataset.cw233Round11Theme = currentRankingTheme(documentRef);
   const tables = documentRef.querySelector('#ciao-v233-tables-overlay .cw233-tables-hub');
-  if (tables) tables.dataset.cw233Round11Theme = clean(tables.dataset?.cw233Theme) || 'serie-a';
+  if (tables) {
+    const theme = round11ThemeForCompetition(tables.dataset?.cw233TablesSelected || 'serie_a');
+    tables.dataset.cw233Theme = theme;
+    tables.dataset.cw233Round11Theme = theme;
+  }
   return Boolean(prediction || ranking || tables);
 }
 
@@ -133,7 +152,7 @@ export function installRound11PerformanceThemes(documentRef = globalThis.documen
   }
   const refresh = () => queueMicrotask(() => applyRound11Themes(documentRef));
   documentRef.addEventListener?.('click', event => {
-    if (event.target?.closest?.('[data-cw233-filter],[data-cw233-rank-filter],[data-cw233-table-select]')) refresh();
+    if (event.target?.closest?.('[data-cw233-filter],[data-cw233-rank-filter],[data-cw233-tables-competition]')) refresh();
   });
   documentRef.addEventListener?.('ciao-v233-round11-theme', refresh);
   applyRound11Themes(documentRef);

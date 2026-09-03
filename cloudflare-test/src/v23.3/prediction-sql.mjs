@@ -292,7 +292,7 @@ export function resetPredictionDomain(sql) {
   const predictions = affected(sql.exec('DELETE FROM predictions'));
   affected(sql.exec('DELETE FROM prediction_reconciled_matches'));
   const ranking = affected(sql.exec('DELETE FROM ranking_snapshots'));
-  affected(sql.exec('DELETE FROM participants'));
+  const participants = affected(sql.exec('DELETE FROM participants'));
   const caches = affected(sql.exec(`UPDATE schema_meta SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) WHERE key = 'prediction_cache_generation'`));
-  return Object.freeze({ predictions, points:predictions, ranking, caches });
+  return Object.freeze({ predictions, points:predictions, ranking, participants, profiles:participants, caches });
 }

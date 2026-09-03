@@ -37,11 +37,12 @@ const rankingCache = new Map();
 const RANKING_STYLE_ID = 'cw233-ranking-round7-style';
 
 function text(value) { return String(value ?? '').trim(); }
-function esc(value) { return String(value ?? '').replace(/[&<>"']/g,c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function esc(value) { return String(value ?? '').replace(/[&<>"']/g,c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c])); }
 function initData() { return text(globalThis.Telegram?.WebApp?.initData); }
 function telegramUser() { return globalThis.Telegram?.WebApp?.initDataUnsafe?.user || null; }
 function contentNode() { return document.querySelector('#ciao-miniapp-root .content'); }
 function themeFor(value) { return ({overall:'serie-a',serie_a:'serie-a',coppa_italia:'coppa',ucl:'champions',uel:'europa',uecl:'conference'})[text(value)] || 'serie-a'; }
+function setHtmlIfChanged(node, html) { if (!node || node.innerHTML === html) return false; node.innerHTML = html; return true; }
 
 function ensureRankingPremiumStyle() {
   if (typeof document === 'undefined' || document.getElementById(RANKING_STYLE_ID)) return;
@@ -88,17 +89,26 @@ function ensureRankingShell(){
 }
 function updateRankingChrome(){
   const page=ensureRankingShell();if(!page)return;page.dataset.cw233Round11Theme=themeFor(active);
-  const hero=page.querySelector('.cw233-ranking-hero-slot');if(hero)hero.innerHTML=heroHtml();
+  const hero=page.querySelector('.cw233-ranking-hero-slot');if(hero)setHtmlIfChanged(hero,heroHtml());
   for(const button of page.querySelectorAll('[data-cw233-rank-filter]'))button.setAttribute('aria-selected',String(button.dataset.cw233RankFilter===active));
   dispatchThemeRefresh();
 }
 function renderRankingContent({loading=false,error=null}={}){
   const page=ensureRankingShell();if(!page)return;const target=page.querySelector('.cw233-ranking-content');if(!target)return;
-  if(loading){target.innerHTML='<div class="cw233-ranking-skeleton" aria-hidden="true"><div class="cw233-ranking-skeleton-row"></div><div class="cw233-ranking-skeleton-row"></div><div class="cw233-ranking-skeleton-row"></div></div>';return;}
-  if(error){target.innerHTML=`<div class="empty"><div class="cw233-ranking-empty"><strong>Не удалось загрузить рейтинг</strong><span>${esc(error?.code||'Попробуйте ещё раз')}</span></div></div>`;return;}
-  target.innerHTML=rankingHtml();
+  if(loading){setHtmlIfChanged(target,'<div class="cw233-ranking-skeleton" aria-hidden="true"><div class="cw233-ranking-skeleton-row"></div><div class="cw233-ranking-skeleton-row"></div><div class="cw233-ranking-skeleton-row"></div></div>');return;}
+  if(error){setHtmlIfChanged(target,`<div class="empty"><div class="cw233-ranking-empty"><strong>Не удалось загрузить рейтинг</strong><span>${esc(error?.code||'Попробуйте ещё раз')}</span></div></div>`);return;}
+  setHtmlIfChanged(target,rankingHtml());
 }
 function applyRows(nextRows){rows=Array.isArray(nextRows)?nextRows:[];me=resolveCurrentRankingRow(rows,telegramUser());updateRankingChrome();renderRankingContent();}
+
+async function prefetchRankingScope(filter){
+  const auth=initData();if(!auth)return false;client=client||createPredictionClient({initData:auth});
+  try{
+    const value=filter.key==='overall'?await client.rankings({scope:'overall'}):await client.rankings({scope:'competition',competition:filter.key});
+    if(Array.isArray(value))rankingCache.set(filter.key,{rows:value,at:Date.now()});
+    return true;
+  }catch{return false;}
+}
 
 async function load(nextScope=active){
   const generation=++loadGeneration;pageActive=true;active=nextScope||'overall';client=client||createPredictionClient({initData:initData()});
@@ -112,8 +122,10 @@ async function load(nextScope=active){
 }
 function close(){pageActive=false;loadGeneration+=1;}
 function scheduleRankingPrefetch(){
-  const run=()=>{const auth=initData();if(!auth)return;client=client||createPredictionClient({initData:auth});void client.rankings({scope:'overall'}).then(value=>{if(Array.isArray(value))rankingCache.set('overall',{rows:value,at:Date.now()});}).catch(()=>{});};
-  if(typeof globalThis.requestIdleCallback==='function')globalThis.requestIdleCallback(run,{timeout:2200});else setTimeout(run,1800);
+  const run=()=>{void prefetchRankingScope(RANKING_FILTERS[0]);};
+  if(typeof globalThis.queueMicrotask==='function')globalThis.queueMicrotask(run);else setTimeout(run,0);
+  const warmCompetitions=()=>{for(const filter of RANKING_FILTERS.filter(filter=>filter.key!=='overall'))void prefetchRankingScope(filter);};
+  if(typeof globalThis.requestIdleCallback==='function')globalThis.requestIdleCallback(warmCompetitions,{timeout:900});else setTimeout(warmCompetitions,450);
 }
 
 export function installRankingUi(){

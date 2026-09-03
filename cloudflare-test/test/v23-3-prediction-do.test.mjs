@@ -148,7 +148,7 @@ test('internal ranking ordering follows approved tie breakers', async () => {
   assert.deepEqual(body.ranking.map(row => row.user_id), ['telegram:1','telegram:2','telegram:3']);
 });
 
-test('internal reset clears prediction domain and increments cache generation only', async () => {
+test('internal reset clears prediction, ranking and profile participant domain and increments cache generation only', async () => {
   const sql = new FakeSql();
   sql.predictions.set('p1', { prediction_id:'p1' });
   sql.predictions.set('p2', { prediction_id:'p2' });
@@ -160,8 +160,9 @@ test('internal reset clears prediction domain and increments cache generation on
   const body = await response.json();
   assert.equal(response.status, 200);
   assert.deepEqual(body.stages, {
-    predictions:{ok:true,affected:2}, points:{ok:true,affected:2}, ranking:{ok:true,affected:1}, caches:{ok:true,affected:1},
+    predictions:{ok:true,affected:2}, points:{ok:true,affected:2}, ranking:{ok:true,affected:1}, profiles:{ok:true,affected:1}, caches:{ok:true,affected:1},
   });
+  assert.equal(sql.participants.size, 0);
   assert.equal(sql.calls.some(item => /DELETE FROM schema_meta/i.test(item.query)), false);
   assert.equal(sql.cacheGeneration, 1);
 });

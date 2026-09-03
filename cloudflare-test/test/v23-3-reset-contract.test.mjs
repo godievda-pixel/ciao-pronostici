@@ -38,7 +38,7 @@ test('v23.3 reset contract rejects Production targets and defaults to dry-run', 
   assert.equal(plan.executable, false);
   assert.equal(plan.mutatedUserData, false);
   assert.match(plan.resetKey, /^v23\.3-reset-/);
-  assert.deepEqual(plan.requiredStages, ['predictions', 'points', 'ranking', 'caches']);
+  assert.deepEqual(plan.requiredStages, ['predictions', 'points', 'ranking', 'profiles', 'caches']);
 });
 
 test('v23.3 reset result is overall false when any required stage fails', async () => {
@@ -51,6 +51,7 @@ test('v23.3 reset result is overall false when any required stage fails', async 
       predictions: { ok: true, affected: 12 },
       points: { ok: true, affected: 12 },
       ranking: { ok: false, affected: 0 },
+      profiles: { ok: true, affected: 8 },
       caches: { ok: true, affected: 3 },
     },
   });
@@ -62,6 +63,7 @@ test('v23.3 reset result is overall false when any required stage fails', async 
       predictions: { ok: true, affected: 12 },
       points: { ok: true, affected: 12 },
       ranking: { ok: false, affected: 0 },
+      profiles: { ok: true, affected: 8 },
       caches: { ok: true, affected: 3 },
     },
     resetKey: 'v23.3-reset-test-key',
@@ -102,6 +104,7 @@ test('v23.3 reset result requires every Variant B stage and a reset key', async 
         predictions: { ok: true, affected: 0 },
         points: { ok: true, affected: 0 },
         ranking: { ok: true, affected: 0 },
+        profiles: { ok: true, affected: 0 },
         caches: { ok: true, affected: 0 },
       },
     }),
@@ -116,6 +119,7 @@ test('v23.3 reset result requires every Variant B stage and a reset key', async 
         predictions: { ok: true, affected: 0 },
         points: { ok: true, affected: 0 },
         ranking: { ok: true, affected: 0 },
+        profiles: { ok: true, affected: 0 },
       },
     }),
     /caches/i,

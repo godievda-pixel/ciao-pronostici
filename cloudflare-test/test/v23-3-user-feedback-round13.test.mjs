@@ -32,14 +32,11 @@ test('Round 13 removes the CSS-generated second lock and keeps the markup lock o
   assert.doesNotMatch(source, /content:\s*['"]\s*🔒['"]/);
 });
 
-test('Ranking loading overlay is neutral and never contains a fake participant identity', async () => {
+test('Ranking relies on the native stable skeleton and has no extra Round 13 fullscreen loader', async () => {
   const source = await readFile(new URL('../src/v23.3/round13-mobile-regressions.mjs', import.meta.url), 'utf8');
-  assert.match(source, /ciao-v233-round13-ranking-loading/);
-  assert.match(source, /tab === 'table'/);
-  const start = source.indexOf('function rankingLoadingHtml');
-  const end = source.indexOf('\n}', start) + 2;
-  const loading = source.slice(start, end);
-  assert.doesNotMatch(loading, /Участник|место|очков/i);
+  const ranking = await readFile(new URL('../src/v23.3/ranking-ui.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /ciao-v233-round13-ranking-loading|rankingLoadingOverlay|showRankingLoading/);
+  assert.match(ranking, /cw233-ranking-skeleton/);
 });
 
 test('Matches transition guard hides stale overlays synchronously on bottom-nav pointerdown', async () => {

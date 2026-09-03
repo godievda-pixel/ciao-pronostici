@@ -271,22 +271,58 @@ function mineBody(rows) {
   return `<div class="section-title"><h3>Мои прогнозы</h3></div><div class="card mine-card">${rows.map(mineMatchHtml).join('')}</div>`;
 }
 
+function setHtmlIfChanged(node, html) {
+  if (!node || node.innerHTML === html) return false;
+  node.innerHTML = html;
+  return true;
+}
+
+function ensurePredictionShell(main = contentNode()) {
+  if (!main) return null;
+  let page = main.querySelector('.cw233-prediction-page');
+  if (page) return page;
+  page = document.createElement('div');
+  page.className = 'cw233-prediction-page';
+  page.dataset.cw233Round11Theme = themeFor(activeFilter);
+  page.innerHTML = `<div class="cw233-prediction-hero-slot"></div><div class="cw233-prediction-tabs-slot"></div><div class="cw233-prediction-filters-slot"></div><div class="cw233-prediction-body-slot"></div><div class="cw233-prediction-save-slot"></div>`;
+  main.replaceChildren(page);
+  setHtmlIfChanged(page.querySelector('.cw233-prediction-tabs-slot'), tabsHtml());
+  setHtmlIfChanged(page.querySelector('.cw233-prediction-filters-slot'), filtersHtml());
+  return page;
+}
+
 function dispatchThemeRefresh() {
   try { document.dispatchEvent(new Event('ciao-v233-round11-theme')); } catch {}
 }
+
+function updatePredictionChrome(page) {
+  page.dataset.cw233Round11Theme = themeFor(activeFilter);
+  setHtmlIfChanged(page.querySelector('.cw233-prediction-hero-slot'), heroHtml());
+  const tabsSlot = page.querySelector('.cw233-prediction-tabs-slot');
+  if (!tabsSlot?.querySelector?.('[data-cw233-mode]')) setHtmlIfChanged(tabsSlot, tabsHtml());
+  const filtersSlot = page.querySelector('.cw233-prediction-filters-slot');
+  if (!filtersSlot?.querySelector?.('[data-cw233-filter]')) setHtmlIfChanged(filtersSlot, filtersHtml());
+  for (const button of page.querySelectorAll('[data-cw233-mode]')) button.setAttribute('aria-selected', String(button.dataset.cw233Mode === activeMode));
+  for (const button of page.querySelectorAll('[data-cw233-filter]')) button.setAttribute('aria-selected', String(button.dataset.cw233Filter === activeFilter));
+}
+
 function render() {
   if (!pageActive) return;
   const main = contentNode(); if (!main) return;
-  const filterScrollLeft = main.querySelector('.cw233-pred-filters')?.scrollLeft || 0;
-  const roundScrollLeft = main.querySelector('.cw233-pred-nav')?.scrollLeft || 0;
-  const mainScrollTop = Number(main.scrollTop) || 0;
+  const page = ensurePredictionShell(main); if (!page) return;
   const modeRows = predictionRowsForMode(matches, activeMode);
   const selected = filterPredictionMatches(modeRows, activeFilter);
   const writable = activeMode === 'make' && selected.some(match => match?.state === 'open');
-  main.innerHTML = `<div class="cw233-prediction-page" data-cw233-round11-theme="${themeFor(activeFilter)}">${heroHtml()}${tabsHtml()}${filtersHtml()}${activeMode === 'mine' ? mineBody(selected) : makeBody(selected)}${writable ? '<div class="savebar"><button type="button" class="save" data-cw233-save-all>Сохранить прогнозы</button></div>' : ''}</div>`;
-  const filters = main.querySelector('.cw233-pred-filters'); const navigation = main.querySelector('.cw233-pred-nav');
-  if (filters) filters.scrollLeft = filterScrollLeft; if (navigation) navigation.scrollLeft = roundScrollLeft;
-  main.scrollTop = mainScrollTop;
+  updatePredictionChrome(page);
+  const body = page.querySelector('.cw233-prediction-body-slot');
+  const roundScrollLeft = body?.querySelector?.('.cw233-pred-nav')?.scrollLeft || 0;
+  const bodyHtml = activeMode === 'mine' ? mineBody(selected) : makeBody(selected);
+  const bodyChanged = setHtmlIfChanged(body, bodyHtml);
+  if (bodyChanged && roundScrollLeft) {
+    const navigation = body?.querySelector?.('.cw233-pred-nav');
+    if (navigation) navigation.scrollLeft = roundScrollLeft;
+  }
+  setHtmlIfChanged(page.querySelector('.cw233-prediction-save-slot'), writable ? '<div class="savebar"><button type="button" class="save" data-cw233-save-all>Сохранить прогнозы</button></div>' : '');
   dispatchThemeRefresh();
 }
 
@@ -393,8 +429,13 @@ function warmPredictionCache(attempt = 0, generation = warmGeneration) {
 function schedulePrefetch() {
   const generation = ++warmGeneration;
   const run = () => warmPredictionCache(0, generation);
-  if (typeof globalThis.requestIdleCallback === 'function') globalThis.requestIdleCallback(run, { timeout:550 });
-  else setTimeout(run, 180);
+  if (initData()) {
+    if (typeof globalThis.queueMicrotask === 'function') globalThis.queueMicrotask(run);
+    else setTimeout(run, 0);
+    return;
+  }
+  if (typeof globalThis.requestIdleCallback === 'function') globalThis.requestIdleCallback(run, { timeout:350 });
+  else setTimeout(run, 80);
 }
 
 export function installPredictionsUi() {

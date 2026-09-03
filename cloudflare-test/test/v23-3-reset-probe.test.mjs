@@ -22,7 +22,7 @@ test('v23.3 reset probe reports BLOCKED without mutating data', async () => {
   assert.equal(report.guardedBackendResetVerified, false);
   assert.equal(report.predictionGateStatus, 'REQUIRES_AUTHENTICATED_SMOKE');
   assert.match(report.resetKey, /^v23\.3-reset-/);
-  assert.deepEqual(report.requiredStages, ['predictions','points','ranking','caches']);
+  assert.deepEqual(report.requiredStages, ['predictions','points','ranking','profiles','caches']);
 });
 
 test('verified guarded TEST reset can make cutover ready but never enables Production reset', async () => {
