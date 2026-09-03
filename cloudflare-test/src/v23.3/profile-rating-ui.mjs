@@ -49,6 +49,19 @@ export function applyProfileRankingStats(documentRef = globalThis.document, stat
   return true;
 }
 
+export function applyProfileRankingPoints(documentRef = globalThis.document, points = 0) {
+  const grid = profileStatsGrid(documentRef);
+  if (!grid) return false;
+  const stat = grid.querySelector?.('.stat:first-child') || grid.firstElementChild;
+  const value = stat?.querySelector?.('b,strong,[data-value]');
+  if (!stat || !value) return false;
+  const normalized = Number.isFinite(Number(points)) ? Math.trunc(Number(points)) : 0;
+  value.textContent = String(normalized);
+  stat.setAttribute?.('data-cw233-profile-points', 'true');
+  value.setAttribute?.('data-cw233-profile-points', 'true');
+  return true;
+}
+
 function applyCached(documentRef) {
   if (!profileActive || !hasLoadedProfileStats) return false;
   return applyProfileRankingStats(documentRef, cachedProfileStats);
