@@ -143,10 +143,10 @@ test('standings render the full compact football stat line instead of only five 
   assert.match(html, /data-cw233-stat="goals">9:1<\/td>/);
 });
 
-test('Home predict button is excluded from Match Center capture and routed to Predictions', async () => {
-  const matchCenter = await readFile(new URL('../src/v23.3/match-center.mjs', import.meta.url), 'utf8');
+test('Home predict button is excluded from canonical Match Center capture and routed to Predictions', async () => {
+  const matchLinks = await readFile(new URL('../src/v23.3/match-center-links.mjs', import.meta.url), 'utf8');
   const predictions = await readFile(new URL('../src/v23.3/predictions-ui.mjs', import.meta.url), 'utf8');
-  assert.match(matchCenter, /data-cw231-action[^\n]*predict|cw231Action\s*===\s*['"]predict['"]/);
+  assert.match(matchLinks, /data-cw231-action[^\n]*predict|cw231Action\s*===\s*['"]predict['"]/);
   assert.match(predictions, /data-cw231-action[^\n]*predict|cw231Action\s*===\s*['"]predict['"]/);
 });
 
