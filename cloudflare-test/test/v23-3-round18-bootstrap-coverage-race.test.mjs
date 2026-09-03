@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createMatchCenterController } from '../src/v23.3/match-center-core.mjs';
+import { prepareCanonicalMatchCenterPayload } from '../src/v23.3/match-center.mjs';
 
 function bootstrapMatch() {
   return {
@@ -22,7 +23,7 @@ function bootstrapMatch() {
   };
 }
 
-test('Round 18 first lazy section request ignores stale false coverage from bootstrap card', async () => {
+test('Round 18 routed open treats bootstrap coverage as non-authoritative before first lazy section request', async () => {
   const bootstrap = bootstrapMatch();
   const authoritative = {
     ...bootstrap,
@@ -60,14 +61,26 @@ test('Round 18 first lazy section request ignores stale false coverage from boot
     documentRef:{ hidden:false, addEventListener(){} },
   });
 
-  await controller.open({
+  const payload = prepareCanonicalMatchCenterPayload({
     competition:'coppa_italia',
     matchId:'coppa_italia:77',
     initialMatch:bootstrap,
   });
+  assert.equal(Object.prototype.hasOwnProperty.call(payload.initialMatch, 'coverage'), false);
+
+  await controller.open(payload);
 
   assert.equal(sectionCalls, 1);
   assert.equal(controller.getState().sectionState.overview.status, 'ready');
   assert.equal(controller.getState().sections.overview.venue.name, 'Renzo Barbera');
   assert.equal(controller.getState().match.coverage.overview, true);
+});
+
+test('Round 18 bootstrap preparation leaves Serie A legacy delegation payload untouched', () => {
+  const payload = {
+    competition:'serie_a',
+    matchId:'serie_a:77',
+    initialMatch:{ ...bootstrapMatch(), competition:'serie_a', matchId:'serie_a:77' },
+  };
+  assert.equal(prepareCanonicalMatchCenterPayload(payload), payload);
 });
