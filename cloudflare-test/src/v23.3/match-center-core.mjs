@@ -374,24 +374,6 @@ function mountMatchCenterOverlay(overlay, state) {
   overlay.innerHTML = renderMatchCenter(state);
 }
 
-function legacyId(matchId) {
-  const valueText = String(matchId || '');
-  if (!valueText.startsWith('serie_a:')) return 0;
-  const value = Number(valueText.slice('serie_a:'.length));
-  return Number.isFinite(value) && value > 0 ? value : 0;
-}
-
-function delegateSerieA(payload, root = globalThis) {
-  const id = legacyId(payload?.matchId);
-  if (!id) return false;
-  const CustomEventCtor = root?.CustomEvent || globalThis.CustomEvent;
-  if (typeof root?.dispatchEvent !== 'function' || typeof CustomEventCtor !== 'function') return false;
-  root.dispatchEvent(new CustomEventCtor('ciao-v233-open-serie-a-match', {
-    detail: { matchId: String(payload.matchId), legacyId: id },
-  }));
-  return true;
-}
-
 export function installCanonicalMatchCenter(
   documentRef = globalThis.document,
   {
@@ -425,11 +407,6 @@ export function installCanonicalMatchCenter(
   });
 
   async function open(payload = {}) {
-    if (payload?.competition === 'serie_a') {
-      controller.close();
-      overlay.hidden = true;
-      return delegateSerieA(payload, root) ? 'legacy' : 'legacy_unavailable';
-    }
     if (typeof overlay.scrollTo === 'function') overlay.scrollTo(0, 0);
     else overlay.scrollTop = 0;
     return controller.open(payload);
@@ -473,7 +450,6 @@ export function installCanonicalMatchCenter(
 }
 
 export function openCanonicalMatchCenter(payload) {
-  if (payload?.competition === 'serie_a') return delegateSerieA(payload) ? 'legacy' : 'legacy_unavailable';
   if (!installedApi && typeof document !== 'undefined') installCanonicalMatchCenter(document);
   if (!installedApi) throw new Error('Match Center UI is not installed');
   return installedApi.openCanonicalMatchCenter(payload);
