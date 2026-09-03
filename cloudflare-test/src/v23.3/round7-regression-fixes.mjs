@@ -20,9 +20,9 @@ function ensureStyles(documentRef = globalThis.document) {
   style.textContent = `
     #ciao-v232-matches-overlay,#ciao-v233-tables-overlay,#ciao-v233-match-center-overlay{inset:0!important;padding-bottom:calc(104px + env(safe-area-inset-bottom,0px))!important}
     #ciao-miniapp-root .nav{z-index:80!important}
-    #ciao-v233-tables-overlay .cw233-standing-viewport{overflow-x:auto!important;overflow-y:hidden!important;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scrollbar-width:none!important}
+    #ciao-v233-tables-overlay .cw233-standing-viewport{width:100%!important;max-width:100%!important;overflow-x:auto!important;overflow-y:hidden!important;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scrollbar-width:none!important}
     #ciao-v233-tables-overlay .cw233-standing-viewport::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}
-    #ciao-v233-tables-overlay .cw233-standing-table{width:100%!important;min-width:660px!important;table-layout:fixed!important}
+    #ciao-v233-tables-overlay .cw233-standing-table{width:100%!important;min-width:0;table-layout:fixed!important}
     #ciao-v233-tables-overlay .cw233-standing-table th:nth-child(1),#ciao-v233-tables-overlay .cw233-standing-table td:nth-child(1){width:40px!important}
     #ciao-v233-tables-overlay .cw233-standing-table th:nth-child(2),#ciao-v233-tables-overlay .cw233-standing-table td:nth-child(2){width:190px!important}
     #ciao-v233-tables-overlay .cw233-standing-table th:nth-child(3),#ciao-v233-tables-overlay .cw233-standing-table td:nth-child(3),
