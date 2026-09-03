@@ -1,7 +1,6 @@
 export const USER_FEEDBACK_ROUND13_BUILD = '2026-09-03-r13';
 
 const STYLE_ID = 'ciao-v233-round13-mobile-style';
-const RANKING_LOADING_ID = 'ciao-v233-round13-ranking-loading';
 const SERIE_A_NAV_CLASS = 'cw233-serie-a-round-nav-shell';
 const SERIE_A_CACHE_TTL = 60_000;
 const TABLE_LABELS = Object.freeze({
@@ -16,7 +15,6 @@ let serieAScheduleCache = null;
 let serieAScheduleLoadedAt = 0;
 let serieAScheduleInflight = null;
 let serieARetryTimer = 0;
-let rankingLoadingTimer = 0;
 let applyQueued = false;
 
 function text(value) {
@@ -68,22 +66,6 @@ const ROUND13_CSS = `
 #ciao-v233-tables-overlay .cw233-table-selectors-viewport{overflow-x:hidden!important;overscroll-behavior-x:none!important}
 #ciao-v233-tables-overlay .cw233-table-selectors{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:4px!important;min-width:0!important;overflow:hidden!important;width:100%!important;padding-right:0!important}
 #ciao-v233-tables-overlay .cw233-table-selector{min-width:0!important;width:100%!important;padding:0 3px!important;white-space:nowrap!important;text-align:center!important;font-size:10px!important}
-
-/* Ranking loading is neutral: no synthetic participant, rank or points. */
-#${RANKING_LOADING_ID}{position:fixed;z-index:74;inset:0 0 calc(72px + env(safe-area-inset-bottom,0px));padding:14px 10px 24px;box-sizing:border-box;overflow:hidden;background:radial-gradient(circle at 88% 3%,rgba(45,72,206,.20),transparent 34%),linear-gradient(180deg,#07101f 0%,#060d1a 100%)}
-#${RANKING_LOADING_ID}[hidden]{display:none!important}
-#${RANKING_LOADING_ID} .cw233-round13-loading-hero{height:96px;border:1px solid rgba(91,117,210,.24);border-radius:23px;background:linear-gradient(145deg,rgba(24,46,99,.82),rgba(13,25,58,.90));display:grid;grid-template-columns:52px 1fr 92px;align-items:center;gap:12px;padding:14px;box-sizing:border-box}
-#${RANKING_LOADING_ID} .cw233-round13-loading-avatar{width:52px;height:52px;border-radius:17px;background:rgba(75,101,184,.28)}
-#${RANKING_LOADING_ID} .cw233-round13-loading-lines{display:grid;gap:8px}
-#${RANKING_LOADING_ID} .cw233-round13-loading-lines i,#${RANKING_LOADING_ID} .cw233-round13-loading-stat,#${RANKING_LOADING_ID} .cw233-round13-loading-tab,#${RANKING_LOADING_ID} .cw233-round13-loading-row{display:block;background:linear-gradient(90deg,rgba(43,61,108,.40),rgba(67,91,158,.55),rgba(43,61,108,.40));background-size:220% 100%;animation:cw233-r13-pulse 1.25s ease-in-out infinite}
-#${RANKING_LOADING_ID} .cw233-round13-loading-lines i:first-child{width:72%;height:13px;border-radius:7px}
-#${RANKING_LOADING_ID} .cw233-round13-loading-lines i:last-child{width:48%;height:9px;border-radius:6px}
-#${RANKING_LOADING_ID} .cw233-round13-loading-stats{display:grid;grid-template-columns:1fr 1fr;gap:7px}
-#${RANKING_LOADING_ID} .cw233-round13-loading-stat{height:46px;border-radius:13px}
-#${RANKING_LOADING_ID} .cw233-round13-loading-tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:16px}
-#${RANKING_LOADING_ID} .cw233-round13-loading-tab{height:39px;border-radius:12px}
-#${RANKING_LOADING_ID} .cw233-round13-loading-list{display:grid;gap:10px;margin-top:78px}
-#${RANKING_LOADING_ID} .cw233-round13-loading-row{height:61px;border-radius:17px;border:1px solid rgba(85,107,173,.10)}
 
 /* Keep Matches opaque while the legacy deferred controller catches up. */
 #ciao-v232-matches-overlay{background:#07101f!important;isolation:isolate!important}
@@ -189,52 +171,6 @@ function compactTableSelectors(documentRef) {
   }
 }
 
-function rankingLoadingHtml() {
-  return `<div class="cw233-round13-loading-hero"><span class="cw233-round13-loading-avatar"></span><span class="cw233-round13-loading-lines"><i></i><i></i></span><span class="cw233-round13-loading-stats"><i class="cw233-round13-loading-stat"></i><i class="cw233-round13-loading-stat"></i></span></div><div class="cw233-round13-loading-tabs">${'<i class="cw233-round13-loading-tab"></i>'.repeat(5)}</div><div class="cw233-round13-loading-list">${'<i class="cw233-round13-loading-row"></i>'.repeat(3)}</div>`;
-}
-
-function rankingLoadingOverlay(documentRef) {
-  let overlay = documentRef.getElementById?.(RANKING_LOADING_ID);
-  if (overlay) return overlay;
-  overlay = documentRef.createElement('div');
-  overlay.id = RANKING_LOADING_ID;
-  overlay.hidden = true;
-  overlay.setAttribute('aria-hidden', 'true');
-  overlay.innerHTML = rankingLoadingHtml();
-  (documentRef.body || documentRef.documentElement)?.appendChild?.(overlay);
-  return overlay;
-}
-
-function hideRankingLoading(documentRef) {
-  const overlay = documentRef.getElementById?.(RANKING_LOADING_ID);
-  if (!overlay) return;
-  overlay.hidden = true;
-  overlay.setAttribute('aria-hidden', 'true');
-  if (rankingLoadingTimer) {
-    globalThis.clearTimeout?.(rankingLoadingTimer);
-    rankingLoadingTimer = 0;
-  }
-}
-
-function showRankingLoading(documentRef) {
-  const overlay = rankingLoadingOverlay(documentRef);
-  overlay.hidden = false;
-  overlay.setAttribute('aria-hidden', 'false');
-  if (rankingLoadingTimer) globalThis.clearTimeout?.(rankingLoadingTimer);
-  rankingLoadingTimer = globalThis.setTimeout?.(() => hideRankingLoading(documentRef), 8000) || 0;
-}
-
-function syncRankingLoading(documentRef) {
-  const overlay = documentRef.getElementById?.(RANKING_LOADING_ID);
-  if (!overlay || overlay.hidden) return;
-  const page = documentRef.querySelector?.('#ciao-miniapp-root .cw233-ranking-page');
-  if (!page) return;
-  const isSkeleton = Boolean(page.querySelector?.('.cw233-ranking-skeleton'));
-  if (!isSkeleton) {
-    globalThis.requestAnimationFrame?.(() => hideRankingLoading(documentRef));
-  }
-}
-
 function hideOverlay(documentRef, id) {
   const overlay = documentRef.getElementById?.(id);
   if (!overlay) return;
@@ -248,13 +184,10 @@ function handleBottomNavPointerdown(event, documentRef) {
   const tab = text(nav.dataset?.tab);
   if (tab !== 'calendar') hideOverlay(documentRef, 'ciao-v232-matches-overlay');
   hideOverlay(documentRef, 'ciao-v233-match-center-overlay');
-  if (tab === 'table') showRankingLoading(documentRef);
-  else hideRankingLoading(documentRef);
 }
 
 function applyDom(documentRef) {
   compactTableSelectors(documentRef);
-  syncRankingLoading(documentRef);
   void syncSerieARounds(documentRef);
 }
 
@@ -277,7 +210,6 @@ export function installRound13MobileRegressions(documentRef = globalThis.documen
     style.textContent = ROUND13_CSS;
     documentRef.head.appendChild(style);
   }
-  rankingLoadingOverlay(documentRef);
   const onPointerdown = event => handleBottomNavPointerdown(event, documentRef);
   const onClick = event => {
     const filter = event.target?.closest?.('[data-cw233-filter], [data-cw233-mode]');
