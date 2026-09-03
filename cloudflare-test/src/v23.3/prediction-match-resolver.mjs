@@ -7,6 +7,15 @@ import { enrichSerieAMatchesWithCrests, fetchSerieACrestRegistry } from './serie
 
 const LEGACY_CORE_API = '/api/ciao-core-api-fast-v4';
 const LEGACY_SERIE_A_SCHEDULE = '/api/ciao-schedule-fast-v1';
+const PREDICTION_MATCH_CACHE_TTL = 35_000;
+const PREDICTION_MATCH_CACHE = new Map();
+const PREDICTION_MATCH_INFLIGHT = new Map();
+const CANONICAL_MATCH_CACHE = PREDICTION_MATCH_CACHE;
+const CANONICAL_MATCH_INFLIGHT = PREDICTION_MATCH_INFLIGHT;
+const SERIE_A_CACHE = new Map();
+const SERIE_A_INFLIGHT = new Map();
+const ENV_IDS = new WeakMap();
+let nextEnvId = 1;
 
 export class PredictionMatchError extends Error {
   constructor(code, status) {
@@ -18,6 +27,22 @@ export class PredictionMatchError extends Error {
 
 function text(value) {
   return String(value ?? '').trim();
+}
+
+function envIdentity(env) {
+  if (!env || (typeof env !== 'object' && typeof env !== 'function')) return 'env:none';
+  if (!ENV_IDS.has(env)) ENV_IDS.set(env, nextEnvId++);
+  return `env:${ENV_IDS.get(env)}`;
+}
+
+function fresh(cache, key, now = Date.now()) {
+  const value = cache.get(key);
+  if (!value) return null;
+  if (now - value.at > PREDICTION_MATCH_CACHE_TTL) {
+    cache.delete(key);
+    return null;
+  }
+  return value.value;
 }
 
 export function normalizePredictionSeason(value) {
@@ -190,44 +215,55 @@ async function enrichSerieAWithBsd(schedule, env, fetchRegistry = fetchSerieACre
   }
 }
 
+async function loadSerieAUncached({ request, env, adapt = adaptSerieASchedule, fetchRegistry = fetchSerieACrestRegistry }) {
+  const [stateResult, scheduleResult] = await Promise.allSettled([
+    fetchLegacySerieAJson({ request, env, path:LEGACY_CORE_API, body:{ action:'state' } }),
+    fetchLegacySerieAJson({ request, env, path:LEGACY_SERIE_A_SCHEDULE, body:{} }),
+  ]);
+
+  let stable = null;
+  if (stateResult.status === 'fulfilled') {
+    try {
+      const round = stateSchedule(stateResult.value);
+      if (round) {
+        const adapted = adapt(round);
+        if (Array.isArray(adapted?.matches) && adapted.matches.length) stable = adapted;
+      }
+    } catch {}
+  }
+
+  let schedule = null;
+  if (scheduleResult.status === 'fulfilled') {
+    try {
+      const adapted = adapt(scheduleResult.value);
+      if (Array.isArray(adapted?.matches) && adapted.matches.length) schedule = adapted;
+    } catch {}
+  }
+
+  if (!stable && !schedule) throw new PredictionMatchError('match_resolution_failed', 502);
+  const primary = stable ? enrichSerieACrests(stable, schedule) : schedule;
+  return enrichSerieAWithBsd(primary, env, fetchRegistry);
+}
+
 async function loadSerieA({ request, env, adapt = adaptSerieASchedule, fetchRegistry = fetchSerieACrestRegistry }) {
   if (!env?.CIAO_WEB_API || typeof env.CIAO_WEB_API.fetch !== 'function') {
     throw new PredictionMatchError('match_resolution_failed', 502);
   }
-
-  try {
-    const statePayload = await fetchLegacySerieAJson({
-      request,
-      env,
-      path:LEGACY_CORE_API,
-      body:{ action:'state' },
-    });
-    const stableRound = stateSchedule(statePayload);
-    if (stableRound) {
-      const adapted = adapt(stableRound);
-      if (Array.isArray(adapted?.matches) && adapted.matches.length) {
-        let enriched = adapted;
-        try {
-          const schedulePayload = await fetchLegacySerieAJson({
-            request,
-            env,
-            path:LEGACY_SERIE_A_SCHEDULE,
-            body:{},
-          });
-          enriched = enrichSerieACrests(adapted, adapt(schedulePayload));
-        } catch {}
-        return enrichSerieAWithBsd(enriched, env, fetchRegistry);
-      }
-    }
-  } catch {}
-
-  const schedulePayload = await fetchLegacySerieAJson({
-    request,
-    env,
-    path:LEGACY_SERIE_A_SCHEDULE,
-    body:{},
+  const cacheable = adapt === adaptSerieASchedule && fetchRegistry === fetchSerieACrestRegistry;
+  if (!cacheable) return loadSerieAUncached({ request, env, adapt, fetchRegistry });
+  const key = `${envIdentity(env)}\n${text(env?.PREDICTION_SEASON)}\nserie_a`;
+  const cached = fresh(SERIE_A_CACHE, key);
+  if (cached !== null) return cached;
+  const inflight = SERIE_A_INFLIGHT.get(key);
+  if (inflight) return inflight;
+  const pending = loadSerieAUncached({ request, env, adapt, fetchRegistry }).then(value => {
+    SERIE_A_CACHE.set(key, { at:Date.now(), value });
+    return value;
+  }).finally(() => {
+    if (SERIE_A_INFLIGHT.get(key) === pending) SERIE_A_INFLIGHT.delete(key);
   });
-  return enrichSerieAWithBsd(adapt(schedulePayload), env, fetchRegistry);
+  SERIE_A_INFLIGHT.set(key, pending);
+  return pending;
 }
 
 function assertActiveSeason(match, activeSeason) {
@@ -283,23 +319,7 @@ async function listOne({ request, env, competition, deps, range }) {
   return fetchExternal({ competition, from: range.from, to: range.to, apiKey });
 }
 
-export async function listCanonicalPredictionMatches({
-  request,
-  env,
-  competition = 'all',
-  now = new Date(),
-  deps = {},
-} = {}) {
-  const requested = text(competition) || 'all';
-  const keys = requested === 'all' ? [...COMPETITION_KEYS] : [requested];
-  for (const key of keys) {
-    try {
-      getCompetitionConfig(key);
-    } catch {
-      throw new PredictionMatchError('competition_not_supported', 400);
-    }
-  }
-  const range = activeDateRange(now);
+async function listCanonicalPredictionMatchesUncached({ request, env, requested, keys, range, deps }) {
   const settled = await Promise.allSettled(
     keys.map(key => listOne({ request, env, competition:key, deps, range })),
   );
@@ -336,4 +356,39 @@ export async function listCanonicalPredictionMatches({
     from:range.from,
     to:range.to,
   });
+}
+
+export async function listCanonicalPredictionMatches({
+  request,
+  env,
+  competition = 'all',
+  now = new Date(),
+  deps = {},
+} = {}) {
+  const requested = text(competition) || 'all';
+  const keys = requested === 'all' ? [...COMPETITION_KEYS] : [requested];
+  for (const key of keys) {
+    try {
+      getCompetitionConfig(key);
+    } catch {
+      throw new PredictionMatchError('competition_not_supported', 400);
+    }
+  }
+  const range = activeDateRange(now);
+  const cacheable = !Object.keys(deps || {}).length;
+  if (!cacheable) return listCanonicalPredictionMatchesUncached({ request, env, requested, keys, range, deps });
+
+  const key = `${envIdentity(env)}\n${text(env?.PREDICTION_SEASON)}\n${requested}\n${range.from}\n${range.to}`;
+  const cached = fresh(CANONICAL_MATCH_CACHE, key);
+  if (cached !== null) return cached;
+  const inflight = CANONICAL_MATCH_INFLIGHT.get(key);
+  if (inflight) return inflight;
+  const pending = listCanonicalPredictionMatchesUncached({ request, env, requested, keys, range, deps }).then(value => {
+    CANONICAL_MATCH_CACHE.set(key, { at:Date.now(), value });
+    return value;
+  }).finally(() => {
+    if (CANONICAL_MATCH_INFLIGHT.get(key) === pending) CANONICAL_MATCH_INFLIGHT.delete(key);
+  });
+  CANONICAL_MATCH_INFLIGHT.set(key, pending);
+  return pending;
 }
