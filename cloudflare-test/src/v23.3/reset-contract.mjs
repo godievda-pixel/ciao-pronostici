@@ -2,6 +2,7 @@ export const RESET_STAGES = Object.freeze([
   'predictions',
   'points',
   'ranking',
+  'profiles',
   'caches',
 ]);
 
