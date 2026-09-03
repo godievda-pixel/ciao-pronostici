@@ -44,7 +44,7 @@ function coppaMatch(id, stage, home, away, extra = {}) {
   };
 }
 
-test('v23.3 Tables exposes all five tournament destinations and full UEFA rows', () => {
+test('v23.3 Tables exposes all five compact tournament destinations and full UEFA rows', () => {
   const html = renderTablesHub({
     selectedCompetition: 'ucl',
     data: {
@@ -60,13 +60,18 @@ test('v23.3 Tables exposes all five tournament destinations and full UEFA rows',
     },
   });
 
-  for (const competition of ['serie_a', 'ucl', 'uel', 'uecl', 'coppa_italia']) {
-    assert.match(html, new RegExp(`data-cw233-tables-competition="${competition}"`));
+  const selectors = [
+    ['serie_a', 'Серия А'],
+    ['ucl', 'ЛЧ'],
+    ['uel', 'ЛЕ'],
+    ['uecl', 'ЛК'],
+    ['coppa_italia', 'КИ'],
+  ];
+  for (const [competition, label] of selectors) {
+    assert.match(html, new RegExp(`data-cw233-tables-competition="${competition}"[^>]*>${label}</button>`));
   }
-  for (const title of ['Серия А', 'Лига Чемпионов', 'Лига Европы', 'Лига Конференций', 'Кубок Италии']) {
-    assert.match(html, new RegExp(title));
-  }
-
+  assert.match(html, /<p>Лига Чемпионов<\/p>/);
+  assert.match(html, /<th>#<\/th><th>Команда<\/th><th>И<\/th><th>В<\/th><th>Н<\/th><th>П<\/th><th>Г<\/th><th>РМ<\/th><th>О<\/th>/);
   assert.match(html, /Арсенал/);
   assert.match(html, /Интер/);
   assert.match(html, /19/);
