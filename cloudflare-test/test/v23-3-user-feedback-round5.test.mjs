@@ -51,7 +51,7 @@ test('Serie A standings hydrate real crests from the same stable state teams use
   assert.match(indexSource, /\.\/serie-a-legacy-bridge\.mjs/);
 });
 
-test('Serie A prediction feed falls back to the proven v22.5 state round instead of depending on schedule-fast', async () => {
+test('Serie A prediction feed keeps the proven v22.5 state round authoritative while schedule crest enrichment stays optional', async () => {
   const calls = [];
   const result = await listCanonicalPredictionMatches({
     request:new Request('https://ciao-web-app-test.example/api/v23.3/predictions/available?competition=serie_a', {
@@ -83,7 +83,8 @@ test('Serie A prediction feed falls back to the proven v22.5 state round instead
   assert.equal(result.matches[0].competition, 'serie_a');
   assert.equal(result.matches[0].matchId, 'serie_a:101');
   assert.equal(result.matches[0].season, '2026-27');
+  assert.equal(result.matches[0].kickoffAt, '2026-09-10T19:00:00.000Z');
   assert.equal(result.matches[0].homeTeam.crestUrl, 'https://img.test/roma.png');
   assert.ok(calls.includes('/api/ciao-core-api-fast-v4:state'));
-  assert.equal(calls.some(call => call.startsWith('/api/ciao-schedule-fast-v1:')), false);
+  assert.ok(calls.some(call => call.startsWith('/api/ciao-schedule-fast-v1:')));
 });
