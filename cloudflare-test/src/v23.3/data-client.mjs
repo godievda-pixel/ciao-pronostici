@@ -4,6 +4,8 @@ import { resolveTelegramInitData } from '../v23.2/data-client.mjs';
 const STANDINGS_CACHE_TTL = 45_000;
 const STANDINGS_CACHE = new Map();
 const STANDINGS_INFLIGHT = new Map();
+const MATCH_CENTER_CACHE = new Map();
+const MATCH_CENTER_INFLIGHT = new Map();
 const FETCH_IDS = new WeakMap();
 let nextFetchId = 1;
 
@@ -21,7 +23,7 @@ function fetchIdentity(fetchImpl) {
   return FETCH_IDS.get(fetchImpl);
 }
 
-function standingCacheKey(path, initData, fetchImpl) {
+function requestCacheKey(path, initData, fetchImpl) {
   return `${fetchIdentity(fetchImpl)}\n${String(initData || '')}\n${path}`;
 }
 
@@ -30,6 +32,23 @@ function freshStanding(key, now = Date.now()) {
   if (!cached) return null;
   if (now - cached.at > STANDINGS_CACHE_TTL) {
     STANDINGS_CACHE.delete(key);
+    return null;
+  }
+  return cached.value;
+}
+
+function matchCenterTtl(snapshot) {
+  const status = String(snapshot?.match?.status || snapshot?.status || '').toLowerCase();
+  if (status === 'live') return 10_000;
+  if (status === 'finished') return 5 * 60_000;
+  return 60_000;
+}
+
+function freshMatchCenter(key, now = Date.now()) {
+  const cached = MATCH_CENTER_CACHE.get(key);
+  if (!cached) return null;
+  if (now - cached.at > cached.ttl) {
+    MATCH_CENTER_CACHE.delete(key);
     return null;
   }
   return cached.value;
@@ -81,13 +100,13 @@ export async function loadCompetitionStandings(
   const query = new URLSearchParams({ competition });
   const path = `/api/v23.3/standings?${query.toString()}`;
   if (!initData) throw createClientError('telegram_auth_required');
-  const key = standingCacheKey(path, initData, fetchImpl);
+  const key = requestCacheKey(path, initData, fetchImpl);
   if (!force) {
     const cached = freshStanding(key);
     if (cached !== null) return cached;
-    const inflight = STANDINGS_INFLIGHT.get(key);
-    if (inflight) return inflight;
   }
+  const inflight = STANDINGS_INFLIGHT.get(key);
+  if (inflight) return inflight;
   const pending = loadJson(path, { initData, fetchImpl }).then(value => {
     STANDINGS_CACHE.set(key, { at:Date.now(), value });
     return value;
@@ -104,6 +123,7 @@ export async function loadMatchCenterSnapshot(
   {
     initData = resolveTelegramInitData(),
     fetchImpl = globalThis.fetch,
+    force = false,
   } = {},
 ) {
   getCompetitionConfig(competition);
@@ -111,5 +131,25 @@ export async function loadMatchCenterSnapshot(
     competition,
     match_id: String(matchId || ''),
   });
-  return loadJson(`/api/v23.3/match-center?${query.toString()}`, { initData, fetchImpl });
+  const path = `/api/v23.3/match-center?${query.toString()}`;
+  if (!initData) throw createClientError('telegram_auth_required');
+  const key = requestCacheKey(path, initData, fetchImpl);
+  if (!force) {
+    const cached = freshMatchCenter(key);
+    if (cached !== null) return cached;
+  }
+  const inflight = MATCH_CENTER_INFLIGHT.get(key);
+  if (inflight) return inflight;
+  const pending = loadJson(path, { initData, fetchImpl }).then(value => {
+    MATCH_CENTER_CACHE.set(key, {
+      at:Date.now(),
+      ttl:matchCenterTtl(value),
+      value,
+    });
+    return value;
+  }).finally(() => {
+    if (MATCH_CENTER_INFLIGHT.get(key) === pending) MATCH_CENTER_INFLIGHT.delete(key);
+  });
+  MATCH_CENTER_INFLIGHT.set(key, pending);
+  return pending;
 }

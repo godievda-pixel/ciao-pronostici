@@ -32,33 +32,6 @@ function installStyles(documentRef) {
   documentRef.head?.appendChild(style);
 }
 
-function patchTableLabels(documentRef) {
-  for (const button of documentRef.querySelectorAll?.('#ciao-v233-tables-overlay .cw233-table-selector') || []) {
-    const key=button.dataset?.cw233TablesCompetition;
-    const label=tableSelectorLabel(key);
-    if (label && button.textContent !== label) button.textContent=label;
-  }
-  const hub=documentRef.querySelector?.('#ciao-v233-tables-overlay .cw233-tables-hub');
-  const heading=hub?.querySelector?.('.cw233-tables-head p');
-  const key=hub?.dataset?.cw233TablesSelected;
-  const title=tableSectionTitle(key);
-  if (heading && key && heading.textContent !== title) heading.textContent=title;
-}
-
-function patchRanking(documentRef) {
-  const page=documentRef.querySelector?.('#ciao-miniapp-root .cw233-ranking-page');
-  if (!page) return;
-  for (const button of page.querySelectorAll?.('[data-cw233-rank-filter]') || []) {
-    const key=button.dataset?.cw233RankFilter;
-    const label=rankingSelectorLabel(key);
-    if (label && button.textContent !== label) button.textContent=label;
-  }
-  const active=[...page.querySelectorAll?.('[data-cw233-rank-filter]') || []].find(b=>b.getAttribute?.('aria-selected')==='true')?.dataset?.cw233RankFilter || '';
-  const heading=page.querySelector?.('.cw233-ranking-section-head h3');
-  const title=rankingSectionTitle(active);
-  if (heading && active && heading.textContent !== title) heading.textContent=title;
-}
-
 export function primeTablesOverlay(documentRef = globalThis.document) {
   const overlay=documentRef?.getElementById?.('ciao-v233-tables-overlay');
   if (!overlay) return false;
@@ -66,7 +39,6 @@ export function primeTablesOverlay(documentRef = globalThis.document) {
   overlay.style.visibility='visible';
   overlay.style.display='block';
   overlay.scrollTop=0;
-  patchTableLabels(documentRef);
   return true;
 }
 
@@ -107,17 +79,16 @@ export function installRound16Runtime(documentRef = globalThis.document) {
       if (tab === 'seriea') primeTablesOverlay(documentRef);
     }
     stabilizeTournamentBack(documentRef,event);
-    patchTableLabels(documentRef);
   };
   const onClick=event=>{
     stabilizeTournamentBack(documentRef,event);
-    const run=()=>{ patchTableLabels(documentRef); patchRanking(documentRef); patchProfile(documentRef); };
+    const run=()=>{ patchProfile(documentRef); };
     if (typeof globalThis.queueMicrotask === 'function') globalThis.queueMicrotask(run); else globalThis.setTimeout?.(run,0);
   };
   documentRef.addEventListener('pointerdown',onPointerDown,true);
   documentRef.addEventListener('click',onClick,true);
-  patchTableLabels(documentRef); patchRanking(documentRef); patchProfile(documentRef);
-  return Object.freeze({ refresh:()=>{patchTableLabels(documentRef);patchRanking(documentRef);patchProfile(documentRef);}, disconnect:()=>{documentRef.removeEventListener('pointerdown',onPointerDown,true);documentRef.removeEventListener('click',onClick,true);} });
+  patchProfile(documentRef);
+  return Object.freeze({ refresh:()=>{patchProfile(documentRef);}, disconnect:()=>{documentRef.removeEventListener('pointerdown',onPointerDown,true);documentRef.removeEventListener('click',onClick,true);} });
 }
 
 if (typeof document !== 'undefined') installRound16Runtime(document);

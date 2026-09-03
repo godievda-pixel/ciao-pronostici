@@ -3,11 +3,12 @@ export { PredictionLeague } from './v23.3/prediction-league-do.mjs';
 import { adaptSerieASchedule } from './v23.2/serie-a-adapter.mjs';
 import {
   BsdUpstreamError,
-  fetchBsdMatchSnapshot,
+  fetchBsdMatchCenterSnapshot,
   fetchBsdMatches,
   fetchBsdStandings,
 } from './v23.2/bsd-provider.mjs';
 import { normalizeTeamAlias, russianTeamName } from './v23.2/team-registry.mjs';
+import { canonicalMatchCenterSnapshot } from './v23.3/match-center-snapshot.mjs';
 import { createPredictionService } from './v23.3/prediction-service.mjs';
 import { assertSafeResetTarget } from './v23.3/reset-contract.mjs';
 import { predictionObjectName } from './v23.3/prediction-sql.mjs';
@@ -490,6 +491,13 @@ async function handleV23_3Standings(request, env, url) {
   }
 }
 
+async function loadSerieAMatchCenterSnapshot(request, env, initData, matchId) {
+  const schedule = await fetchSerieAScheduleForCrests(request, env, initData);
+  const match = schedule?.matches?.find(item => item?.matchId === matchId) || null;
+  if (!match) return null;
+  return canonicalMatchCenterSnapshot(match, { venue:match.venue });
+}
+
 async function handleV23_3MatchCenter(request, env, url) {
   if (request.method !== 'GET') {
     return errorJson(405, { error: 'method_not_allowed' });
@@ -502,8 +510,9 @@ async function handleV23_3MatchCenter(request, env, url) {
 
   const competition = String(url.searchParams.get('competition') || '');
   const matchId = String(url.searchParams.get('match_id') || '');
+  const supported = competition === 'serie_a' || EXTERNAL_COMPETITIONS.has(competition);
 
-  if (!EXTERNAL_COMPETITIONS.has(competition)) {
+  if (!supported) {
     return errorJson(400, { error: 'competition_not_supported', competition });
   }
   if (!matchId) {
@@ -513,13 +522,22 @@ async function handleV23_3MatchCenter(request, env, url) {
     return errorJson(400, { error: 'competition_match_mismatch', competition });
   }
 
+  if (competition === 'serie_a') {
+    const match = await loadSerieAMatchCenterSnapshot(request, env, initData, matchId);
+    if (!match) return errorJson(404, { error:'match_not_found', competition });
+    return Response.json({
+      ok:true,
+      data:{ competition, provider:'ciao-web-api', match },
+    });
+  }
+
   const apiKey = String(env.BSD_API_KEY || '');
   if (!apiKey) {
     return errorJson(503, { error: 'bsd_api_key_missing', competition });
   }
 
   try {
-    const match = await fetchBsdMatchSnapshot({ competition, matchId, apiKey });
+    const match = await fetchBsdMatchCenterSnapshot({ competition, matchId, apiKey });
     return Response.json({
       ok: true,
       data: {
@@ -529,6 +547,9 @@ async function handleV23_3MatchCenter(request, env, url) {
       },
     });
   } catch (error) {
+    if (error instanceof BsdUpstreamError && error.code === 'match_not_eligible') {
+      return errorJson(404, { error:'match_not_eligible', competition });
+    }
     return bsdFailure(error, competition, 'match_center_upstream_failed');
   }
 }

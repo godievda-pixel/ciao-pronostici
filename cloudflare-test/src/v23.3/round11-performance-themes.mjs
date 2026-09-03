@@ -117,30 +117,8 @@ const CSS = `
 .cw233-prediction-page .cw233-pred-round-locked{min-height:132px;display:grid;place-items:center;text-align:center;padding:22px;border:1px solid var(--r11line);border-radius:18px;background:rgba(7,14,34,.72);color:#9eb0df;font-size:12px;font-weight:750}
 `;
 
-function currentPredictionTheme(documentRef) {
-  const selected = documentRef.querySelector?.('.cw233-prediction-page [data-cw233-filter][aria-selected="true"]');
-  return round11ThemeForCompetition(selected?.dataset?.cw233Filter || 'all');
-}
-
-function currentRankingTheme(documentRef) {
-  const selected = documentRef.querySelector?.('.cw233-ranking-page [data-cw233-rank-filter][aria-selected="true"]');
-  return round11ThemeForCompetition(selected?.dataset?.cw233RankFilter || 'overall');
-}
-
-export function applyRound11Themes(documentRef = globalThis.document) {
-  if (!documentRef?.querySelector) return false;
-  const prediction = documentRef.querySelector('.cw233-prediction-page');
-  if (prediction) prediction.dataset.cw233Round11Theme = currentPredictionTheme(documentRef);
-  const ranking = documentRef.querySelector('.cw233-ranking-page');
-  if (ranking) ranking.dataset.cw233Round11Theme = currentRankingTheme(documentRef);
-  const tables = documentRef.querySelector('#ciao-v233-tables-overlay .cw233-tables-hub');
-  if (tables) {
-    const theme = round11ThemeForCompetition(tables.dataset?.cw233TablesSelected || 'serie_a');
-    tables.dataset.cw233Theme = theme;
-    tables.dataset.cw233Round11Theme = theme;
-  }
-  return Boolean(prediction || ranking || tables);
-}
+// Compatibility export: Round 17 surfaces now own their theme at render time.
+export const applyRound11Themes = () => true;
 
 export function installRound11PerformanceThemes(documentRef = globalThis.document) {
   if (!documentRef?.head || !documentRef?.createElement) return null;
@@ -150,13 +128,7 @@ export function installRound11PerformanceThemes(documentRef = globalThis.documen
     style.textContent = CSS;
     documentRef.head.appendChild(style);
   }
-  const refresh = () => queueMicrotask(() => applyRound11Themes(documentRef));
-  documentRef.addEventListener?.('click', event => {
-    if (event.target?.closest?.('[data-cw233-filter],[data-cw233-rank-filter],[data-cw233-tables-competition]')) refresh();
-  });
-  documentRef.addEventListener?.('ciao-v233-round11-theme', refresh);
-  applyRound11Themes(documentRef);
-  return Object.freeze({ refresh });
+  return Object.freeze({ refresh:applyRound11Themes, disconnect:() => {} });
 }
 
 if (typeof document !== 'undefined') {

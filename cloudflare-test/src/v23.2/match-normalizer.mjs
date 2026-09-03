@@ -45,7 +45,8 @@ const COUNTRY_CODES = Object.freeze({
   portugal: 'POR',
 });
 
-const ITALIAN_ONLY_COMPETITIONS = new Set(['ucl', 'uel', 'uecl']);
+const ITALIAN_ONLY_COMPETITIONS = new Set(['coppa_italia', 'ucl', 'uel', 'uecl']);
+const UEFA_COMPETITIONS = new Set(['ucl', 'uel', 'uecl']);
 const UEFA_LEAGUE_ROUND_LIMIT = Object.freeze({ ucl:8, uel:8, uecl:6 });
 const UEFA_QUALIFICATION_STAGE = /(?:qualif(?:ication|ying)?|preliminary|предваритель|квалификац)/i;
 const UEFA_LEAGUE_STAGE = /(?:league\s+(?:stage|phase)|этап\s+лиги)/i;
@@ -117,7 +118,7 @@ export function normalizeMatch(raw, competition) {
 
 export function isUefaQualificationMatch(match = {}) {
   const competition = text(match?.competition);
-  if (!ITALIAN_ONLY_COMPETITIONS.has(competition)) return false;
+  if (!UEFA_COMPETITIONS.has(competition)) return false;
   const stage = text(match?.stage);
   if (UEFA_QUALIFICATION_STAGE.test(stage)) return true;
 

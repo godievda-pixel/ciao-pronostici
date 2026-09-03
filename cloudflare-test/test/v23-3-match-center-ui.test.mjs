@@ -247,10 +247,10 @@ test('canonical match links resolve external schedule and profile cards to compe
       return selector === '[data-cw232-match]' ? scheduleCard : null;
     },
   };
-  assert.deepEqual(resolveCanonicalMatchTarget(scheduleTarget), {
-    competition: 'ucl',
-    matchId: 'ucl:1001',
-  });
+  const scheduleResolved = resolveCanonicalMatchTarget(scheduleTarget);
+  assert.equal(scheduleResolved?.competition, 'ucl');
+  assert.equal(scheduleResolved?.matchId, 'ucl:1001');
+  if (scheduleResolved?.initialMatch) assert.equal(scheduleResolved.initialMatch.matchId, 'ucl:1001');
 
   const profileCard = {
     dataset: { cw232Competition: 'uel', cw232ProfileMatch: 'uel:2002' },
@@ -260,15 +260,18 @@ test('canonical match links resolve external schedule and profile cards to compe
       return selector === '[data-cw232-profile-match][data-cw232-competition]' ? profileCard : null;
     },
   };
-  assert.deepEqual(resolveCanonicalMatchTarget(profileTarget), {
-    competition: 'uel',
-    matchId: 'uel:2002',
-  });
+  const profileResolved = resolveCanonicalMatchTarget(profileTarget);
+  assert.equal(profileResolved?.competition, 'uel');
+  assert.equal(profileResolved?.matchId, 'uel:2002');
+  if (profileResolved?.initialMatch) assert.equal(profileResolved.initialMatch.matchId, 'uel:2002');
 });
 
-test('Serie A canonical Match Center delegates to the existing stable openMatchCenter bridge', () => {
+test('Serie A legacy openMatchCenter bridge now routes into the canonical v23.3 Match Center', () => {
   const patched = applyHomeV233SourcePatch('predict = __cw231HomeHtml;');
-  assert.match(patched, /ciao-v233-open-serie-a-match/);
-  assert.match(patched, /openMatchCenter/);
-  assert.match(patched, /legacyId/);
+  assert.match(patched, /__cw233LegacyOpenMatchCenter/);
+  assert.match(patched, /CiaoV233MatchCenter/);
+  assert.match(patched, /openCanonicalMatchCenter/);
+  assert.match(patched, /competition:\s*['"]serie_a['"]/);
+  assert.match(patched, /serie_a:\$\{legacyId\}/);
+  assert.doesNotMatch(patched, /ciao-v233-open-serie-a-match/);
 });

@@ -1,4 +1,3 @@
-import { getCompetitionConfig } from '../v23.2/competition-config.mjs';
 import { buildCoppaBracket } from '../v23.2/coppa-bracket.mjs';
 import { loadCompetitionMatches } from '../v23.2/data-client.mjs';
 import { formatKickoff, seasonDateRange } from '../v23.2/matches-ui.mjs';
@@ -9,6 +8,29 @@ const STYLE_ID = 'ciao-v233-tables-style';
 const TABLE_COMPETITIONS = Object.freeze(['serie_a', 'ucl', 'uel', 'uecl', 'coppa_italia']);
 const TABLES_CACHE_TTL = 60_000;
 const TABLES_CACHE = new Map();
+const TABLE_LABELS = Object.freeze({
+  serie_a:'Серия А', ucl:'ЛЧ', uel:'ЛЕ', uecl:'ЛК', coppa_italia:'КИ',
+});
+const TABLE_TITLES = Object.freeze({
+  serie_a:'Серия А', ucl:'Лига Чемпионов', uel:'Лига Европы', uecl:'Лига Конференций', coppa_italia:'Кубок Италии',
+});
+const TABLE_THEMES = Object.freeze({
+  serie_a:'serie-a', ucl:'champions', uel:'europa', uecl:'conference', coppa_italia:'coppa',
+});
+
+export function tablesThemeForCompetition(value) {
+  return TABLE_THEMES[String(value ?? '').trim()] || 'serie-a';
+}
+
+export function tablesLabelForCompetition(value) {
+  const key = String(value ?? '').trim();
+  return TABLE_LABELS[key] || TABLE_TITLES[key] || key;
+}
+
+export function tablesTitleForCompetition(value) {
+  const key = String(value ?? '').trim();
+  return TABLE_TITLES[key] || 'Таблицы';
+}
 
 function esc(value) {
   return String(value ?? '')
@@ -46,9 +68,8 @@ function renderSelectors(selectedCompetition) {
   return `<div class="cw233-table-selectors-viewport">
     <div class="cw233-table-selectors" role="tablist" aria-label="Турнирные таблицы">
       ${TABLE_COMPETITIONS.map(competition => {
-        const config = getCompetitionConfig(competition);
         const active = selectedCompetition === competition;
-        return `<button type="button" class="cw233-table-selector${active ? ' is-active' : ''}" data-cw233-tables-action="competition" data-cw233-tables-competition="${esc(competition)}" aria-selected="${active ? 'true' : 'false'}">${esc(config.title)}</button>`;
+        return `<button type="button" class="cw233-table-selector${active ? ' is-active' : ''}" data-cw233-tables-action="competition" data-cw233-tables-competition="${esc(competition)}" aria-selected="${active ? 'true' : 'false'}">${esc(tablesLabelForCompetition(competition))}</button>`;
       }).join('')}
     </div>
   </div>`;
@@ -158,12 +179,12 @@ export function renderTablesHub({
   if (!TABLE_COMPETITIONS.includes(selectedCompetition)) {
     selectedCompetition = 'serie_a';
   }
-  const config = getCompetitionConfig(selectedCompetition);
-  return `<section class="cw233-tables-hub" data-cw233-tables-view="hub" data-cw233-tables-selected="${esc(selectedCompetition)}">
+  const theme = tablesThemeForCompetition(selectedCompetition);
+  return `<section class="cw233-tables-hub" data-cw233-tables-view="hub" data-cw233-tables-selected="${esc(selectedCompetition)}" data-cw233-theme="${esc(theme)}" data-cw233-round11-theme="${esc(theme)}">
     <header class="cw233-tables-head">
       <span>Ciao, Web!</span>
       <h2>Таблицы</h2>
-      <p>${selectedCompetition === 'coppa_italia' ? 'Сетка плей-офф' : esc(config.title)}</p>
+      <p>${esc(tablesTitleForCompetition(selectedCompetition))}</p>
     </header>
     ${renderSelectors(selectedCompetition)}
     <div class="cw233-tables-content" data-cw233-tables-content="${esc(selectedCompetition)}">
@@ -317,6 +338,8 @@ export function patchTablesHub(overlay, html) {
   const selectorLeft = Number(current.querySelector?.('.cw233-table-selectors-viewport')?.scrollLeft) || 0;
   const standingLeft = Number(current.querySelector?.('.cw233-standing-viewport')?.scrollLeft) || 0;
   current.dataset.cw233TablesSelected = next.dataset?.cw233TablesSelected || 'serie_a';
+  current.dataset.cw233Theme = next.dataset?.cw233Theme || tablesThemeForCompetition(current.dataset.cw233TablesSelected);
+  current.dataset.cw233Round11Theme = next.dataset?.cw233Round11Theme || current.dataset.cw233Theme;
   const currentHead = current.querySelector?.('.cw233-tables-head');
   const nextHead = next.querySelector?.('.cw233-tables-head');
   if (currentHead && nextHead) currentHead.innerHTML = nextHead.innerHTML;
@@ -334,7 +357,6 @@ export function patchTablesHub(overlay, html) {
   const restoredStanding = current.querySelector?.('.cw233-standing-viewport');
   if (restoredSelectors) restoredSelectors.scrollLeft = selectorLeft;
   if (restoredStanding) restoredStanding.scrollLeft = standingLeft;
-  try { documentRef.dispatchEvent?.(new Event('ciao-v233-round11-theme')); } catch {}
   return true;
 }
 

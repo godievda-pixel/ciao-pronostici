@@ -1,14 +1,39 @@
 import { openCanonicalMatchCenter } from './match-center.mjs';
+import { getMatchBootstrap } from './match-bootstrap-cache.mjs';
+
+const PREDICTION_CONTROL_SELECTOR = '[data-cw233-delta],[data-cw233-save-all],[data-cw231-action="predict"]';
+const INTERACTIVE_SELECTOR = 'button,input,select,textarea,a,[data-cw233-pred-nav]';
 
 function canonicalPair(competition, matchId) {
   const key = String(competition || '').trim();
   const id = String(matchId || '').trim();
   if (!key || !id || !id.startsWith(`${key}:`) || !id.slice(key.length + 1).trim()) return null;
-  return Object.freeze({ competition: key, matchId: id });
+  const initialMatch = getMatchBootstrap(key, id);
+  return Object.freeze({ competition:key, matchId:id, ...(initialMatch ? { initialMatch } : {}) });
+}
+
+function pairFromCanonicalId(matchId) {
+  const id = String(matchId || '').trim();
+  const separator = id.indexOf(':');
+  if (separator <= 0) return null;
+  return canonicalPair(id.slice(0, separator), id);
 }
 
 export function resolveCanonicalMatchTarget(target) {
   if (!target?.closest) return null;
+  if (target.closest(PREDICTION_CONTROL_SELECTOR)) return null;
+  if (target.closest(INTERACTIVE_SELECTOR)) return null;
+
+  const canonical = target.closest('[data-cw233-match][data-cw233-competition]');
+  if (canonical) {
+    return canonicalPair(
+      canonical.dataset?.cw233Competition,
+      canonical.dataset?.cw233Match,
+    );
+  }
+
+  const predictionCard = target.closest('[data-cw233-pred-card]');
+  if (predictionCard) return pairFromCanonicalId(predictionCard.dataset?.cw233PredCard);
 
   const profileCard = target.closest('[data-cw232-profile-match][data-cw232-competition]');
   if (profileCard) {
@@ -38,6 +63,7 @@ export function installCanonicalMatchLinks(
     if (!payload) return;
     event.preventDefault?.();
     event.stopPropagation?.();
+    event.stopImmediatePropagation?.();
     void open(payload);
   };
 
