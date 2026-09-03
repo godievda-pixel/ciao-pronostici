@@ -1,3 +1,9 @@
+const LINEUP_STYLE = `<style data-cw233-mc-lineups-style>
+.cw233-mc-lineups{display:grid;gap:14px}.cw233-mc-lineup-side{display:grid;gap:10px;padding:12px;border:1px solid color-mix(in srgb,var(--mc-accent) 18%,var(--mc-border));border-radius:16px;background:color-mix(in srgb,var(--mc-accent) 4%,rgba(255,255,255,.025))}.cw233-mc-lineup-side>header{display:flex;align-items:center;justify-content:space-between;gap:10px}.cw233-mc-lineup-side>header span{font-size:11px;font-weight:850}.cw233-mc-lineup-side>header strong{padding:5px 8px;border-radius:9px;background:color-mix(in srgb,var(--mc-accent) 18%,rgba(255,255,255,.04));font-size:10px;color:color-mix(in srgb,var(--mc-accent) 52%,#fff)}.cw233-mc-pitch{display:grid;gap:12px;min-height:330px;padding:18px 9px;border:1px solid color-mix(in srgb,var(--mc-accent) 24%,rgba(255,255,255,.12));border-radius:16px;background:linear-gradient(90deg,transparent 49.7%,rgba(255,255,255,.13) 50%,transparent 50.3%),linear-gradient(180deg,color-mix(in srgb,var(--mc-accent) 12%,rgba(255,255,255,.025)),rgba(255,255,255,.018))}.cw233-mc-pitch-row{display:flex;align-items:center;justify-content:space-around;gap:5px;min-width:0}.cw233-mc-pitch-player{display:flex;min-width:0;max-width:76px;flex:1 1 0;flex-direction:column;align-items:center;gap:3px;text-align:center}.cw233-mc-pitch-player>span{display:grid;place-items:center;width:24px;height:24px;border:1px solid color-mix(in srgb,var(--mc-accent) 42%,rgba(255,255,255,.18));border-radius:50%;background:var(--mc-bg);font-size:9px;font-weight:900;color:color-mix(in srgb,var(--mc-accent) 58%,#fff)}.cw233-mc-pitch-player>b{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9px}.cw233-mc-lineup-groups{display:grid;gap:9px}.cw233-mc-lineup-groups>div,.cw233-mc-lineup-subs{padding:9px;border-radius:12px;background:rgba(255,255,255,.035)}.cw233-mc-lineup-groups small,.cw233-mc-lineup-subs small{display:block;margin-bottom:7px;font-size:8px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.45)}.cw233-mc-lineup-groups>div>div,.cw233-mc-lineup-subs>div{display:flex;flex-wrap:wrap;gap:8px}.cw233-mc-lineup-groups .cw233-mc-pitch-player,.cw233-mc-lineup-subs .cw233-mc-pitch-player{min-width:62px;max-width:90px}.cw233-mc-lineup-subs.is-empty span{font-size:9px;color:rgba(255,255,255,.42)}
+@media(min-width:540px){.cw233-mc-lineups{grid-template-columns:repeat(2,minmax(0,1fr))}.cw233-mc-pitch{min-height:360px}}
+@media(max-width:380px){.cw233-mc-pitch{min-height:300px;padding-left:5px;padding-right:5px}.cw233-mc-pitch-player>b{font-size:8px}}
+</style>`;
+
 function esc(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -109,7 +115,7 @@ function renderSide(sideKey, side = {}, context = {}) {
 
 export function renderMatchCenterLineups(section = {}, context = {}) {
   const source = section && typeof section === 'object' ? section : {};
-  return `<section class="cw233-mc-lineups" data-cw233-mc-lineups>
+  return `${LINEUP_STYLE}<section class="cw233-mc-lineups" data-cw233-mc-lineups>
     ${renderSide('home', source.home || {}, context)}
     ${renderSide('away', source.away || {}, context)}
   </section>`;
