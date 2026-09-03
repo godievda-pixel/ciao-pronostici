@@ -34,7 +34,7 @@ const sections = Object.freeze({
     home:{ xg:2.57, possession:61, shots:17, shotsOnTarget:8, bigChances:5, corners:6, fouls:11, offsides:1, yellowCards:2, redCards:0, saves:2, passAccuracy:87.4, interceptions:4, tackles:20 },
     away:{ xg:0.87, possession:39, shots:9, shotsOnTarget:3, bigChances:1, corners:2, fouls:14, offsides:3, yellowCards:4, redCards:0, saves:3, passAccuracy:82.9, interceptions:6, tackles:24 },
   },
-  events:[{ type:'goal', minute:12, side:'home', player:'J. Pohjanpalo', homeScore:1, awayScore:0 }],
+  events:[{ type:'goal', minute:12, side:'home', player:'J. Pohjanpalo', assist:'D. Johnsen', homeScore:1, awayScore:0 }, { type:'substitution', minute:61, side:'home', playerIn:'Hernani', playerOut:'A. Palumbo' }],
   lineups:{
     home:{ formation:'4-3-3', starters:[{ playerId:10, name:'J. Pohjanpalo', shirtNumber:20 }], substitutes:[{ playerId:11, name:'F. Ranocchia', shirtNumber:14 }] },
     away:{ formation:'3-5-2', starters:[{ playerId:20, name:'D. Mensah', shirtNumber:7 }], substitutes:[] },
@@ -42,7 +42,7 @@ const sections = Object.freeze({
   players:[{ playerId:10, name:'J. Pohjanpalo', teamName:'Палермо', rating:8.8, goals:2, assists:1, xg:1.3, xa:0.2, minutes:90 }],
 });
 
-test('Round 19 external Match Center exposes a Serie A legacy-compatible data adapter', () => {
+test('Round 19 external Match Center exposes the final Serie A cw20 data contract', () => {
   assert.equal(typeof BsdAdapter.toSerieALegacyMatchCenterData, 'function');
   const legacy = BsdAdapter.toSerieALegacyMatchCenterData(base, sections);
   assert.equal(legacy.status, 'finished');
@@ -59,6 +59,10 @@ test('Round 19 external Match Center exposes a Serie A legacy-compatible data ad
   assert.equal(legacy.stats.shotmap[0].pos.x, 72);
   assert.equal(legacy.stats.shotmap[0].home, true);
   assert.equal(legacy.incidents.incidents[0].player_name, 'J. Pohjanpalo');
+  assert.equal(legacy.incidents.incidents[0].player, 'J. Pohjanpalo');
+  assert.equal(legacy.incidents.incidents[0].assist, 'D. Johnsen');
+  assert.equal(legacy.incidents.incidents[1].player_in, 'Hernani');
+  assert.equal(legacy.incidents.incidents[1].player_out, 'A. Palumbo');
   assert.equal(legacy.lineups.lineups.home.players[0].name, 'J. Pohjanpalo');
   assert.equal(legacy.lineups.lineups.home.substitutes[0].name, 'F. Ranocchia');
   assert.equal(legacy.player_stats.player_stats[0].expected_goals, 1.3);
@@ -77,7 +81,7 @@ test('Round 19 loader fetches all canonical sections then returns one legacy sna
   assert.deepEqual(seen.sort(), ['events','lineups','overview','players','stats']);
   assert.equal(legacy.match.home_score, 5);
   assert.equal(legacy.stats.momentum.length, 2);
-  assert.equal(legacy.incidents.incidents.length, 1);
+  assert.equal(legacy.incidents.incidents.length, 2);
 });
 
 test('Round 19 build patch installs an external event bridge into the real legacy renderer', () => {
@@ -110,6 +114,28 @@ predict = __cw231HomeHtml;
   const patched = applyHomeV233SourcePatch(fixture);
   assert.match(patched, /function closeMatchCenter\(\)\{__cw233ExternalMatchContext=null;/);
   assert.match(patched, /CiaoV233ExternalLegacyMatchCenter\?\.refresh/);
+});
+
+test('Round 19 patches the final cw20 refresh override, not only the early legacy refresh', () => {
+  const lateMarker = '/* ===== /Ciao, Web! v20.15 stable match center live patch ===== */';
+  const fixture = `
+const __cw231HomeHtml = () => '';
+let predict;
+function matchCenterHtml(d){ return String(d); }
+function bindMatchCenter(){}
+function closeMatchCenter(){}
+function patchMatchCenter(){}
+async function refreshMatchCenter(){}
+predict = __cw231HomeHtml;
+refreshMatchCenter=async function(){ return 'cw20-final'; };
+${lateMarker}
+`;
+  const patched = applyHomeV233SourcePatch(fixture);
+  const late = patched.indexOf(lateMarker);
+  const finalBridge = patched.indexOf('cw233-external-final-refresh-r19');
+  assert.ok(late >= 0);
+  assert.ok(finalBridge > late);
+  assert.match(patched.slice(finalBridge), /CiaoV233ExternalLegacyMatchCenter\?\.refresh/);
 });
 
 test('Round 19 wrapper must not suppress core click listeners', async () => {
