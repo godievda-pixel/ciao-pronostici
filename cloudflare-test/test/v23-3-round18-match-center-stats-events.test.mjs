@@ -93,7 +93,7 @@ test('Round 18 statistics renderer restores every required legacy metric', () =>
   assert.match(html, /--mc-stat-away:/);
 });
 
-test('Round 18 event timeline sorts chronology and preserves event semantics', () => {
+test('Round 18 event timeline follows Serie A latest-first chronology and preserves event semantics', () => {
   const html = renderMatchCenterEvents([
     { type:'substitution', minute:61, side:'away', playerIn:'Trossard', playerOut:'Martinelli' },
     { type:'period', minute:45, addedTime:2, text:'Перерыв' },
@@ -105,12 +105,14 @@ test('Round 18 event timeline sorts chronology and preserves event semantics', (
   ], { match:match() });
 
   assert.match(html, /data-cw233-mc-events/);
-  assert.ok(html.indexOf('11′') < html.indexOf('18′'));
-  assert.ok(html.indexOf('18′') < html.indexOf('45+2′'));
-  assert.ok(html.indexOf('45+2′') < html.indexOf('52′'));
-  assert.ok(html.indexOf('52′') < html.indexOf('54′'));
-  assert.ok(html.indexOf('54′') < html.indexOf('61′'));
-  assert.ok(html.indexOf('61′') < html.indexOf('66′'));
+  assert.ok(html.indexOf('66′') < html.indexOf('61′'));
+  assert.ok(html.indexOf('61′') < html.indexOf('54′'));
+  assert.ok(html.indexOf('54′') < html.indexOf('52′'));
+  assert.ok(html.indexOf('52′') < html.indexOf('45+2′'));
+  assert.ok(html.indexOf('45+2′') < html.indexOf('18′'));
+  assert.ok(html.indexOf('18′') < html.indexOf('11′'));
+  assert.match(html, /cw233-mc-event-minute/);
+  assert.match(html, /cw233-mc-event-text/);
   assert.match(html, /data-cw233-mc-event="goal"/);
   assert.match(html, /data-cw233-mc-event="yellow_card"/);
   assert.match(html, /data-cw233-mc-event="red_card"/);
