@@ -5,10 +5,19 @@ const ORIGIN = 'https://ciao-web-app-test.ciao-web.workers.dev/';
 
 const MODULE_PATHS = Object.freeze({
   core:'/v23.3/match-center-core.mjs',
+  dataClient:'/v23.3/data-client.mjs',
+  sectionCache:'/v23.3/match-center-section-cache.mjs',
   sections:'/v23.3/match-center-sections.mjs',
+  overview:'/v23.3/match-center-overview.mjs',
+  stats:'/v23.3/match-center-stats.mjs',
+  events:'/v23.3/match-center-events.mjs',
+  lineups:'/v23.3/match-center-lineups.mjs',
+  players:'/v23.3/match-center-players.mjs',
+  theme:'/v23.3/match-center-theme.mjs',
   adapter:'/v23.3/serie-a-match-center-adapter.mjs',
   parity:'/v23.3/match-center-parity.mjs',
   bridge:'/v23.3/serie-a-legacy-bridge.mjs',
+  deployment:'/v23.3/round18-deployment-marker.mjs',
 });
 
 const FIVE_TABS = Object.freeze(['overview','stats','events','lineups','players']);
@@ -24,6 +33,7 @@ const SECTION_MARKERS = Object.freeze([
 ]);
 
 export const ROUND18_DEPLOYMENT_MARKER = 'serie_a_legacy_parity_gate';
+export const ROUND18_BUILD_MARKER = 'round18-match-center-parity-r1';
 
 function sourceText(value) {
   return String(value ?? '');
@@ -35,8 +45,12 @@ export function evaluateRound18MatchCenterSources(sources = {}) {
   const adapter = sourceText(sources.adapter);
   const parity = sourceText(sources.parity);
   const bridge = sourceText(sources.bridge);
+  const deployment = sourceText(sources.deployment);
 
   const checks = Object.freeze({
+    deploymentIdentity:
+      deployment.includes('ROUND18_BUILD_MARKER')
+      && deployment.includes(ROUND18_BUILD_MARKER),
     matchCenterShell:
       core.includes('data-cw233-mc-view')
       && core.includes('patchMatchCenterOverlay'),
@@ -66,6 +80,7 @@ export function evaluateRound18MatchCenterSources(sources = {}) {
 
   return Object.freeze({
     marker:ROUND18_DEPLOYMENT_MARKER,
+    buildMarker:ROUND18_BUILD_MARKER,
     passed:missing.length === 0,
     checks,
     missing,
@@ -108,6 +123,7 @@ export async function probeRound18MatchCenter({ origin = ORIGIN, fetchImpl = fet
     observedAt:new Date().toISOString(),
     origin,
     marker:ROUND18_DEPLOYMENT_MARKER,
+    buildMarker:ROUND18_BUILD_MARKER,
     modules,
     passed:evaluation.passed,
     checks:evaluation.checks,
