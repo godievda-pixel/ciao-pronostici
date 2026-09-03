@@ -157,4 +157,5 @@ test('Round 18 keeps stats failure section-local and allows events to load', asy
   assert.equal(state.sectionState.stats.status, 'error');
   assert.equal(state.sectionState.events.status, 'ready');
   assert.equal(state.sections.events[0].player, 'Thuram');
+  controller.close();
 });
