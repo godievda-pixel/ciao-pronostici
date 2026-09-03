@@ -1,6 +1,5 @@
-const PLAYER_STYLE = `<style data-cw233-mc-players-style>
-.cw233-mc-players{display:grid;gap:8px}.cw233-mc-players-list{display:grid;gap:8px}.cw233-mc-player-card{display:grid;gap:9px;padding:11px 12px;border:1px solid color-mix(in srgb,var(--mc-accent) 16%,var(--mc-border));border-radius:14px;background:linear-gradient(145deg,color-mix(in srgb,var(--mc-accent) 5%,rgba(255,255,255,.035)),rgba(255,255,255,.02))}.cw233-mc-player-main{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}.cw233-mc-player-main>div{min-width:0}.cw233-mc-player-main strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}.cw233-mc-player-main span{display:block;margin-top:3px;font-size:9px;color:rgba(255,255,255,.44)}.cw233-mc-player-main>b{display:grid;place-items:center;min-width:44px;height:34px;padding:0 9px;border:1px solid color-mix(in srgb,var(--mc-accent) 42%,rgba(255,255,255,.16));border-radius:11px;background:linear-gradient(135deg,color-mix(in srgb,var(--mc-accent) 36%,rgba(255,255,255,.05)),color-mix(in srgb,var(--mc-accent-2) 24%,rgba(255,255,255,.04)));font-size:13px;color:#fff}.cw233-mc-player-metrics{display:flex;flex-wrap:wrap;gap:5px}.cw233-mc-player-metrics span{padding:5px 7px;border-radius:8px;background:rgba(255,255,255,.045);font-size:8px;color:rgba(255,255,255,.68)}.cw233-mc-players-unavailable{min-height:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:20px;text-align:center}.cw233-mc-players-unavailable strong{font-size:12px}.cw233-mc-players-unavailable span{max-width:280px;font-size:9px;line-height:1.45;color:rgba(255,255,255,.48)}
-@media(min-width:540px){.cw233-mc-players-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
+const PLAYER_STYLE = `<style data-cw233-mc-players-parity-style>
+.cw233-mc-players{display:grid;gap:9px}.cw233-mc-players-list{overflow:hidden;border:1px solid var(--mc-border);border-radius:17px;background:rgba(255,255,255,.025)}.cw233-mc-rating-row{display:grid;grid-template-columns:minmax(0,1fr) 45px;align-items:center;gap:10px;min-height:50px;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.06)}.cw233-mc-rating-row:last-child{border-bottom:0}.cw233-mc-rating-name{min-width:0}.cw233-mc-rating-name b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;font-weight:900;color:var(--mc-text)}.cw233-mc-rating-meta{display:block;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:8px;line-height:1.25;color:var(--mc-muted)}.cw233-mc-rating{display:grid;place-items:center;min-width:42px;height:31px;border-radius:10px;background:rgba(255,255,255,.055);font-size:12px;font-weight:900;color:var(--mc-text)}.cw233-mc-players-unavailable{min-height:160px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:20px;text-align:center}.cw233-mc-players-unavailable strong{font-size:11px}.cw233-mc-players-unavailable span{max-width:280px;font-size:9px;line-height:1.45;color:var(--mc-muted)}
 </style>`;
 
 function esc(value) {
@@ -42,28 +41,19 @@ function russianCount(value, forms) {
   return `${number} ${form}`;
 }
 
-function metric(value, label) {
-  const number = finite(value);
-  return number === null ? '' : `<span>${esc(label)} ${number}</span>`;
-}
-
-function playerMetrics(player = {}) {
+function metricText(player = {}) {
   const metrics = [];
-  const minutes = finite(player.minutes);
-  if (minutes !== null) metrics.push(`<span>${minutes} мин</span>`);
   const goals = russianCount(player.goals, ['гол', 'гола', 'голов']);
-  if (goals) metrics.push(`<span>${esc(goals)}</span>`);
+  if (goals) metrics.push(goals);
   const assists = russianCount(player.assists, ['ассист', 'ассиста', 'ассистов']);
-  if (assists) metrics.push(`<span>${esc(assists)}</span>`);
-  const xg = metric(player.xg, 'xG');
-  if (xg) metrics.push(xg);
-  const xa = metric(player.xa, 'xA');
-  if (xa) metrics.push(xa);
-  const shots = russianCount(player.shots, ['удар', 'удара', 'ударов']);
-  if (shots) metrics.push(`<span>${esc(shots)}</span>`);
-  const keyPasses = russianCount(player.keyPasses, ['ключ. передача', 'ключ. передачи', 'ключ. передач']);
-  if (keyPasses) metrics.push(`<span>${esc(keyPasses)}</span>`);
-  return metrics.join('');
+  if (assists) metrics.push(assists);
+  const xg = finite(player.xg);
+  if (xg !== null) metrics.push(`xG ${xg}`);
+  const xa = finite(player.xa);
+  if (xa !== null) metrics.push(`xA ${xa}`);
+  const minutes = finite(player.minutes);
+  if (minutes !== null) metrics.push(`${minutes} мин`);
+  return metrics.join(' · ');
 }
 
 function playerId(player = {}, index = 0) {
@@ -74,10 +64,10 @@ function playerId(player = {}, index = 0) {
 function renderPlayer(player, index) {
   const rating = finite(player.rating);
   const name = text(player.name) || 'Игрок';
-  const team = text(player.teamName ?? player.team_name);
-  return `<article class="cw233-mc-player-card" data-cw233-mc-player="${esc(playerId(player, index))}">
-    <div class="cw233-mc-player-main"><div><strong>${esc(name)}</strong>${team ? `<span>${esc(team)}</span>` : ''}</div><b data-cw233-mc-player-rating>${rating}</b></div>
-    <div class="cw233-mc-player-metrics">${playerMetrics(player)}</div>
+  const meta = metricText(player);
+  return `<article class="cw233-mc-rating-row" data-cw233-mc-player="${esc(playerId(player, index))}">
+    <div class="cw233-mc-rating-name"><b>${esc(name)}</b>${meta ? `<small class="cw233-mc-rating-meta">${esc(meta)}</small>` : ''}</div>
+    <span class="cw233-mc-rating" data-cw233-mc-player-rating>${rating === null ? '—' : esc(rating.toFixed(1))}</span>
   </article>`;
 }
 
