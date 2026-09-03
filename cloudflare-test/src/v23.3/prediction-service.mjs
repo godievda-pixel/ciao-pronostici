@@ -91,7 +91,7 @@ function predictionState(match, activeSeason, now, deps) {
   }
 }
 
-export function createPredictionService({ request, env, now = new Date(), deps = {} } = {}) {
+export function createPredictionService({ request, env, now = new Date(), deps = {}, scheduleBackground } = {}) {
   const d = {
     buildPredictionWritePayload: deps.buildPredictionWritePayload || buildPredictionWritePayload,
     resolveAuthenticatedUser: deps.resolveAuthenticatedUser || resolveAuthenticatedUser,
@@ -100,6 +100,9 @@ export function createPredictionService({ request, env, now = new Date(), deps =
     assertPredictionWritable: deps.assertPredictionWritable || assertPredictionWritable,
     resultFingerprint: deps.resultFingerprint || resultFingerprint,
   };
+  const background = typeof scheduleBackground === 'function'
+    ? scheduleBackground
+    : promise => { Promise.resolve(promise).catch(() => {}); };
 
   async function user() {
     try { return await d.resolveAuthenticatedUser({ request, env }); }
@@ -194,6 +197,10 @@ export function createPredictionService({ request, env, now = new Date(), deps =
     }
   }
 
+  function reconcileInBackground(stub) {
+    background(reconcileFinishedMatches(stub).catch(() => {}));
+  }
+
   async function rankings({ scope = 'overall', competition } = {}) {
     try {
       const authenticated = await user();
@@ -201,7 +208,7 @@ export function createPredictionService({ request, env, now = new Date(), deps =
       if (scope === 'competition' && !text(competition)) throw new PredictionServiceError('competition_required', 400);
       const { stub } = activeStub(env);
       await registerParticipants(stub, authenticated);
-      await reconcileFinishedMatches(stub);
+      reconcileInBackground(stub);
       const params = new URLSearchParams({ scope });
       if (scope === 'competition') params.set('competition', competition);
       const payload = await internalJson(stub, `/rankings?${params}`);
@@ -218,7 +225,7 @@ export function createPredictionService({ request, env, now = new Date(), deps =
       const authenticated = await user();
       const { stub } = activeStub(env);
       await registerParticipants(stub, authenticated);
-      await reconcileFinishedMatches(stub);
+      reconcileInBackground(stub);
       const params = new URLSearchParams({ user_id: authenticated.userId });
       const payload = await internalJson(stub, `/rankings/me?${params}`);
       return payload.ranking && typeof payload.ranking === 'object' ? payload.ranking : null;

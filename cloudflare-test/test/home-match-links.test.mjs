@@ -28,7 +28,7 @@ test('nearest Serie A card has both club logos and opens match center', () => {
   assert.match(patched, /data-cw231-round="\$\{Number\(nearest\.raw\?\.round_number\) \|\| 0\}"/);
 });
 
-test('favorite home card resolves its clickable id through the same normalized Serie A calendar as Today', () => {
+test('favorite home card resolves its clickable id from hydrated v23.3 Home state, never stale legacy schedule state', () => {
   const source = `
   function __cw231FavoriteHtml() {
     const host = document.createElement('div');
@@ -39,8 +39,9 @@ test('favorite home card resolves its clickable id through the same normalized S
 
   const patched = applyFavoriteHtmlSourcePatch(source);
 
-  assert.match(patched, /__cw231RawScheduleMatches\(\)/);
-  assert.match(patched, /CiaoV23Today\.normalizeMatch/);
+  assert.match(patched, /CiaoV233Home\?\.state\?\.\(\)/);
+  assert.match(patched, /homeState\?\.hydrated/);
+  assert.doesNotMatch(patched, /__cw231RawScheduleMatches\(\)/);
   assert.match(patched, /match\?\.matchId/);
   assert.match(patched, /card\.dataset\.cw231Action = 'match'/);
   assert.match(patched, /card\.dataset\.cw231Match = String\(match\.matchId\)/);
@@ -69,7 +70,7 @@ test('favorite home match card renders both clubs with logos and calendar status
   assert.match(patched, /card\.querySelector\('\.cw211-prediction'\)/);
 });
 
-test('favorite match reserves its final geometry before calendar hydration', async () => {
+test('favorite match reserves its final geometry before Home hydration', async () => {
   const source = `
   function __cw231FavoriteHtml() {
     const host = document.createElement('div');

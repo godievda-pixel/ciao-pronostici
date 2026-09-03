@@ -35,6 +35,7 @@ const COPPA_STAGE_LABELS = Object.freeze({
   Semifinals:'1/2 финала',
   Final:'Финал',
 });
+const MATCH_CACHE_TTL = 45_000;
 
 function text(value) { return String(value ?? '').trim(); }
 function time(match) {
@@ -215,6 +216,7 @@ let pageActive = false;
 let loadingMatches = false;
 let loadingFailed = false;
 let loadGeneration = 0;
+let loadedAt = 0;
 
 function initData() { return text(globalThis.Telegram?.WebApp?.initData); }
 function telegramUser() { return globalThis.Telegram?.WebApp?.initDataUnsafe?.user || null; }
@@ -369,22 +371,14 @@ function render() {
 }
 
 async function reloadMatches(generation = loadGeneration) {
-  const finalState = await loadPredictionCompetitionsProgressively({
-    load:competition => client.available(competition),
-    onUpdate(state) {
-      if (!pageActive || generation !== loadGeneration) return;
-      matches = [...state.matches];
-      currentParticipant = state.participant || currentParticipant;
-      loadingMatches = state.pending > 0 && predictionRowsForMode(matches, activeMode).length === 0;
-      loadingFailed = false;
-      render();
-    },
-  });
+  const finalState = await client.available('all');
   if (!pageActive || generation !== loadGeneration) return finalState;
-  matches = [...finalState.matches];
-  currentParticipant = finalState.participant || currentParticipant;
+  matches = sortMatches(Array.isArray(finalState?.matches) ? finalState.matches : []);
+  currentParticipant = finalState?.participant || currentParticipant;
   loadingMatches = false;
-  loadingFailed = matches.length === 0 && Object.keys(finalState.errors).length === PREDICTION_COMPETITIONS.length;
+  const errors = finalState?.errors && typeof finalState.errors === 'object' ? finalState.errors : {};
+  loadingFailed = matches.length === 0 && Object.keys(errors).length === PREDICTION_COMPETITIONS.length;
+  loadedAt = Date.now();
   render();
   return finalState;
 }
@@ -392,17 +386,18 @@ async function reloadMatches(generation = loadGeneration) {
 async function open() {
   const generation = ++loadGeneration;
   pageActive = true;
-  loadingMatches = true;
+  const hasCache = loadedAt > 0 && (Date.now() - loadedAt) <= MATCH_CACHE_TTL;
+  loadingMatches = matches.length === 0;
   loadingFailed = false;
-  matches = [];
   render();
   try {
     client = client || createPredictionClient({ initData:initData() });
+    if (hasCache) loadingMatches = false;
     await reloadMatches(generation);
   } catch {
     if (!pageActive || generation !== loadGeneration) return;
     loadingMatches = false;
-    loadingFailed = true;
+    loadingFailed = matches.length === 0;
     render();
   }
 }

@@ -22,12 +22,16 @@ test('standing logos accept legacy and BSD logo_url variants', () => {
   assert.equal(row.team.crestUrl, 'https://img.example/roma.png');
 });
 
-test('predictions render available matches progressively and never trigger ranking reconciliation', async () => {
+test('predictions load all competitions in one available request and never trigger ranking reconciliation', async () => {
   const source = await readFile(new URL('../src/v23.3/predictions-ui.mjs', import.meta.url), 'utf8');
+  const start = source.indexOf('async function reloadMatches');
+  const end = source.indexOf('async function open()', start);
+  const reload = source.slice(start, end);
+
   assert.doesNotMatch(source, /Загружаем прогнозы/);
-  assert.doesNotMatch(source, /Promise\.all\(\s*\[\s*client\.available\('all'\)\s*,\s*client\.rankingMe/);
-  assert.match(source, /loadPredictionCompetitionsProgressively/);
-  assert.match(source, /client\.available\(competition\)/);
+  assert.match(reload, /client\.available\(['"]all['"]\)/);
+  assert.doesNotMatch(reload, /client\.available\(competition\)/);
+  assert.doesNotMatch(reload, /loadPredictionCompetitionsProgressively/);
   assert.doesNotMatch(source, /client\.rankingMe\(\)/);
 });
 

@@ -1,6 +1,7 @@
 import { getCompetitionConfig, COMPETITION_KEYS } from '../v23.2/competition-config.mjs';
 import { adaptSerieASchedule } from '../v23.2/serie-a-adapter.mjs';
 import { fetchBsdMatchSnapshot, fetchBsdMatches } from '../v23.2/bsd-provider.mjs';
+import { normalizeTeamAlias, russianTeamName } from '../v23.2/team-registry.mjs';
 import { predictionDeadlineForKickoff } from './competition-data.mjs';
 
 const LEGACY_CORE_API = '/api/ciao-core-api-fast-v4';
@@ -132,13 +133,22 @@ async function fetchLegacySerieAJson({ request, env, path, body }) {
   return payload;
 }
 
+function canonicalTeamName(team = {}) {
+  const raw = text(team?.rawName || team?.name);
+  return raw ? normalizeTeamAlias(russianTeamName(raw)) : '';
+}
+
 function sameTeam(left = {}, right = {}) {
   const leftId = text(left?.id);
   const rightId = text(right?.id);
-  if (leftId && rightId) return leftId === rightId;
-  const leftName = text(left?.rawName || left?.name).toLowerCase();
-  const rightName = text(right?.rawName || right?.name).toLowerCase();
+  if (leftId && rightId && leftId === rightId) return true;
+  const leftName = canonicalTeamName(left);
+  const rightName = canonicalTeamName(right);
   return Boolean(leftName && rightName && leftName === rightName);
+}
+
+function sameFixture(left = {}, right = {}) {
+  return sameTeam(left?.homeTeam, right?.homeTeam) && sameTeam(left?.awayTeam, right?.awayTeam);
 }
 
 function mergeTeamCrest(primary = {}, source = {}) {
@@ -154,7 +164,7 @@ function enrichSerieACrests(primarySchedule, crestSchedule) {
   return Object.freeze({
     ...primarySchedule,
     matches:Object.freeze(primary.map(match => {
-      const source = byId.get(text(match?.matchId));
+      const source = byId.get(text(match?.matchId)) || crestMatches.find(item => sameFixture(match, item));
       if (!source) return match;
       return Object.freeze({
         ...match,

@@ -73,8 +73,9 @@ test('available all joins canonical matches with authenticated stored prediction
   assert.equal(result.matches[1].prediction,null);
 });
 
-test('rankings register the authenticated participant before reconciliation and ranking read', async()=>{
+test('rankings register the participant, return ranking without awaiting reconciliation, and schedule reconciliation in background', async()=>{
   const order=[];
+  const scheduled=[];
   const ns=namespace(async req=>{
     const path=new URL(req.url).pathname; order.push(path);
     if(path==='/participants') {
@@ -86,30 +87,37 @@ test('rankings register the authenticated participant before reconciliation and 
     if(path==='/rankings') return Response.json({ok:true,ranking:[{user_id:'telegram:42',display_name:'Daniil',points:5}]});
     throw new Error(path);
   });
-  const service=createPredictionService({request,env:baseEnv(ns),deps:{
+  const service=createPredictionService({request,env:baseEnv(ns),scheduleBackground:promise=>scheduled.push(promise),deps:{
     resolveAuthenticatedUser:async()=>authUser(),
     listCanonicalPredictionMatches:async()=>({matches:[match('ucl:1',{status:'finished',homeScore:2,awayScore:1})],errors:{}}),
   }});
   const rows=await service.rankings({scope:'overall'});
-  assert.deepEqual(order,['/participants','/reconcile','/rankings']);
+  assert.equal(order[0],'/participants');
+  assert.ok(order.includes('/rankings'));
+  assert.equal(scheduled.length,1);
   assert.equal(rows[0].display_name,'Daniil');
   assert.equal(rows[0].points,5);
+  await scheduled[0];
+  assert.ok(order.includes('/reconcile'));
 });
 
 test('rankingMe registers the current user so a zero-point participant still has a ranking card', async()=>{
   const order=[];
+  const scheduled=[];
   const ns=namespace(async req=>{
     const path=new URL(req.url).pathname; order.push(path);
     if(path==='/participants') return Response.json({ok:true,participants:[{user_id:'telegram:42',display_name:'Daniil',username:'ciao42'}]});
     if(path==='/rankings/me') return Response.json({ok:true,ranking:{position:1,user_id:'telegram:42',display_name:'Daniil',points:0}});
     throw new Error(path);
   });
-  const service=createPredictionService({request,env:baseEnv(ns),deps:{
+  const service=createPredictionService({request,env:baseEnv(ns),scheduleBackground:promise=>scheduled.push(promise),deps:{
     resolveAuthenticatedUser:async()=>authUser(),
     listCanonicalPredictionMatches:async()=>({matches:[],errors:{}}),
   }});
   assert.deepEqual(await service.rankingMe(), {position:1,user_id:'telegram:42',display_name:'Daniil',points:0});
   assert.deepEqual(order,['/participants','/rankings/me']);
+  assert.equal(scheduled.length,1);
+  await scheduled[0];
 });
 
 test('Durable Object failures map to prediction_backend_unavailable', async()=>{

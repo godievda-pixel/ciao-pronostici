@@ -7,6 +7,7 @@ import {
   fetchBsdMatches,
   fetchBsdStandings,
 } from './v23.2/bsd-provider.mjs';
+import { normalizeTeamAlias, russianTeamName } from './v23.2/team-registry.mjs';
 import { createPredictionService } from './v23.3/prediction-service.mjs';
 import { assertSafeResetTarget } from './v23.3/reset-contract.mjs';
 import { predictionObjectName } from './v23.3/prediction-sql.mjs';
@@ -106,7 +107,7 @@ function normalizeLegacySerieAStandings(payload) {
 }
 
 function normalizedTeamName(value) {
-  return String(value ?? '').trim().toLocaleLowerCase('ru-RU').replace(/\s+/g, ' ');
+  return normalizeTeamAlias(russianTeamName(String(value ?? '').trim()));
 }
 
 function serieACrestLookup(schedule) {
@@ -117,9 +118,11 @@ function serieACrestLookup(schedule) {
       const crestUrl = String(team?.crestUrl || '').trim();
       if (!crestUrl) continue;
       const id = String(team?.id || '').trim();
-      const name = normalizedTeamName(team?.name || team?.rawName);
+      const names = [team?.name, team?.rawName]
+        .map(normalizedTeamName)
+        .filter(Boolean);
       if (id) byId.set(id, crestUrl);
-      if (name) byName.set(name, crestUrl);
+      for (const name of names) byName.set(name, crestUrl);
     }
   }
   return { byId, byName };
@@ -132,8 +135,10 @@ function enrichSerieAStandingsCrests(standings, schedule) {
     rows:(Array.isArray(standings?.rows) ? standings.rows : []).map(row => {
       if (String(row?.team?.crestUrl || '').trim()) return row;
       const id = String(row?.team?.id || '').trim();
-      const name = normalizedTeamName(row?.team?.name || row?.team?.rawName);
-      const crestUrl = (id && lookup.byId.get(id)) || (name && lookup.byName.get(name)) || '';
+      const names = [row?.team?.name, row?.team?.rawName]
+        .map(normalizedTeamName)
+        .filter(Boolean);
+      const crestUrl = (id && lookup.byId.get(id)) || names.map(name => lookup.byName.get(name)).find(Boolean) || '';
       return crestUrl ? { ...row, team:{ ...row.team, crestUrl } } : row;
     }),
   };
@@ -194,20 +199,29 @@ async function handlePredictionsAvailable(request, env, url) {
   return predictionResponse(() => service.available(competition));
 }
 
-async function handleRankings(request, env, url) {
+function rankingService(request, env, ctx) {
+  return createPredictionService({
+    request,
+    env,
+    now:new Date(),
+    scheduleBackground:promise => ctx?.waitUntil?.(promise),
+  });
+}
+
+async function handleRankings(request, env, url, ctx) {
   if (request.method !== 'GET') return errorJson(405, { error: 'method_not_allowed' });
   const scope = String(url.searchParams.get('scope') || 'overall');
   const competition = String(url.searchParams.get('competition') || '');
-  const service = createPredictionService({ request, env, now: new Date() });
+  const service = rankingService(request, env, ctx);
   return predictionResponse(() => service.rankings({
     scope,
     competition: scope === 'competition' ? competition : undefined,
   }));
 }
 
-async function handleRankingMe(request, env) {
+async function handleRankingMe(request, env, ctx) {
   if (request.method !== 'GET') return errorJson(405, { error: 'method_not_allowed' });
-  const service = createPredictionService({ request, env, now: new Date() });
+  const service = rankingService(request, env, ctx);
   return predictionResponse(() => service.rankingMe());
 }
 
@@ -492,7 +506,7 @@ async function handleV23_3MatchCenter(request, env, url) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     if (url.pathname === '/healthz') {
@@ -515,8 +529,8 @@ export default {
     if (url.pathname === V23_3_MATCH_CENTER) return handleV23_3MatchCenter(request, env, url);
     if (url.pathname === V23_3_PREDICTIONS_AVAILABLE) return handlePredictionsAvailable(request, env, url);
     if (url.pathname === V23_3_PREDICTIONS) return handlePredictions(request, env, url);
-    if (url.pathname === V23_3_RANKINGS_ME) return handleRankingMe(request, env);
-    if (url.pathname === V23_3_RANKINGS) return handleRankings(request, env, url);
+    if (url.pathname === V23_3_RANKINGS_ME) return handleRankingMe(request, env, ctx);
+    if (url.pathname === V23_3_RANKINGS) return handleRankings(request, env, url, ctx);
     if (url.pathname === V23_3_TEST_RESET) return handleTestPredictionReset(request, env);
 
     if (url.pathname.startsWith('/api/')) {
