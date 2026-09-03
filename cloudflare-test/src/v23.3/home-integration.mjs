@@ -7,6 +7,7 @@ import {
 } from './competition-data.mjs';
 import { installCanonicalMatchCenter } from './match-center.mjs';
 import { installCanonicalMatchLinks } from './match-center-links.mjs';
+import { rememberMatchBootstrap } from './match-bootstrap-cache.mjs';
 
 const DEFAULT_TTL_MS = 60_000;
 
@@ -108,7 +109,10 @@ export function renderHomeBootstrapSection() {
 
 export function renderHomeTodaySection(matches = [], { now = new Date(), timeZone } = {}) {
   const selected = selectHomeMatches(matches, { now, timeZone });
-  const cards = selected.map(match => renderCard(match, timeZone)).join('');
+  const cards = selected.map(match => {
+    rememberMatchBootstrap(match);
+    return renderCard(match, timeZone);
+  }).join('');
   const body = cards
     ? `<div class="cw231-today-list">${cards}</div>`
     : '<div class="cw231-empty"><div class="cw231-empty__title">Сегодня и в ближайшем календаре матчей пока нет</div></div>';
