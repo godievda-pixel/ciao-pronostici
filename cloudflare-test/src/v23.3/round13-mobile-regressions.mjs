@@ -9,7 +9,7 @@ const TABLE_LABELS = Object.freeze({
   ucl:'ЛЧ',
   uel:'ЛЕ',
   uecl:'ЛК',
-  coppa_italia:'Кубок Италии',
+  coppa_italia:'КИ',
 });
 
 let serieAScheduleCache = null;
@@ -64,9 +64,10 @@ const ROUND13_CSS = `
 #ciao-miniapp-root .${SERIE_A_NAV_CLASS}.is-loading:before{content:'';display:block;width:100%;height:39px;border-radius:12px;background:linear-gradient(90deg,rgba(34,52,101,.36),rgba(47,70,132,.48),rgba(34,52,101,.36));background-size:220% 100%;animation:cw233-r13-pulse 1.25s ease-in-out infinite}
 @keyframes cw233-r13-pulse{0%{background-position:100% 0}100%{background-position:-100% 0}}
 
-/* Tables: four football competitions fit on one mobile line. */
-#ciao-v233-tables-overlay .cw233-table-selectors{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:6px!important;overflow:hidden!important;width:100%!important;padding-right:0!important}
-#ciao-v233-tables-overlay .cw233-table-selector{min-width:0!important;width:100%!important;padding:0 6px!important;white-space:nowrap!important;text-align:center!important}
+/* Tables: all five competitions fit one mobile line with no selector scroll. */
+#ciao-v233-tables-overlay .cw233-table-selectors-viewport{overflow-x:hidden!important;overscroll-behavior-x:none!important}
+#ciao-v233-tables-overlay .cw233-table-selectors{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:4px!important;min-width:0!important;overflow:hidden!important;width:100%!important;padding-right:0!important}
+#ciao-v233-tables-overlay .cw233-table-selector{min-width:0!important;width:100%!important;padding:0 3px!important;white-space:nowrap!important;text-align:center!important;font-size:10px!important}
 
 /* Ranking loading is neutral: no synthetic participant, rank or points. */
 #${RANKING_LOADING_ID}{position:fixed;z-index:74;inset:0 0 calc(72px + env(safe-area-inset-bottom,0px));padding:14px 10px 24px;box-sizing:border-box;overflow:hidden;background:radial-gradient(circle at 88% 3%,rgba(45,72,206,.20),transparent 34%),linear-gradient(180deg,#07101f 0%,#060d1a 100%)}
@@ -181,8 +182,9 @@ async function syncSerieARounds(documentRef, attempt = 0) {
 }
 
 function compactTableSelectors(documentRef) {
-  for (const button of documentRef.querySelectorAll?.('#ciao-v233-tables-overlay .cw233-table-selector[data-cw233-table-select]') || []) {
-    const label = compactTableLabel(button.dataset?.cw233TableSelect);
+  for (const button of documentRef.querySelectorAll?.('#ciao-v233-tables-overlay .cw233-table-selector') || []) {
+    const competition = button.dataset?.cw233TablesCompetition || button.dataset?.cw233TableSelect;
+    const label = compactTableLabel(competition);
     if (label && button.textContent !== label) button.textContent = label;
   }
 }
@@ -276,24 +278,25 @@ export function installRound13MobileRegressions(documentRef = globalThis.documen
     documentRef.head.appendChild(style);
   }
   rankingLoadingOverlay(documentRef);
-  documentRef.addEventListener?.('pointerdown', event => handleBottomNavPointerdown(event, documentRef), true);
-  documentRef.addEventListener?.('click', event => {
+  const onPointerdown = event => handleBottomNavPointerdown(event, documentRef);
+  const onClick = event => {
     const filter = event.target?.closest?.('[data-cw233-filter], [data-cw233-mode]');
     if (filter) queueApply(documentRef);
-  }, true);
-  const observer = typeof MutationObserver === 'function'
-    ? new MutationObserver(() => queueApply(documentRef))
-    : null;
-  observer?.observe?.(documentRef.documentElement || documentRef.body, {
-    childList:true,
-    subtree:true,
-    attributes:true,
-    attributeFilter:['aria-selected','hidden'],
-  });
+    const nav = event.target?.closest?.('#ciao-miniapp-root .nav button[data-tab]');
+    if (nav?.dataset?.tab === 'seriea') globalThis.setTimeout?.(() => queueApply(documentRef), 0);
+  };
+  const onThemeRefresh = () => queueApply(documentRef);
+  documentRef.addEventListener?.('pointerdown', onPointerdown, true);
+  documentRef.addEventListener?.('click', onClick, true);
+  documentRef.addEventListener?.('ciao-v233-round11-theme', onThemeRefresh);
   applyDom(documentRef);
   return Object.freeze({
     refresh:() => applyDom(documentRef),
-    disconnect:() => observer?.disconnect?.(),
+    disconnect:() => {
+      documentRef.removeEventListener?.('pointerdown', onPointerdown, true);
+      documentRef.removeEventListener?.('click', onClick, true);
+      documentRef.removeEventListener?.('ciao-v233-round11-theme', onThemeRefresh);
+    },
   });
 }
 
