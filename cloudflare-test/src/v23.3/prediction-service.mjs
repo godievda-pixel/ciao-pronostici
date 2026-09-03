@@ -8,6 +8,8 @@ import {
 import { predictionObjectName } from './prediction-sql.mjs';
 import { resultFingerprint } from './prediction-scorer.mjs';
 
+const UEFA_COMPETITIONS = new Set(['ucl','uel','uecl']);
+
 export class PredictionServiceError extends Error {
   constructor(code, status) {
     super(code);
@@ -49,9 +51,7 @@ async function internalJson(stub, path, { method = 'GET', body } = {}) {
     }));
     let payload;
     try { payload = await response.json(); } catch { throw new PredictionServiceError('prediction_backend_unavailable', 503); }
-    if (!response.ok || !payload?.ok) {
-      throw new PredictionServiceError('prediction_backend_unavailable', 503);
-    }
+    if (!response.ok || !payload?.ok) throw new PredictionServiceError('prediction_backend_unavailable', 503);
     return payload?.data ?? payload;
   } catch (error) {
     if (error instanceof PredictionServiceError) throw error;
@@ -60,11 +60,7 @@ async function internalJson(stub, path, { method = 'GET', body } = {}) {
 }
 
 function participantFrom(user) {
-  return {
-    user_id: user.userId,
-    display_name: user.displayName,
-    username: user.username,
-  };
+  return { user_id:user.userId, display_name:user.displayName, username:user.username };
 }
 
 function participantRoster(authenticated) {
@@ -74,7 +70,6 @@ function participantRoster(authenticated) {
     if (!text(participant?.userId)) continue;
     byId.set(participant.userId, participantFrom(participant));
   }
-
   const current = participantFrom(authenticated);
   byId.delete(current.user_id);
   return [current, ...byId.values()];
@@ -89,6 +84,66 @@ function predictionState(match, activeSeason, now, deps) {
     if (error?.code === 'prediction_locked') return 'locked';
     throw error;
   }
+}
+
+function numericRound(match) {
+  const direct = Number(match?.round);
+  if (Number.isInteger(direct) && direct > 0) return direct;
+  const source = text(match?.stage);
+  const parsed = source.match(/(?:round|matchday|тур)\s*[-–—:]?\s*(\d+)/i) || source.match(/\b(\d+)\b/);
+  const value = Number(parsed?.[1]);
+  return Number.isInteger(value) && value > 0 ? value : null;
+}
+
+function uefaCompetitionsNeedingGate(matches = []) {
+  const rounds = new Map();
+  for (const match of matches) {
+    const competition = text(match?.competition);
+    if (!UEFA_COMPETITIONS.has(competition)) continue;
+    const round = numericRound(match);
+    if (!round) continue;
+    if (!rounds.has(competition)) rounds.set(competition, new Set());
+    rounds.get(competition).add(round);
+  }
+  return new Set([...rounds].filter(([, values]) => values.size > 1).map(([competition]) => competition));
+}
+
+function buildUefaRoundGate(matches = [], reconciledIds = new Set()) {
+  const gate = new Map();
+  const byCompetition = new Map();
+  for (const match of matches) {
+    const competition = text(match?.competition);
+    const round = numericRound(match);
+    if (!UEFA_COMPETITIONS.has(competition) || !round) continue;
+    if (!byCompetition.has(competition)) byCompetition.set(competition, new Map());
+    const rounds = byCompetition.get(competition);
+    if (!rounds.has(round)) rounds.set(round, []);
+    rounds.get(round).push(match);
+  }
+
+  for (const [competition, rounds] of byCompetition) {
+    const ordered = [...rounds.keys()].sort((a, b) => a - b);
+    if (ordered.length < 2) continue;
+    const fullyReconciled = round => rounds.get(round).every(match => (
+      text(match?.status).toLowerCase() === 'finished' && reconciledIds.has(text(match?.matchId))
+    ));
+    const eligibleRound = ordered.find(round => !fullyReconciled(round));
+    if (!eligibleRound) continue;
+    for (const round of ordered) {
+      for (const match of rounds.get(round)) {
+        if (round > eligibleRound) {
+          gate.set(text(match.matchId), Object.freeze({
+            competition,
+            round,
+            eligibleRound,
+            locked:true,
+            reason:'previous_round_not_reconciled',
+          }));
+        }
+      }
+    }
+  }
+  return gate;
 }
 
 export function createPredictionService({ request, env, now = new Date(), deps = {}, scheduleBackground } = {}) {
@@ -112,34 +167,59 @@ export function createPredictionService({ request, env, now = new Date(), deps =
   async function registerParticipants(stub, authenticated) {
     const participants = participantRoster(authenticated);
     await internalJson(stub, '/participants', {
-      method:'POST',
-      body:{ season:env.PREDICTION_SEASON, participants },
+      method:'POST', body:{ season:env.PREDICTION_SEASON, participants },
     });
     return participants;
+  }
+
+  async function reconciledSet(stub, competition = '') {
+    const params = new URLSearchParams();
+    if (competition) params.set('competition', competition);
+    const suffix = params.size ? `?${params}` : '';
+    const payload = await internalJson(stub, `/reconciled${suffix}`);
+    return new Set(Array.isArray(payload.match_ids) ? payload.match_ids.map(text).filter(Boolean) : []);
+  }
+
+  async function gateForCanonical(stub, canonicalMatches) {
+    const needingGate = uefaCompetitionsNeedingGate(canonicalMatches);
+    if (!needingGate.size) return new Map();
+    const reconciled = await reconciledSet(stub);
+    return buildUefaRoundGate(canonicalMatches, reconciled);
   }
 
   async function save(body) {
     try {
       const authenticated = await user();
       const input = d.buildPredictionWritePayload(body);
+      const { stub } = activeStub(env);
+      let roundGate = new Map();
+      if (UEFA_COMPETITIONS.has(input.competition_key)) {
+        const canonical = await d.listCanonicalPredictionMatches({
+          request, env, competition:input.competition_key, now,
+        });
+        roundGate = await gateForCanonical(stub, canonical.matches || []);
+      }
+
       const validated = [];
       for (const item of input.predictions) {
+        if (roundGate.get(text(item.match_id))?.locked) {
+          throw new PredictionServiceError('prediction_round_locked', 409);
+        }
         const match = await d.resolveCanonicalPredictionMatch({
-          request, env, competition: input.competition_key, matchId: item.match_id,
+          request, env, competition:input.competition_key, matchId:item.match_id,
         });
-        const lockedAt = d.assertPredictionWritable({ match, activeSeason: env.PREDICTION_SEASON, now });
+        const lockedAt = d.assertPredictionWritable({ match, activeSeason:env.PREDICTION_SEASON, now });
         validated.push({
-          match_id: item.match_id,
-          competition: input.competition_key,
-          predicted_home: item.home_score,
-          predicted_away: item.away_score,
-          locked_at: lockedAt,
+          match_id:item.match_id,
+          competition:input.competition_key,
+          predicted_home:item.home_score,
+          predicted_away:item.away_score,
+          locked_at:lockedAt,
         });
       }
-      const { stub } = activeStub(env);
       const payload = await internalJson(stub, '/write', {
-        method: 'POST',
-        body: { participant: participantFrom(authenticated), season: env.PREDICTION_SEASON, predictions: validated },
+        method:'POST',
+        body:{ participant:participantFrom(authenticated), season:env.PREDICTION_SEASON, predictions:validated },
       });
       return Array.isArray(payload.predictions) ? payload.predictions : [];
     } catch (error) { throw mapError(error); }
@@ -149,7 +229,7 @@ export function createPredictionService({ request, env, now = new Date(), deps =
     try {
       const authenticated = await user();
       const { stub } = activeStub(env);
-      const params = new URLSearchParams({ user_id: authenticated.userId, competition: text(competition) || 'all' });
+      const params = new URLSearchParams({ user_id:authenticated.userId, competition:text(competition) || 'all' });
       const payload = await internalJson(stub, `/user?${params}`);
       return Array.isArray(payload.predictions) ? payload.predictions : [];
     } catch (error) { throw mapError(error); }
@@ -160,17 +240,26 @@ export function createPredictionService({ request, env, now = new Date(), deps =
       const authenticated = await user();
       const canonical = await d.listCanonicalPredictionMatches({ request, env, competition, now });
       const { stub } = activeStub(env);
-      const params = new URLSearchParams({ user_id: authenticated.userId, competition: text(competition) || 'all' });
-      const stored = await internalJson(stub, `/user?${params}`);
+      const params = new URLSearchParams({ user_id:authenticated.userId, competition:text(competition) || 'all' });
+      const [stored, roundGate] = await Promise.all([
+        internalJson(stub, `/user?${params}`),
+        gateForCanonical(stub, canonical.matches || []),
+      ]);
       const byMatch = new Map((stored.predictions || []).map(row => [row.match_id, row]));
       return {
         ...canonical,
-        participant: participantFrom(authenticated),
-        matches: canonical.matches.map(match => ({
-          ...match,
-          prediction: byMatch.get(match.matchId) || null,
-          state: predictionState(match, env.PREDICTION_SEASON, now, d),
-        })),
+        participant:participantFrom(authenticated),
+        matches:canonical.matches.map(match => {
+          const roundLock = roundGate.get(text(match.matchId));
+          return {
+            ...match,
+            prediction:byMatch.get(match.matchId) || null,
+            state:roundLock?.locked ? 'round_locked' : predictionState(match, env.PREDICTION_SEASON, now, d),
+            roundLocked:Boolean(roundLock?.locked),
+            roundLockReason:roundLock?.reason || null,
+            eligibleRound:roundLock?.eligibleRound || null,
+          };
+        }),
       };
     } catch (error) { throw mapError(error); }
   }
@@ -213,10 +302,7 @@ export function createPredictionService({ request, env, now = new Date(), deps =
       if (scope === 'competition') params.set('competition', competition);
       const payload = await internalJson(stub, `/rankings?${params}`);
       const ranking = Array.isArray(payload.ranking) ? payload.ranking : [];
-      return ranking.map(row => ({
-        ...row,
-        is_current: text(row?.user_id) === authenticated.userId,
-      }));
+      return ranking.map(row => ({ ...row, is_current:text(row?.user_id) === authenticated.userId }));
     } catch (error) { throw mapError(error); }
   }
 
@@ -226,7 +312,7 @@ export function createPredictionService({ request, env, now = new Date(), deps =
       const { stub } = activeStub(env);
       await registerParticipants(stub, authenticated);
       reconcileInBackground(stub);
-      const params = new URLSearchParams({ user_id: authenticated.userId });
+      const params = new URLSearchParams({ user_id:authenticated.userId });
       const payload = await internalJson(stub, `/rankings/me?${params}`);
       return payload.ranking && typeof payload.ranking === 'object' ? payload.ranking : null;
     } catch (error) { throw mapError(error); }
