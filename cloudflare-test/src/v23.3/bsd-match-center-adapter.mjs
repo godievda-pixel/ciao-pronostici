@@ -89,17 +89,23 @@ function playerStatsSource(event = {}) {
 }
 
 function overviewInput(event = {}) {
-  const venue = firstObject(event.venue, event.overview_meta?.venue) || {};
-  const referee = firstObject(event.referee, event.main_referee, event.overview_meta?.referee);
-  const form = firstObject(event.form, event.overview_meta?.form) || {};
-  const momentum = firstPresent(event, ['momentum']) ?? event.overview_meta?.momentum ?? null;
-  const shotmap = firstPresent(event, ['shotmap','shot_map']) ?? event.overview_meta?.shotmap ?? null;
-  const predictionSplit = firstPresent(event, ['prediction_split','predictionSplit']) ?? null;
+  const overviewMeta = object(event.overview_meta) || {};
+  const venue = firstObject(event.venue, overviewMeta.venue) || {};
+  const referee = firstObject(event.referee, event.main_referee, overviewMeta.referee);
+  const form = firstObject(event.form, overviewMeta.form) || {};
+  const momentum = firstPresent(event, ['momentum']) ?? overviewMeta.momentum ?? null;
+  const shotmap = firstPresent(event, ['shotmap','shot_map'])
+    ?? overviewMeta.shotmap
+    ?? overviewMeta.shot_map
+    ?? null;
+  const predictionSplit = firstPresent(event, ['prediction_split','predictionSplit'])
+    ?? firstPresent(overviewMeta, ['prediction_split','predictionSplit'])
+    ?? null;
   return {
     venue,
     referee,
     form,
-    prediction:event.prediction || null,
+    prediction:firstObject(event.prediction, overviewMeta.prediction),
     predictionSplit,
     momentum,
     shotmap,
@@ -173,8 +179,12 @@ function hasOverview(event = {}) {
 }
 
 export function extractBsdCoverage(event = {}) {
-  const momentum = hasOwn(event, 'momentum') || hasOwn(event.overview_meta || {}, 'momentum');
-  const shotmap = hasOwn(event, 'shotmap') || hasOwn(event, 'shot_map') || hasOwn(event.overview_meta || {}, 'shotmap');
+  const overviewMeta = object(event.overview_meta) || {};
+  const momentum = hasOwn(event, 'momentum') || hasOwn(overviewMeta, 'momentum');
+  const shotmap = hasOwn(event, 'shotmap')
+    || hasOwn(event, 'shot_map')
+    || hasOwn(overviewMeta, 'shotmap')
+    || hasOwn(overviewMeta, 'shot_map');
   return canonicalCoverage({
     overview:hasOverview(event),
     stats:Boolean(statsSource(event)),
