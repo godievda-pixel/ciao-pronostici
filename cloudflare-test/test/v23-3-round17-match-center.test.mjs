@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import worker from '../src/worker.js';
 import { canonicalMatchCenterSnapshot } from '../src/v23.3/match-center-snapshot.mjs';
 import {
   extractBsdMatchDetails,
@@ -119,4 +120,73 @@ test('Round 17 BSD detailed resolver returns the canonical Match Center snapshot
   assert.deepEqual(snapshot.events, [{ type:'goal', minute:31 }]);
   assert.deepEqual(snapshot.statistics, [{ name:'shots', home:8, away:6 }]);
   assert.deepEqual(snapshot.lineups, [{ team_id:601, formation:'3-4-2-1' }]);
+});
+
+test('Round 17 Worker Match Center resolves Serie A through the same canonical endpoint', async () => {
+  const env = {
+    CIAO_WEB_API:{
+      fetch:async request => {
+        assert.equal(new URL(request.url).pathname, '/api/ciao-schedule-fast-v1');
+        return jsonResponse({
+          ok:true,
+          current_round:1,
+          rounds:[{
+            number:1,
+            matches:[{
+              id:123,
+              kickoff_at:'2026-09-06T18:45:00Z',
+              status:'SCHEDULED',
+              home:{ id:1, name:'Inter', logo_url:'inter.png' },
+              away:{ id:2, name:'Milan', logo_url:'milan.png' },
+              venue:'San Siro',
+            }],
+          }],
+        });
+      },
+    },
+  };
+  const response = await worker.fetch(new Request(
+    'https://ciao-web-app-test.ciao-web.workers.dev/api/v23.3/match-center?competition=serie_a&match_id=serie_a%3A123',
+    { headers:{ 'x-telegram-init-data':'signed-test-user' } },
+  ), env, {});
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.equal(payload.ok, true);
+  assert.equal(payload.data.match.competition, 'serie_a');
+  assert.equal(payload.data.match.matchId, 'serie_a:123');
+  assert.equal(payload.data.match.homeTeam.name, 'Inter');
+});
+
+test('Round 17 Worker maps filtered external Match Center requests to controlled 404', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async url => {
+    const href = String(url);
+    if (href.includes('/leagues/?')) return jsonResponse({ results:[{ id:10, name:'UEFA Champions League' }] });
+    if (href.includes('/leagues/10/season/')) return jsonResponse({ id:20, name:'2026/27' });
+    if (href.includes('/events/99/')) return jsonResponse({
+      id:99,
+      league:{ id:10, name:'UEFA Champions League' },
+      season:{ id:20, name:'2026/27' },
+      event_date:'2026-09-10T19:00:00Z',
+      status:'scheduled',
+      round_name:'League Stage',
+      round_number:1,
+      home_team:{ id:501, name:'Barcelona', country_code:'ESP' },
+      away_team:{ id:502, name:'Arsenal', country_code:'ENG' },
+    });
+    return jsonResponse({ results:[] });
+  };
+  try {
+    const response = await worker.fetch(new Request(
+      'https://ciao-web-app-test.ciao-web.workers.dev/api/v23.3/match-center?competition=ucl&match_id=ucl%3A99',
+      { headers:{ 'x-telegram-init-data':'signed-test-user' } },
+    ), { BSD_API_KEY:'test' }, {});
+    assert.equal(response.status, 404);
+    const payload = await response.json();
+    assert.equal(payload.ok, false);
+    assert.equal(payload.error, 'match_not_eligible');
+    assert.equal(payload.competition, 'ucl');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
