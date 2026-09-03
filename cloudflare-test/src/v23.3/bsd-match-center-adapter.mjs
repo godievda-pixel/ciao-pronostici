@@ -161,6 +161,7 @@ function overviewInput(event = {}) {
   const venue = firstObject(event.venue, overviewMeta.venue) || {};
   const referee = firstObject(event.referee, event.main_referee, overviewMeta.referee);
   const form = firstObject(event.form, overviewMeta.form) || {};
+  const rawStats = statsSource(event);
   const rawMomentum = firstPresent(event, ['momentum']) ?? overviewMeta.momentum ?? null;
   const rawShotmap = firstPresent(event, ['shotmap','shot_map'])
     ?? overviewMeta.shotmap
@@ -176,6 +177,10 @@ function overviewInput(event = {}) {
     form,
     prediction,
     predictionSplit:explicitPredictionSplit ?? predictionSplitFromModel(prediction),
+    summaryStats:rawStats ? {
+      home:canonicalStatInput(rawStats.home),
+      away:canonicalStatInput(rawStats.away),
+    } : null,
     momentum:normalizeMomentum(rawMomentum),
     shotmap:normalizeShotmap(rawShotmap),
   };
