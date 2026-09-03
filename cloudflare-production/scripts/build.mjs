@@ -19,16 +19,18 @@ export function validateEntryHtml(input) {
 
 export function validateReleaseHtml(input) {
   const html = String(input || '');
-  const required = [
-    NO_X2_MARKER,
-    '.cw18-x2{display:none!important}',
-    '.cw18-summary-bonus{display:none!important}',
-    '.cw18-rule.x2{display:none!important}',
-    '5 / 3 / 2 / 0 · дедлайн −15 минут',
-  ];
-  for (const marker of required) {
-    if (!html.includes(marker)) throw new Error(`production no-x2 marker missing: ${marker}`);
-  }
+  const markerAt = html.indexOf(NO_X2_MARKER);
+  if (markerAt < 0) throw new Error(`production no-x2 marker missing: ${NO_X2_MARKER}`);
+
+  const styleStart = html.lastIndexOf('<style', markerAt);
+  const styleEnd = html.indexOf('</style>', markerAt);
+  if (styleStart < 0 || styleEnd < 0) throw new Error('production no-x2 style block missing');
+  const patch = html.slice(styleStart, styleEnd + '</style>'.length);
+
+  const groupedHide = /#ciao-miniapp-root\s+\.cw18-x2\s*,\s*#ciao-miniapp-root\s+\.cw18-summary-bonus\s*,\s*#ciao-miniapp-root\s+\.cw18-rule\.x2\s*\{\s*display\s*:\s*none\s*!important\s*\}/;
+  if (!groupedHide.test(patch)) throw new Error('production grouped no-x2 hide rule missing');
+  if (!patch.includes('5 / 3 / 2 / 0 · дедлайн −15 минут')) throw new Error('production no-x2 rules copy missing');
+  if (!patch.includes('Дедлайн: прогноз на конкретный матч закрывается за 15 минут до начала.')) throw new Error('production deadline copy missing');
   return true;
 }
 
