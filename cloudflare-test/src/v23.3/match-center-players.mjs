@@ -1,3 +1,8 @@
+const PLAYER_STYLE = `<style data-cw233-mc-players-style>
+.cw233-mc-players{display:grid;gap:8px}.cw233-mc-players-list{display:grid;gap:8px}.cw233-mc-player-card{display:grid;gap:9px;padding:11px 12px;border:1px solid color-mix(in srgb,var(--mc-accent) 16%,var(--mc-border));border-radius:14px;background:linear-gradient(145deg,color-mix(in srgb,var(--mc-accent) 5%,rgba(255,255,255,.035)),rgba(255,255,255,.02))}.cw233-mc-player-main{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}.cw233-mc-player-main>div{min-width:0}.cw233-mc-player-main strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}.cw233-mc-player-main span{display:block;margin-top:3px;font-size:9px;color:rgba(255,255,255,.44)}.cw233-mc-player-main>b{display:grid;place-items:center;min-width:44px;height:34px;padding:0 9px;border:1px solid color-mix(in srgb,var(--mc-accent) 42%,rgba(255,255,255,.16));border-radius:11px;background:linear-gradient(135deg,color-mix(in srgb,var(--mc-accent) 36%,rgba(255,255,255,.05)),color-mix(in srgb,var(--mc-accent-2) 24%,rgba(255,255,255,.04)));font-size:13px;color:#fff}.cw233-mc-player-metrics{display:flex;flex-wrap:wrap;gap:5px}.cw233-mc-player-metrics span{padding:5px 7px;border-radius:8px;background:rgba(255,255,255,.045);font-size:8px;color:rgba(255,255,255,.68)}.cw233-mc-players-unavailable{min-height:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:20px;text-align:center}.cw233-mc-players-unavailable strong{font-size:12px}.cw233-mc-players-unavailable span{max-width:280px;font-size:9px;line-height:1.45;color:rgba(255,255,255,.48)}
+@media(min-width:540px){.cw233-mc-players-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>`;
+
 function esc(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -83,12 +88,12 @@ export function renderMatchCenterPlayers(section = [], context = {}) {
     .sort((a, b) => (finite(b.rating) ?? 0) - (finite(a.rating) ?? 0));
 
   if (!rated.length) {
-    return `<section class="cw233-mc-players" data-cw233-mc-players><div class="cw233-mc-players-unavailable"><strong>Оценки игроков пока недоступны</strong><span>Покажем их, когда провайдер опубликует оценки.</span></div></section>`;
+    return `${PLAYER_STYLE}<section class="cw233-mc-players" data-cw233-mc-players><div class="cw233-mc-players-unavailable"><strong>Оценки игроков пока недоступны</strong><span>Покажем их, когда провайдер опубликует оценки.</span></div></section>`;
   }
 
   const homeName = text(context?.match?.homeTeam?.name);
   const awayName = text(context?.match?.awayTeam?.name);
-  return `<section class="cw233-mc-players" data-cw233-mc-players>
+  return `${PLAYER_STYLE}<section class="cw233-mc-players" data-cw233-mc-players>
     <header class="cw233-mc-section-heading"><span>${esc(homeName)}</span><b>Игроки</b><span>${esc(awayName)}</span></header>
     <div class="cw233-mc-players-list">${rated.map(renderPlayer).join('')}</div>
   </section>`;
