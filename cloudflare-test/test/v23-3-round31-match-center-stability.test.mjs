@@ -45,12 +45,12 @@ test('Round 31 external Overview is tournament-neutral and never renders Serie A
   assert.match(html, /Ключевые показатели/);
   assert.match(html, /Информация о матче/);
   assert.doesNotMatch(html, /Контекст\s+Серии\s*[АA]/i);
-  assert.doesNotMatch(html, /Форма(?:\s+за\s+последние)?/i);
+  assert.doesNotMatch(html, /mc-section-title[^>]*>\s*Форма\b/i);
   assert.doesNotMatch(html, /Матч не найден/i);
   assert.doesNotMatch(html, /cw14-form-card|cw14-match-info/);
 });
 
-test('Round 31 snapshot signature is stable for identical data and changes when live values change', () => {
+test('Round 31 snapshot signature is stable for identical data and changes when visible live/detail values change', () => {
   const first = externalMatchCenterSnapshotSignature(externalSnapshot);
   const same = externalMatchCenterSnapshotSignature(structuredClone(externalSnapshot));
   const changed = externalMatchCenterSnapshotSignature({
@@ -58,14 +58,19 @@ test('Round 31 snapshot signature is stable for identical data and changes when 
     status:'live',
     match:{ ...externalSnapshot.match, home_score:1, away_score:0, live_elapsed:37 },
   });
+  const changedDetail = externalMatchCenterSnapshotSignature({
+    ...structuredClone(externalSnapshot),
+    detail:{ ...externalSnapshot.detail, referee:'Updated Referee' },
+  });
   assert.equal(first, same);
   assert.notEqual(first, changed);
+  assert.notEqual(first, changedDetail);
 });
 
 test('Round 31 viewport ownership hides the outer Matches competition header independently of legacy class timing', () => {
   assert.match(ROUND31_CSS, /html\.cw233-r31-match-center-owned[^\{]*#ciao-v232-matches-overlay\s*\{[^}]*display:none!important/s);
   assert.match(ROUND31_CSS, /match-center-open \.content\s*\{[^}]*overflow-anchor:none!important/s);
-  assert.match(ROUND31_CSS, /\[data-mc-tab-content\][^\{]*min-height:/s);
+  assert.match(ROUND31_CSS, /\[data-mc-tab-content\]\s*\{[^}]*min-height:/s);
 });
 
 test('Round 31 runtime is wired after the legacy Match Center modules', async () => {
