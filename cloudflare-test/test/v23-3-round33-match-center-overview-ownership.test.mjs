@@ -9,7 +9,7 @@ test('Round 33 external Overview preserves useful legacy blocks and removes only
   assert.match(patch, /__cw233Round33SanitizeExternalOverviewHtml/);
   assert.match(patch, /matchTabContent/);
   assert.match(patch, /cw14-form-card/);
-  assert.match(patch, /Контекст\\s\+Серии/);
+  assert.match(patch, /Контекст\\\\s\+Серии/);
   assert.doesNotMatch(patch, /querySelectorAll\?\.\(['"]\.cw14-form-card,\.cw14-match-info['"]\)/);
 });
 
