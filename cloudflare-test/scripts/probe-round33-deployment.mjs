@@ -19,13 +19,17 @@ function compact(value) {
 }
 
 export async function probeRound33Deployment({ fetchImpl = fetch, writeArtifact = true } = {}) {
-  const [shellResponse, runtimeResponse] = await Promise.all([
+  const [shellResponse, runtimeResponse, indexResponse, round35Response] = await Promise.all([
     fetchText('/', fetchImpl),
     fetchText('/v23.3/round31-match-center-stability.mjs', fetchImpl),
+    fetchText('/v23.3/index.mjs', fetchImpl),
+    fetchText('/v23.3/round35-match-center-overview-fixes.mjs', fetchImpl),
   ]);
 
   const shellText = compact(shellResponse.text);
   const runtimeText = compact(runtimeResponse.text);
+  const indexText = compact(indexResponse.text);
+  const round35Text = compact(round35Response.text);
   const sanitizerStart = shellText.indexOf('function __cw233Round33IsFormSection');
   const sanitizerEnd = sanitizerStart >= 0
     ? shellText.indexOf('matchTabContent = function', sanitizerStart)
@@ -66,6 +70,38 @@ export async function probeRound33Deployment({ fetchImpl = fetch, writeArtifact 
     noRound31OverviewCaptureHijack:!/stopImmediatePropagation\?\.\(\)[\s\S]{0,600}renderExternalOverview\(\)/.test(runtimeText),
   };
 
+  const round35Import = {
+    status:indexResponse.status,
+    responseOk:indexResponse.ok,
+    wired:indexText.includes("import './round35-match-center-overview-fixes.mjs'"),
+    afterRound31:indexText.indexOf("import './round35-match-center-overview-fixes.mjs'")
+      > indexText.indexOf("import './round31-match-center-stability.mjs'"),
+  };
+
+  const round35 = {
+    status:round35Response.status,
+    responseOk:round35Response.ok,
+    buildMarker:round35Text.includes("ROUND35_MATCH_CENTER_BUILD = '2026-09-04-r35'"),
+    externalFormSectionRemoval:round35Text.includes("querySelector?.('[data-mc-tab-content=\"overview\"]')")
+      && round35Text.includes("querySelectorAll?.('.cw14-form-card')")
+      && round35Text.includes("closest?.('.mc-section')")
+      && round35Text.includes('target.remove?.()'),
+    externalFormCssFailsafe:round35Text.includes('data-cw233-mc-competition="coppa_italia"')
+      && round35Text.includes('data-cw233-mc-competition="ucl"')
+      && round35Text.includes('data-cw233-mc-competition="uel"')
+      && round35Text.includes('data-cw233-mc-competition="uecl"')
+      && round35Text.includes('.mc-section:has(.cw14-form-card)')
+      && round35Text.includes('display:none!important')
+      && !round35Text.includes('data-cw233-mc-competition="serie_a"'),
+    serieAContextPalette:round35Text.includes('.cw18-match-context')
+      && round35Text.includes('--cw233-serie-context-bg:#071626')
+      && round35Text.includes('--cw233-serie-context-accent:#0c5aa8')
+      && round35Text.includes('--cw233-serie-context-accent-2:#287fc7'),
+    lateMutationGuard:round35Text.includes('new Observer')
+      && round35Text.includes('{ childList:true, subtree:true }')
+      && round35Text.includes('removeRound35ExternalOverviewForm(root)'),
+  };
+
   const checks = [
     overview.responseOk,
     overview.round33Marker,
@@ -77,6 +113,15 @@ export async function probeRound33Deployment({ fetchImpl = fetch, writeArtifact 
     runtime.responseOk,
     runtime.noRound31OverviewReplacement,
     runtime.noRound31OverviewCaptureHijack,
+    round35Import.responseOk,
+    round35Import.wired,
+    round35Import.afterRound31,
+    round35.responseOk,
+    round35.buildMarker,
+    round35.externalFormSectionRemoval,
+    round35.externalFormCssFailsafe,
+    round35.serieAContextPalette,
+    round35.lateMutationGuard,
   ];
 
   const report = {
@@ -86,6 +131,8 @@ export async function probeRound33Deployment({ fetchImpl = fetch, writeArtifact 
     overview,
     ownership,
     runtime,
+    round35Import,
+    round35,
   };
 
   if (writeArtifact) {
@@ -94,7 +141,7 @@ export async function probeRound33Deployment({ fetchImpl = fetch, writeArtifact 
   }
 
   console.log(JSON.stringify(report));
-  if (!report.ok) throw new Error('Round 33 deployment markers are incomplete');
+  if (!report.ok) throw new Error('Round 33/35 deployment markers are incomplete');
   return report;
 }
 
