@@ -223,6 +223,7 @@ test('Round 42 Overview renders form and prediction data already present in the 
   assert.match(html, /52%/);
   assert.match(html, /27%/);
   assert.match(html, /21%/);
+  assert.match(html, /\.cw233-mc-overview-title\{[^}]*display:flex/);
 });
 
 test('Round 42 finished canonical base shows the actual score and shared section headings are not glued together', () => {
@@ -262,5 +263,4 @@ test('Round 42 finished canonical base shows the actual score and shared section
   assert.match(html, /data-cw239-score>2:1</);
   assert.match(html, /Матч завершён/);
   assert.match(html, /\.cw233-mc-section-heading\{[^}]*display:grid/);
-  assert.match(html, /\.cw233-mc-overview-title\{[^}]*display:flex/);
 });
