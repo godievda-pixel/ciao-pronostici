@@ -126,7 +126,7 @@ test('Serie A standings preserve canonical Worker crestUrl', () => {
   assert.equal(row.team.crestUrl, 'https://img.example/roma.png');
 });
 
-test('standings render the full compact football stat line instead of only five columns', () => {
+test('standings render the Round 38 five-column compact stat line directly', () => {
   const html = renderTablesHub({
     selectedCompetition:'serie_a',
     data:{ rows:[{
@@ -136,11 +136,11 @@ test('standings render the full compact football stat line instead of only five 
       goalsFor:9, goalsAgainst:1, goalDifference:8, points:6,
     }] },
   });
-  assert.match(html, /<th>И<\/th><th>В<\/th><th>Н<\/th><th>П<\/th><th>Г<\/th><th>РМ<\/th><th>О<\/th>/);
-  assert.match(html, /data-cw233-stat="wins">2<\/td>/);
-  assert.match(html, /data-cw233-stat="draws">0<\/td>/);
-  assert.match(html, /data-cw233-stat="losses">0<\/td>/);
-  assert.match(html, /data-cw233-stat="goals">9:1<\/td>/);
+  assert.match(html, /<th>#<\/th><th>Команда<\/th><th>И<\/th><th>РМ<\/th><th>О<\/th>/);
+  assert.doesNotMatch(html, /<th>В<\/th>|<th>Н<\/th>|<th>П<\/th>|<th>Г<\/th>/);
+  assert.match(html, /data-cw233-stat="played">2<\/td>/);
+  assert.match(html, /data-cw233-stat="goal-difference">8<\/td>/);
+  assert.match(html, /data-cw233-stat="points">6<\/td>/);
 });
 
 test('Home predict button is excluded from canonical Match Center capture and routed to Predictions', async () => {
@@ -180,15 +180,14 @@ test('round7 compatibility layer paints custom overlays through the bottom navig
   assert.match(source, /padding-bottom:calc\(104px \+ env\(safe-area-inset-bottom/);
 });
 
-test('round7 mobile standings keep every stat visible while Round 12 removes the obsolete crop-inducing fixed width', async () => {
-  const round7 = await readFile(new URL('../src/v23.3/round7-regression-fixes.mjs', import.meta.url), 'utf8');
-  const round12 = await readFile(new URL('../src/v23.3/round12-stability-performance.mjs', import.meta.url), 'utf8');
-  assert.match(round7, /cw233-standing-viewport[^}]*overflow-x:auto!important/);
-  assert.doesNotMatch(round7, /cw233-standing-table[^}]*min-width:(?:6|7)\d\dpx!important/);
-  assert.match(round7, /nth-child\(4\)[^}]*display:table-cell!important/);
-  assert.match(round7, /nth-child\(7\)[^}]*display:table-cell!important/);
-  assert.match(round12, /@media\(min-width:420px\)/);
-  assert.match(round12, /cw233-standing-table--full\{min-width:0!important;width:100%!important/);
+test('Round 38 compact standings fit the mobile viewport without the old full-stat horizontal scroller', async () => {
+  const tables = await readFile(new URL('../src/v23.3/tables-ui.mjs', import.meta.url), 'utf8');
+  const round37 = await readFile(new URL('../src/v23.3/round37-runtime.mjs', import.meta.url), 'utf8');
+  assert.match(tables, /cw233-standing-viewport\{[^}]*overflow-x:hidden/);
+  assert.match(tables, /cw233-standing-table\{[^}]*table-layout:fixed/);
+  assert.match(tables, /@media\(max-width:390px\)/);
+  assert.match(tables, /cw233-table-logo\{width:34px;height:34px/);
+  assert.doesNotMatch(round37, /compactStandingTable|compactTables|MutationObserver/);
 });
 
 test('round7 keeps the bottom navigation above every full-height overlay', async () => {
