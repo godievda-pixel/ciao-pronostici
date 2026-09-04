@@ -51,7 +51,15 @@ export const ROUND35_CSS = `
 }
 
 /* External Overview Form fail-safe: hide the WHOLE legacy Form section, never only its contents. */
-#ciao-miniapp-root.match-center-open[data-cw233-mc-competition] [data-mc-tab-content="overview"] .mc-section:has(.cw14-form-card){
+#ciao-miniapp-root.match-center-open:is(
+  [data-cw233-mc-competition="coppa_italia"],
+  [data-cw233-mc-competition="ucl"],
+  [data-cw233-mc-competition="uel"],
+  [data-cw233-mc-competition="uecl"],
+  [data-cw233-mc-competition="champions_league"],
+  [data-cw233-mc-competition="europa_league"],
+  [data-cw233-mc-competition="conference_league"]
+) [data-mc-tab-content="overview"] .mc-section:has(.cw14-form-card){
   display:none!important;
 }
 `;
