@@ -66,6 +66,19 @@ test('Round 37 Ranking restores clickable predictor profiles through the legacy 
   assert.match(indexSource, /predictor-profile-ui\.mjs/);
 });
 
+test('Round 37 favorite-club badges can render the legacy custom emoji asset instead of a football placeholder', async () => {
+  const profiles = await import(predictorProfileUrl.href);
+  assert.equal(
+    profiles.favoriteTeamAssetUrl({ customEmojiId:'emoji-123' }),
+    '/api/ciao-core-api-fast-v4?asset=emoji&id=emoji-123',
+  );
+  assert.equal(
+    profiles.favoriteTeamAssetUrl({ custom_emoji_id:'emoji with spaces' }),
+    '/api/ciao-core-api-fast-v4?asset=emoji&id=emoji%20with%20spaces',
+  );
+  assert.equal(profiles.favoriteTeamAssetUrl({ crestUrl:'https://img.test/club.png' }), 'https://img.test/club.png');
+});
+
 test('Round 37 compact tables keep only #, team, played, goal difference and points', async () => {
   assert.equal(existsSync(round37Url), true, 'round37-runtime.mjs must exist');
   const runtime = await import(round37Url.href);
