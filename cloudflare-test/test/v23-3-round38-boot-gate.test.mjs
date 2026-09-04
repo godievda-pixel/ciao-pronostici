@@ -29,6 +29,15 @@ test('Home loading source no longer emits fake match cards and dispatches settle
   assert.match(source, /ciao-v233-home-settled/);
 });
 
+test('v23.3 entry marks the boot gate runtime-ready after module installation', async () => {
+  const source = await readFile(new URL('../src/v23.3/index.mjs', import.meta.url), 'utf8');
+  assert.match(source, /CiaoV233BootGate\?\.markRuntimeReady\?\.\(\)/);
+  assert.ok(
+    source.indexOf('CiaoV233BootGate?.markRuntimeReady?.()') > source.indexOf('export const CiaoV233'),
+    'runtime-ready signal must be emitted only after the v23.3 module graph has initialized',
+  );
+});
+
 test('TEST build pipeline applies round38 boot patch to final dist', async () => {
   const source = await readFile(new URL('../scripts/build-with-test-baseline.mjs', import.meta.url), 'utf8');
   assert.match(source, /applyRound38BootGateSourcePatch/);
