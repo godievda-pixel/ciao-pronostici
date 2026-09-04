@@ -42,10 +42,44 @@ const runtimeFixture = `
   const syncViewportOwnership = () => {};
 `;
 
+const indexFixture = `
+  import './round31-match-center-stability.mjs';
+  import './round35-match-center-overview-fixes.mjs';
+`;
+
+const round35Fixture = `
+  export const ROUND35_MATCH_CENTER_BUILD = '2026-09-04-r35';
+  const ROUND35_CSS = \`
+    #ciao-miniapp-root.match-center-open .cw18-match-context{
+      --cw233-serie-context-bg:#071626;
+      --cw233-serie-context-accent:#0c5aa8;
+      --cw233-serie-context-accent-2:#287fc7;
+    }
+    #ciao-miniapp-root.match-center-open:is(
+      [data-cw233-mc-competition="coppa_italia"],
+      [data-cw233-mc-competition="ucl"],
+      [data-cw233-mc-competition="uel"],
+      [data-cw233-mc-competition="uecl"]
+    ) [data-mc-tab-content="overview"] .mc-section:has(.cw14-form-card){display:none!important;}
+  \`;
+  function removeRound35ExternalOverviewForm(root) {
+    const host = root.querySelector?.('[data-mc-tab-content="overview"]');
+    for (const marker of host.querySelectorAll?.('.cw14-form-card') || []) {
+      const section = marker.closest?.('.mc-section');
+      const target = section || marker;
+      target.remove?.();
+    }
+  }
+  const observer = new Observer(() => removeRound35ExternalOverviewForm(root));
+  observer.observe(root, { childList:true, subtree:true });
+`;
+
 function fixtureFetch(overrides = {}) {
   const fixtures = {
     '/': shellFixture,
     '/v23.3/round31-match-center-stability.mjs': runtimeFixture,
+    '/v23.3/index.mjs': indexFixture,
+    '/v23.3/round35-match-center-overview-fixes.mjs': round35Fixture,
     ...overrides,
   };
   return async input => {
@@ -56,7 +90,7 @@ function fixtureFetch(overrides = {}) {
   };
 }
 
-test('Round 33 deployment probe verifies Form-only external Overview and Match Center ownership', async () => {
+test('Round 33/35 deployment probe verifies final external Form removal and Serie A context palette', async () => {
   const report = await probeRound33Deployment({ fetchImpl:fixtureFetch(), writeArtifact:false });
   assert.equal(report.ok, true);
   assert.equal(report.overview.round33Marker, true);
@@ -67,9 +101,16 @@ test('Round 33 deployment probe verifies Form-only external Overview and Match C
   assert.equal(report.ownership.suspendedCssIsolation, true);
   assert.equal(report.runtime.noRound31OverviewReplacement, true);
   assert.equal(report.runtime.noRound31OverviewCaptureHijack, true);
+  assert.equal(report.round35Import.wired, true);
+  assert.equal(report.round35Import.afterRound31, true);
+  assert.equal(report.round35.buildMarker, true);
+  assert.equal(report.round35.externalFormSectionRemoval, true);
+  assert.equal(report.round35.externalFormCssFailsafe, true);
+  assert.equal(report.round35.serieAContextPalette, true);
+  assert.equal(report.round35.lateMutationGuard, true);
 });
 
-test('Round 33 deployment probe rejects a sanitizer that no longer removes Form', async () => {
+test('Round 33/35 deployment probe rejects a sanitizer that no longer removes Form', async () => {
   await assert.rejects(
     probeRound33Deployment({
       fetchImpl:fixtureFetch({
@@ -77,22 +118,22 @@ test('Round 33 deployment probe rejects a sanitizer that no longer removes Form'
       }),
       writeArtifact:false,
     }),
-    /Round 33 deployment markers are incomplete/,
+    /Round 33\/35 deployment markers are incomplete/,
   );
 });
 
-test('Round 33 deployment probe rejects external sanitizer that removes non-Form Serie A context', async () => {
+test('Round 33/35 deployment probe rejects external sanitizer that removes non-Form Serie A context', async () => {
   const withContextRemoval = shellFixture.replace(
     'if (__cw233Round33IsFormSection(section)) section.remove?.();',
     "if (__cw233Round33IsFormSection(section)) section.remove?.(); if (/Контекст\\s+Серии/i.test(section.textContent || '')) section.remove?.();",
   );
   await assert.rejects(
     probeRound33Deployment({ fetchImpl:fixtureFetch({ '/':withContextRemoval }), writeArtifact:false }),
-    /Round 33 deployment markers are incomplete/,
+    /Round 33\/35 deployment markers are incomplete/,
   );
 });
 
-test('Round 33 deployment probe rejects a reintroduced Round31 external Overview replacement', async () => {
+test('Round 33/35 deployment probe rejects a reintroduced Round31 external Overview replacement', async () => {
   await assert.rejects(
     probeRound33Deployment({
       fetchImpl:fixtureFetch({
@@ -100,11 +141,35 @@ test('Round 33 deployment probe rejects a reintroduced Round31 external Overview
       }),
       writeArtifact:false,
     }),
-    /Round 33 deployment markers are incomplete/,
+    /Round 33\/35 deployment markers are incomplete/,
   );
 });
 
-test('TEST workflow probes and uploads the Round 33 deployment observation on develop pushes', () => {
+test('Round 35 deployment probe rejects a runtime that hides only Form contents instead of the whole section', async () => {
+  const broken = round35Fixture
+    .replace('.mc-section:has(.cw14-form-card)', '.cw14-form-card')
+    .replace("const section = marker.closest?.('.mc-section');", 'const section = null;');
+  await assert.rejects(
+    probeRound33Deployment({
+      fetchImpl:fixtureFetch({ '/v23.3/round35-match-center-overview-fixes.mjs':broken }),
+      writeArtifact:false,
+    }),
+    /Round 33\/35 deployment markers are incomplete/,
+  );
+});
+
+test('Round 35 deployment probe rejects a runtime that loses the Serie A context palette', async () => {
+  const broken = round35Fixture.replace('--cw233-serie-context-accent:#0c5aa8;', '');
+  await assert.rejects(
+    probeRound33Deployment({
+      fetchImpl:fixtureFetch({ '/v23.3/round35-match-center-overview-fixes.mjs':broken }),
+      writeArtifact:false,
+    }),
+    /Round 33\/35 deployment markers are incomplete/,
+  );
+});
+
+test('TEST workflow probes and uploads the Round 33/35 deployment observation on develop pushes', () => {
   const workflow = readFileSync(new URL('../../.github/workflows/ciao-test-check.yml', import.meta.url), 'utf8');
   assert.match(workflow, /name: Probe deployed Round 33 fixes/);
   assert.match(workflow, /if: github\.event_name == 'push'/);
