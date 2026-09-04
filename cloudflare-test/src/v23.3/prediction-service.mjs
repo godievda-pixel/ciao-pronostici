@@ -75,6 +75,17 @@ function participantRoster(authenticated) {
   return [current, ...byId.values()];
 }
 
+function favoriteTeamMap(authenticated) {
+  const byId = new Map();
+  const currentId = text(authenticated?.userId);
+  if (currentId && authenticated?.favoriteTeam) byId.set(currentId, authenticated.favoriteTeam);
+  for (const participant of Array.isArray(authenticated?.participants) ? authenticated.participants : []) {
+    const userId = text(participant?.userId);
+    if (userId && participant?.favoriteTeam) byId.set(userId, participant.favoriteTeam);
+  }
+  return byId;
+}
+
 function predictionState(match, activeSeason, now, deps) {
   if (text(match?.status).toLowerCase() === 'finished') return 'finished';
   try {
@@ -311,7 +322,16 @@ export function createPredictionService({ request, env, now = new Date(), deps =
       if (scope === 'competition') params.set('competition', competition);
       const payload = await internalJson(stub, `/rankings?${params}`);
       const ranking = Array.isArray(payload.ranking) ? payload.ranking : [];
-      return ranking.map(row => ({ ...row, is_current:text(row?.user_id) === authenticated.userId }));
+      const clubs = favoriteTeamMap(authenticated);
+      return ranking.map(row => {
+        const enriched = {
+          ...row,
+          is_current:text(row?.user_id) === authenticated.userId,
+        };
+        const favoriteTeam = clubs.get(text(row?.user_id));
+        if (favoriteTeam) enriched.favorite_team = favoriteTeam;
+        return enriched;
+      });
     } catch (error) { throw mapError(error); }
   }
 
@@ -323,7 +343,10 @@ export function createPredictionService({ request, env, now = new Date(), deps =
       reconcileInBackground(stub);
       const params = new URLSearchParams({ user_id:authenticated.userId });
       const payload = await internalJson(stub, `/rankings/me?${params}`);
-      return payload.ranking && typeof payload.ranking === 'object' ? payload.ranking : null;
+      if (!payload.ranking || typeof payload.ranking !== 'object') return null;
+      const ranking = { ...payload.ranking };
+      if (authenticated.favoriteTeam) ranking.favorite_team = authenticated.favoriteTeam;
+      return ranking;
     } catch (error) { throw mapError(error); }
   }
 

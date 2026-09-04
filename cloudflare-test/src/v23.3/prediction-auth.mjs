@@ -48,6 +48,34 @@ function stableUserId(user = {}) {
   return stableId ? `telegram:${stableId}` : null;
 }
 
+export function normalizeFavoriteTeam(source = {}) {
+  const team = source?.favorite_team ?? source?.favoriteTeam;
+  if (!team || typeof team !== 'object') return null;
+  const rawId = Number(team.id ?? team.team_id ?? team.teamId);
+  const id = Number.isFinite(rawId) && rawId > 0 ? rawId : null;
+  const name = text(team.name ?? team.team_name ?? team.teamName);
+  const crestUrl = text(team.logo_url ?? team.logoUrl ?? team.crest_url ?? team.crestUrl ?? team.logo ?? team.crest);
+  const customEmojiId = text(team.custom_emoji_id ?? team.customEmojiId);
+  if (!id && !name && !crestUrl && !customEmojiId) return null;
+  return Object.freeze({
+    id,
+    name: name || 'Любимый клуб',
+    crestUrl: crestUrl || null,
+    customEmojiId: customEmojiId || null,
+  });
+}
+
+function normalizedParticipant(source, userId) {
+  const participant = {
+    userId,
+    displayName: displayName(source),
+    username: text(source.username) || null,
+  };
+  const favoriteTeam = normalizeFavoriteTeam(source);
+  if (favoriteTeam) participant.favoriteTeam = favoriteTeam;
+  return Object.freeze(participant);
+}
+
 function participantRoster(payload = {}, currentUser = null) {
   const standings = extractStandings(payload);
   if (!standings.length) return Object.freeze([]);
@@ -60,21 +88,13 @@ function participantRoster(payload = {}, currentUser = null) {
       : row;
     const userId = stableUserId(source);
     if (!userId) continue;
-    byId.set(userId, Object.freeze({
-      userId,
-      displayName: displayName(source),
-      username: text(source.username) || null,
-    }));
+    byId.set(userId, normalizedParticipant(source, userId));
   }
 
   if (currentUser && typeof currentUser === 'object') {
     const userId = stableUserId(currentUser);
     if (userId) {
-      const current = Object.freeze({
-        userId,
-        displayName: displayName(currentUser),
-        username: text(currentUser.username) || null,
-      });
+      const current = normalizedParticipant(currentUser, userId);
       byId.delete(userId);
       return Object.freeze([current, ...byId.values()]);
     }
@@ -126,6 +146,8 @@ export async function resolveAuthenticatedUser({ request, env } = {}) {
     displayName: displayName(user),
     username: text(user?.username) || null,
   };
+  const favoriteTeam = normalizeFavoriteTeam(user);
+  if (favoriteTeam) result.favoriteTeam = favoriteTeam;
   const participants = participantRoster(payload, user);
   if (participants.length) result.participants = participants;
 
