@@ -6,7 +6,7 @@ const theme = readFileSync(new URL('../src/v23.3/legacy-match-center-theme.mjs',
 const matchesUi = readFileSync(new URL('../src/v23.2/matches-ui.mjs', import.meta.url), 'utf8');
 
 test('Round 22 Serie A Match Center uses #0c5aa8 as the default competition theme', () => {
-  assert.match(theme, /LEGACY_MATCH_CENTER_THEME_BUILD\s*=\s*'r23-final-themes'/);
+  assert.match(theme, /LEGACY_MATCH_CENTER_THEME_BUILD\s*=\s*'r28-match-center-fixes'/);
   assert.match(theme, /#ciao-miniapp-root\.match-center-open\s*\{[\s\S]*--cw233-mc-accent:#0c5aa8/i);
   assert.match(theme, /#ciao-miniapp-root\.match-center-open\s*\{[\s\S]*background:[^;]+var\(--cw233-mc-bg\)[^;]*!important/i);
 });
