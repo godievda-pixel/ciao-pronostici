@@ -5,13 +5,11 @@ import {
   BsdUpstreamError,
   fetchBsdMatchCenterBase,
   fetchBsdMatchCenterSection,
-  fetchBsdMatchCenterSnapshot,
   fetchBsdMatches,
   fetchBsdStandings,
 } from './v23.2/bsd-provider.mjs';
 import { normalizeTeamAlias, russianTeamName } from './v23.2/team-registry.mjs';
-import { canonicalMatchCenterSnapshot } from './v23.3/match-center-snapshot.mjs';
-import { canonicalCoverage } from './v23.3/match-center-sections.mjs';
+import { createMatchCenterProviders } from './v23.3/match-center-providers.mjs';
 import { createPredictionService } from './v23.3/prediction-service.mjs';
 import { assertSafeResetTarget } from './v23.3/reset-contract.mjs';
 import { predictionObjectName } from './v23.3/prediction-sql.mjs';
@@ -20,6 +18,10 @@ import {
   enrichSerieAStandingsWithCrests,
   fetchSerieACrestRegistry,
 } from './v23.3/serie-a-crest-source.mjs';
+import {
+  loadSerieAMatchCenterBase,
+  loadSerieAMatchCenterSection,
+} from './v23.3/serie-a-match-center-provider.mjs';
 
 const TEST_BUILD = 'ciao-web-v23-3-user-feedback-r4-20260902';
 const V23_2_MATCHES = '/api/v23.2/matches';
@@ -508,11 +510,14 @@ async function handleV23_3Standings(request, env, url) {
   }
 }
 
-async function loadSerieAMatchCenterSnapshot(request, env, initData, matchId) {
-  const schedule = await fetchSerieAScheduleForCrests(request, env, initData);
-  const match = schedule?.matches?.find(item => item?.matchId === matchId) || null;
-  if (!match) return null;
-  return canonicalMatchCenterSnapshot(match, { venue:match.venue });
+function serieAProviderFailure(error, competition, section = '') {
+  const status = Number(error?.status) || 502;
+  return errorJson(status, {
+    error:String(error?.code || error?.message || 'serie_a_match_center_upstream_failed'),
+    provider:'ciao-web-api',
+    competition,
+    ...(section ? { section } : {}),
+  });
 }
 
 async function handleV23_3MatchCenter(request, env, url) {
@@ -543,50 +548,61 @@ async function handleV23_3MatchCenter(request, env, url) {
     return errorJson(400, { error:'invalid_match_center_section', section, competition });
   }
 
-  if (competition === 'serie_a') {
-    if (section) {
-      return errorJson(400, { error:'match_center_section_not_available', section, competition });
-    }
-    const match = await loadSerieAMatchCenterSnapshot(request, env, initData, matchId);
-    if (!match) return errorJson(404, { error:'match_not_found', competition });
-    return Response.json({
-      ok:true,
-      data:{ competition, provider:'ciao-web-api', match },
-    });
-  }
-
   const apiKey = String(env.BSD_API_KEY || '');
-  if (!apiKey) {
+  if (competition !== 'serie_a' && !apiKey) {
     return errorJson(503, { error: 'bsd_api_key_missing', competition });
   }
 
+  const providers = createMatchCenterProviders({
+    loadSerieABase:context => loadSerieAMatchCenterBase(context),
+    loadSerieASection:context => loadSerieAMatchCenterSection(context),
+    loadExternalBase:async () => ({
+      match:await fetchBsdMatchCenterBase({ competition, matchId, apiKey }),
+    }),
+    loadExternalSection:async ({ section:canonicalSection }) => (
+      fetchBsdMatchCenterSection({ competition, matchId, section:canonicalSection, apiKey })
+    ),
+  });
+
   try {
     if (section) {
-      const result = await fetchBsdMatchCenterSection({ competition, matchId, section, apiKey });
+      const result = await providers.loadSection({
+        competition,
+        matchId,
+        section,
+        request,
+        env,
+        initData,
+      });
       return Response.json({
         ok:true,
         data:{
           competition,
-          provider:'bsd-v2',
+          provider:competition === 'serie_a' ? 'ciao-web-api' : 'bsd-v2',
           matchId,
-          section,
-          coverage:canonicalCoverage(result.coverage),
-          available:result.available,
-          data:result.data,
+          ...result,
         },
       });
     }
 
-    const match = await fetchBsdMatchCenterBase({ competition, matchId, apiKey });
+    const match = await providers.loadBase({
+      competition,
+      matchId,
+      request,
+      env,
+      initData,
+    });
     return Response.json({
-      ok: true,
-      data: {
+      ok:true,
+      data:{
         competition,
-        provider: 'bsd-v2',
+        provider:competition === 'serie_a' ? 'ciao-web-api' : 'bsd-v2',
+        matchId,
         match,
       },
     });
   } catch (error) {
+    if (competition === 'serie_a') return serieAProviderFailure(error, competition, section);
     if (error instanceof BsdUpstreamError && error.code === 'match_not_eligible') {
       return errorJson(404, { error:'match_not_eligible', competition });
     }
