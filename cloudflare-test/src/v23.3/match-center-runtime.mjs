@@ -26,16 +26,8 @@ function defaultSource() {
   });
 }
 
-function normalizeSource(source) {
-  const fallback = defaultSource();
-  const value = source && typeof source === 'object' ? source : fallback;
-  return Object.freeze({
-    surface:text(value.surface) || fallback.surface,
-    competition:text(value.competition),
-    navTab:text(value.navTab || value.tab) || fallback.navTab,
-    scrollTop:Number(value.scrollTop) || 0,
-    matchesOverlayScrollTop:Number(value.matchesOverlayScrollTop) || 0,
-  });
+function sourceOrDefault(source) {
+  return source && typeof source === 'object' ? source : defaultSource();
 }
 
 function rootFor(documentRef) {
@@ -148,7 +140,7 @@ export function createCanonicalMatchCenterRuntime({
     const matchId = text(payload.matchId);
     if (!competition || !matchId) throw new Error('match_center_target_required');
 
-    source = normalizeSource(payload.source || currentSource?.());
+    source = sourceOrDefault(payload.source || currentSource?.());
     suspendSource?.(source);
     host.scrollToTop?.();
     return store.open({ competition, matchId });
@@ -156,7 +148,7 @@ export function createCanonicalMatchCenterRuntime({
 
   function back() {
     if (destroyed) return null;
-    const restore = source || normalizeSource(currentSource?.());
+    const restore = sourceOrDefault(source || currentSource?.());
     source = null;
     const result = store.close();
     host.hide();
