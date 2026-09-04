@@ -14,7 +14,7 @@ function fixtureFetch(overrides = {}) {
     '/': '<script>/* cw233-round23-unified-state-fixes */</script>',
     '/v23.3/legacy-match-center-theme.mjs': `
       #ciao-miniapp-root.match-center-open { --cw233-mc-accent:#0c5aa8; --cw233-mc-accent-2:#287fc7; }
-      #ciao-miniapp-root.match-center-open:not([data-cw233-mc-competition]) .mc-back { display:none!important; }
+      #ciao-miniapp-root.match-center-open .mc-back { display:flex!important; }
       #ciao-miniapp-root.match-center-open .mc-toolbar { border-bottom:0!important; }
       #ciao-miniapp-root.match-center-open .cw20-stat-mini,
       #ciao-miniapp-root.match-center-open .cw20-player-row,
@@ -32,13 +32,13 @@ function fixtureFetch(overrides = {}) {
   };
 }
 
-test('Round 24 deployment probe proves the live TEST contains all Round 23 fixes', async () => {
+test('Round 24 deployment probe proves the live TEST contains all surviving Round 23 fixes', async () => {
   const report = await probeRound23Deployment({ fetchImpl:fixtureFetch(), writeArtifact:false });
   assert.equal(report.ok, true);
   assert.equal(report.origin, ORIGIN);
   assert.equal(report.home.round23StateMarker, true);
   assert.equal(report.matchCenter.serieAPalette, true);
-  assert.equal(report.matchCenter.duplicateBackRemoved, true);
+  assert.equal(report.matchCenter.backControlVisible, true);
   assert.equal(report.matchCenter.toolbarFrameRemoved, true);
   assert.equal(report.matchCenter.contextSurfacesThemed, true);
   assert.equal(report.matchCenter.lineupSwitchThemed, true);
