@@ -188,11 +188,25 @@ export function installMatchesUi(documentRef = globalThis.document, { defer = de
   if (!documentRef?.addEventListener || !documentRef?.createElement) return null;
   ensureStyles(documentRef); const overlay = ensureOverlay(documentRef);
   const controller = createMatchesUiController({ show(html){ overlay.innerHTML = html; overlay.hidden = false; if (typeof overlay.scrollTo === 'function') overlay.scrollTo(0,0); }, hide(){ overlay.hidden = true; overlay.innerHTML = ''; }, loadScreen });
+  let pendingNavigationTab = '';
   const handleNav = nav => {
-    const opensHub = nav?.dataset?.tab === 'calendar';
-    if (opensHub) clearMatchesAmbientTheme(overlay);
-    defer(() => { if (opensHub) controller.openHub(); else controller.close(); });
+    const tab = String(nav?.dataset?.tab || '');
+    const opensHub = tab === 'calendar';
+    if (opensHub) {
+      pendingNavigationTab = '';
+      clearMatchesAmbientTheme(overlay);
+      defer(() => controller.openHub());
+      return;
+    }
+    if (overlay.hidden !== true) pendingNavigationTab = tab;
   };
+  const onNavigationReady = event => {
+    const readyTab = String(event?.detail?.tab || '');
+    if (!pendingNavigationTab || readyTab !== pendingNavigationTab) return;
+    pendingNavigationTab = '';
+    controller.close();
+  };
+  documentRef.addEventListener('ciao-v233-navigation-ready', onNavigationReady);
   const navButtons = documentRef.querySelectorAll?.('button[data-tab]') || [];
   for (const nav of navButtons) { if (!nav?.addEventListener || nav.dataset?.cw232NavBound === '1') continue; if (nav.dataset) nav.dataset.cw232NavBound = '1'; nav.addEventListener('click', () => handleNav(nav)); }
   documentRef.addEventListener('click', event => {
