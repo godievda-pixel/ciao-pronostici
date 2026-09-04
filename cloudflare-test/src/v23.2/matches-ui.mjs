@@ -155,7 +155,6 @@ export function createMatchesUiController({ show, hide, loadScreen = loadCompeti
   function close() { requestVersion += 1; activeCompetition = ''; hide(); }
   async function openCompetition(competition) {
     getCompetitionConfig(competition);
-    if (competition === 'serie_a') { close(); return 'legacy'; }
     const version = ++requestVersion; activeCompetition = competition; show(renderLoading(competition));
     try { const html = await loadScreen(competition); if (version !== requestVersion || activeCompetition !== competition) return 'stale'; show(html); return 'loaded'; }
     catch { if (version !== requestVersion || activeCompetition !== competition) return 'stale'; show(renderLoadError(competition)); return 'error'; }
