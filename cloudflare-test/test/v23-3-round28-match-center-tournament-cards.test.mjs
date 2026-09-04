@@ -24,3 +24,10 @@ test('Round 28 Serie A Match Center keeps its own back button and fully owns the
     'opening the Serie A Match Center must suspend the outer Matches overlay just like external tournaments',
   );
 });
+
+test('Round 28 external Match Center uses a positive legacy-compatible runtime id instead of -1', async () => {
+  const homePatch = await read('../scripts/home-v23-3-source-patch.mjs');
+  assert.doesNotMatch(homePatch, /matchViewId\s*=\s*-1\s*;/);
+  assert.match(homePatch, /function\s+__cw233ExternalRuntimeId\s*\(/);
+  assert.match(homePatch, /matchViewId\s*=\s*__cw233ExternalRuntimeId\(detail\)\s*;/);
+});
