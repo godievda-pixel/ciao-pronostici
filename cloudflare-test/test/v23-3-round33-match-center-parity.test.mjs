@@ -51,6 +51,7 @@ test('Round 33 hides the obsolete Round 9 Serie A tournament header whenever the
 
 test('Round 33 external Overview restores useful parity blocks instead of the stripped Round 31 two-block view', () => {
   const html = renderRound31ExternalOverview(richExternalSnapshot);
+  const visibleText = html.replace(/<[^>]+>/g, ' ');
 
   assert.match(html, /Ключевые показатели/);
   assert.match(html, /Форма/);
@@ -60,7 +61,7 @@ test('Round 33 external Overview restores useful parity blocks instead of the st
   assert.match(html, /Карта ударов/);
   assert.match(html, /Сантьяго Бернабеу/);
   assert.match(html, /81[\s ]?044/);
-  assert.match(html, /2\s*:\s*1/);
+  assert.match(visibleText, /2\s*:\s*1/);
   assert.doesNotMatch(html, /Контекст\s+Серии\s*[АA]/i);
   assert.doesNotMatch(html, /Матч не найден/i);
 });
