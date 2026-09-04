@@ -21,7 +21,7 @@ const CSS = `
 
 /* One tournament ambience across Matches, Predictions, Ranking and Tables. */
 .cw233-prediction-page,.cw233-ranking-page,.cw233-tables-hub{
-  --r11a:#315bff;--r11b:#183bd8;--r11soft:rgba(49,91,255,.15);--r11line:rgba(103,142,255,.28)
+  --r11a:#0c5aa8;--r11b:#287fc7;--r11soft:rgba(12,90,168,.15);--r11line:rgba(40,127,199,.28)
 }
 [data-cw233-round11-theme='coppa'],.cw233-tables-hub[data-cw233-theme='coppa']{
   --r11a:#e53b49;--r11b:#087e46;--r11soft:rgba(229,59,73,.13);--r11line:rgba(236,92,104,.26)
@@ -39,7 +39,7 @@ const CSS = `
 #ciao-miniapp-root .content:has(.cw233-prediction-page[data-cw233-round11-theme='serie-a']),
 #ciao-miniapp-root .content:has(.cw233-ranking-page[data-cw233-round11-theme='serie-a']),
 #ciao-v233-tables-overlay:has(.cw233-tables-hub[data-cw233-round11-theme='serie-a']){
-  background:radial-gradient(circle at 82% 4%,rgba(49,91,255,.22),transparent 36%),radial-gradient(circle at 4% 72%,rgba(16,68,164,.16),transparent 43%),linear-gradient(165deg,#081632 0%,#061027 48%,#050b1b 100%)!important
+  background:radial-gradient(circle at 82% 4%,rgba(12,90,168,.22),transparent 36%),radial-gradient(circle at 4% 72%,rgba(40,127,199,.16),transparent 43%),linear-gradient(165deg,#071626 0%,#061321 48%,#050f1a 100%)!important
 }
 #ciao-miniapp-root .content:has(.cw233-prediction-page[data-cw233-round11-theme='coppa']),
 #ciao-miniapp-root .content:has(.cw233-ranking-page[data-cw233-round11-theme='coppa']),
