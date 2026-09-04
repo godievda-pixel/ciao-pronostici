@@ -4,6 +4,7 @@ export const USER_FEEDBACK_ROUND37_PROFILE_BUILD = '2026-09-04-r37-profile';
 
 const OVERLAY_ID = 'ciao-v233-predictor-profile-overlay';
 const STYLE_ID = 'ciao-v233-predictor-profile-style';
+const LEGACY_CORE_API = '/api/ciao-core-api-fast-v4';
 let installed = null;
 let client = null;
 let hydratePending = false;
@@ -20,12 +21,18 @@ export function predictorIdFromRankingRow(row = {}) {
   return Number.isFinite(value) && value > 0 ? value : 0;
 }
 
+export function favoriteTeamAssetUrl(team = {}) {
+  const crest = text(team?.crestUrl || team?.crest_url || team?.logo_url || team?.logoUrl || team?.logo || team?.crest);
+  if (crest) return crest;
+  const customEmojiId = text(team?.customEmojiId || team?.custom_emoji_id);
+  return customEmojiId ? `${LEGACY_CORE_API}?asset=emoji&id=${encodeURIComponent(customEmojiId)}` : '';
+}
+
 function favoriteTeam(source = {}) {
   const team = source?.favorite_team || source?.favoriteTeam || {};
-  const crestUrl = text(team?.crestUrl || team?.crest_url || team?.logo_url || team?.logoUrl || team?.logo || team?.crest);
   return {
     name:text(team?.name || team?.team_name) || 'Любимый клуб',
-    crestUrl,
+    assetUrl:favoriteTeamAssetUrl(team),
   };
 }
 
@@ -64,8 +71,8 @@ function stat(value, label) {
 
 function teamLogo(team) {
   const favorite = favoriteTeam({ favorite_team:team });
-  return favorite.crestUrl
-    ? `<div class="cw237-predictor-logo"><img src="${esc(favorite.crestUrl)}" alt="${esc(favorite.name)}"></div>`
+  return favorite.assetUrl
+    ? `<div class="cw237-predictor-logo"><img src="${esc(favorite.assetUrl)}" alt="${esc(favorite.name)}"></div>`
     : '<div class="cw237-predictor-logo"><span aria-hidden="true">⚽</span></div>';
 }
 
@@ -89,7 +96,7 @@ export function renderPredictorProfile(profile = null, { loading = false, error 
 async function publicPredictor(id, { fetchImpl = globalThis.fetch } = {}) {
   const auth = initData();
   if (!auth) throw new Error('Telegram-профиль недоступен');
-  const response = await fetchImpl('/api/ciao-core-api-fast-v4', {
+  const response = await fetchImpl(LEGACY_CORE_API, {
     method:'POST',
     headers:{ 'content-type':'application/json', 'x-telegram-init-data':auth },
     body:JSON.stringify({ action:'public_predictor', user_id:Number(id) }),
@@ -142,16 +149,23 @@ function activeRankingScope(documentRef) {
 function setAvatarCrest(avatar, team) {
   if (!avatar) return false;
   const favorite = favoriteTeam({ favorite_team:team });
-  if (!favorite.crestUrl) return false;
+  if (!favorite.assetUrl) return false;
   const existing = avatar.querySelector?.('img.cw233-ranking-club-logo');
-  if (existing?.getAttribute?.('src') === favorite.crestUrl) return false;
+  if (existing?.getAttribute?.('src') === favorite.assetUrl) return false;
   const img = avatar.ownerDocument?.createElement?.('img');
   if (!img) return false;
   img.className = 'cw233-ranking-club-logo';
-  img.src = favorite.crestUrl;
+  img.src = favorite.assetUrl;
   img.alt = favorite.name;
   img.loading = 'eager';
   img.decoding = 'async';
+  img.addEventListener?.('error', () => {
+    const fallback = avatar.ownerDocument?.createElement?.('span');
+    if (!fallback) return;
+    fallback.className = 'cw233-ranking-club-placeholder';
+    fallback.textContent = '⚽';
+    img.replaceWith?.(fallback);
+  }, { once:true });
   avatar.replaceChildren?.(img);
   avatar.title = favorite.name;
   return true;
@@ -242,9 +256,10 @@ export function installPredictorProfileUi(documentRef = globalThis.document, roo
     void openPredictorProfile(Number(row.dataset?.cw233PredictorId), { documentRef });
   };
 
+  const onNavigationReady = () => scheduleHydrate(documentRef);
   documentRef.addEventListener('click', onClick, true);
   documentRef.addEventListener('keydown', onKeydown);
-  documentRef.addEventListener('ciao-v233-navigation-ready', () => scheduleHydrate(documentRef));
+  documentRef.addEventListener('ciao-v233-navigation-ready', onNavigationReady);
 
   const Observer = rootRef?.MutationObserver || globalThis.MutationObserver;
   const observer = typeof Observer === 'function'
@@ -263,6 +278,7 @@ export function installPredictorProfileUi(documentRef = globalThis.document, roo
       observer?.disconnect?.();
       documentRef.removeEventListener?.('click', onClick, true);
       documentRef.removeEventListener?.('keydown', onKeydown);
+      documentRef.removeEventListener?.('ciao-v233-navigation-ready', onNavigationReady);
       installed = null;
     },
   });
