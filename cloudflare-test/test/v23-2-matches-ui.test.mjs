@@ -124,7 +124,7 @@ test('matches controller opens the hub and loads every competition including Ser
   assert.match(shown.at(-1), /data-loaded="serie_a"/);
 });
 
-test('DOM installer binds the v23.2 hub to the existing calendar tab and closes on other tabs', () => {
+test('DOM installer keeps Matches visible until the destination tab reports ready', () => {
   const listeners = [];
   const nodes = new Map();
   const append = node => { if (node.id) nodes.set(node.id, node); };
@@ -146,6 +146,14 @@ test('DOM installer binds the v23.2 hub to the existing calendar tab and closes 
     getElementById(id) { return nodes.get(id) || null; },
     querySelectorAll() { return []; },
     addEventListener(type, handler, options) { listeners.push({ type, handler, options }); },
+    removeEventListener(type, handler) {
+      const index = listeners.findIndex(item => item.type === type && item.handler === handler);
+      if (index >= 0) listeners.splice(index, 1);
+    },
+    dispatchEvent(event) {
+      for (const item of [...listeners].filter(item => item.type === event?.type)) item.handler(event);
+      return true;
+    },
   };
 
   installMatchesUi(documentRef, { defer: fn => fn() });
@@ -177,5 +185,8 @@ test('DOM installer binds the v23.2 hub to the existing calendar tab and closes 
     },
     preventDefault() {},
   });
+  assert.equal(overlay.hidden, false);
+
+  documentRef.dispatchEvent({ type:'ciao-v233-navigation-ready', detail:{ tab:'profile' } });
   assert.equal(overlay.hidden, true);
 });

@@ -173,8 +173,6 @@ function hideOverlay(documentRef, id) {
 function handleBottomNavPointerdown(event, documentRef) {
   const nav = event.target?.closest?.('#ciao-miniapp-root .nav button[data-tab]');
   if (!nav) return;
-  const tab = text(nav.dataset?.tab);
-  if (tab !== 'calendar') hideOverlay(documentRef, 'ciao-v232-matches-overlay');
   hideOverlay(documentRef, 'ciao-v233-match-center-overlay');
 }
 

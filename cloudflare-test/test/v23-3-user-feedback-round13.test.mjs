@@ -39,13 +39,12 @@ test('Ranking relies on the native stable skeleton and has no extra Round 13 ful
   assert.match(ranking, /cw233-ranking-skeleton/);
 });
 
-test('Matches transition guard hides stale overlays synchronously on bottom-nav pointerdown', async () => {
+test('Round 13 pointerdown guard hides stale Match Center but leaves Matches to the navigation handoff', async () => {
   const source = await readFile(new URL('../src/v23.3/round13-mobile-regressions.mjs', import.meta.url), 'utf8');
   assert.match(source, /pointerdown/);
-  assert.match(source, /ciao-v232-matches-overlay/);
   assert.match(source, /ciao-v233-match-center-overlay/);
   assert.match(source, /overlay\.hidden\s*=\s*true/);
-  assert.doesNotMatch(source, /setTimeout\([^)]*overlay\.hidden/);
+  assert.doesNotMatch(source, /hideOverlay\(documentRef,\s*['"]ciao-v232-matches-overlay['"]\)/);
 });
 
 test('Tables compact UEFA labels fit the selector while preserving tournament content elsewhere', () => {
