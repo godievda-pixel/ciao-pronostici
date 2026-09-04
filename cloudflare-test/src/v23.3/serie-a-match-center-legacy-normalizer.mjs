@@ -122,15 +122,38 @@ function normalizeStatSide(source = {}) {
   };
 }
 
-function normalizePrediction(value) {
+function normalizePrediction(value, fallbackKind = 'model') {
   const source = object(value);
   if (!source) return null;
   const homeScore = finite(source.homeScore ?? source.home_score ?? source.pred_home_score);
   const awayScore = finite(source.awayScore ?? source.away_score ?? source.pred_away_score);
+  if (homeScore === null && awayScore === null) return null;
   return {
     ...source,
+    kind:text(source.kind) || fallbackKind,
     ...(homeScore !== null ? { homeScore } : {}),
     ...(awayScore !== null ? { awayScore } : {}),
+  };
+}
+
+function splitValue(value) {
+  const source = object(value);
+  return finite(source ? source.pct ?? source.percent ?? source.value : value);
+}
+
+function normalizePredictionSplit(value) {
+  const source = object(value);
+  if (!source) return null;
+  const total = finite(source.total);
+  const home = splitValue(source.home ?? source.homeWin ?? source.home_win ?? source.prob_home ?? source.probHome);
+  const draw = splitValue(source.draw ?? source.prob_draw ?? source.probDraw);
+  const away = splitValue(source.away ?? source.awayWin ?? source.away_win ?? source.prob_away ?? source.probAway);
+  if (total === null && home === null && draw === null && away === null) return null;
+  return {
+    ...(total !== null ? { total } : {}),
+    ...(home !== null ? { home } : {}),
+    ...(draw !== null ? { draw } : {}),
+    ...(away !== null ? { away } : {}),
   };
 }
 
@@ -213,6 +236,7 @@ function normalizePlayer(player) {
 function overviewPayload(source, statsEnvelope) {
   const existing = object(source.overview_meta ?? source.overviewMeta) || {};
   const detail = object(source.detail) || {};
+  const match = object(source.match) || {};
   const momentumSource = firstPresent(source, ['momentum'])
     ?? firstPresent(statsEnvelope, ['momentum'])
     ?? firstPresent(existing, ['momentum']);
@@ -222,9 +246,20 @@ function overviewPayload(source, statsEnvelope) {
   const venue = normalizeVenue(detail, existing);
   const referee = normalizeReferee(detail, existing);
   const form = firstObject(source.form, existing.form);
-  const prediction = normalizePrediction(source.prediction_model ?? source.prediction ?? existing.prediction);
-  const predictionSplit = firstPresent(source, ['prediction_split','predictionSplit'])
-    ?? firstPresent(existing, ['prediction_split','predictionSplit']);
+  const modelPrediction = firstPresent(source, ['prediction_model','predictionModel'])
+    ?? firstPresent(existing, ['prediction_model','predictionModel']);
+  const userPrediction = firstPresent(match, ['prediction'])
+    ?? firstPresent(source, ['prediction'])
+    ?? firstPresent(existing, ['prediction']);
+  const prediction = modelPrediction !== undefined
+    ? normalizePrediction(modelPrediction, 'model')
+    : userPrediction !== undefined
+      ? normalizePrediction(userPrediction, 'user')
+      : null;
+  const predictionSplit = normalizePredictionSplit(
+    firstPresent(source, ['prediction_split','predictionSplit'])
+    ?? firstPresent(existing, ['prediction_split','predictionSplit']),
+  );
   const momentum = normalizeMomentum(momentumSource);
   const shotmap = normalizeShotmap(shotmapSource);
 
@@ -233,7 +268,7 @@ function overviewPayload(source, statsEnvelope) {
     || referee
     || form
     || prediction
-    || predictionSplit !== undefined
+    || predictionSplit
     || momentum.length
     || shotmap.length
   );
@@ -243,7 +278,7 @@ function overviewPayload(source, statsEnvelope) {
     ...(referee ? { referee } : {}),
     ...(form ? { form } : {}),
     ...(prediction ? { prediction } : {}),
-    ...(predictionSplit !== undefined ? { predictionSplit } : {}),
+    ...(predictionSplit ? { predictionSplit } : {}),
     ...(momentum.length ? { momentum } : {}),
     ...(shotmap.length ? { shotmap } : {}),
   };
