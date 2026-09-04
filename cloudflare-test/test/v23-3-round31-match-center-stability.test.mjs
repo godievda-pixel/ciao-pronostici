@@ -66,8 +66,9 @@ test('Round 31 snapshot signature is stable for identical data and changes when 
   assert.notEqual(first, changedDetail);
 });
 
-test('Round 31 viewport ownership hides the outer Matches competition header independently of legacy class timing', () => {
-  assert.match(ROUND31_CSS, /html\.cw233-r31-match-center-owned[^\{]*#ciao-v232-matches-overlay\s*\{[^}]*display:none!important/s);
+test('Round 31 keeps content stability CSS but yields outer viewport ownership to Round 38', () => {
+  assert.doesNotMatch(ROUND31_CSS, /cw233-r31-match-center-owned/);
+  assert.doesNotMatch(ROUND31_CSS, /#ciao-v232-matches-overlay\s*\{[^}]*display:none!important/s);
   assert.match(ROUND31_CSS, /match-center-open \.content\s*\{[^}]*overflow-anchor:none!important/s);
   assert.match(ROUND31_CSS, /\[data-mc-tab-content\]\s*\{[^}]*min-height:/s);
 });
@@ -81,11 +82,11 @@ test('Round 31 runtime is wired after the legacy Match Center modules', async ()
   );
 });
 
-test('Round 31 coalesces refreshes but no longer steals external Overview/tab ownership', async () => {
+test('Round 31 coalesces refreshes but no longer steals external Overview/tab or viewport ownership', async () => {
   const source = await read('../src/v23.3/round31-match-center-stability.mjs');
   assert.match(source, /externalMatchCenterSnapshotSignature/);
   assert.match(source, /if\s*\(signature\s*===\s*lastSnapshotSignature\)\s*return\s+null/);
-  assert.match(source, /MutationObserver/);
+  assert.doesNotMatch(source, /MutationObserver/);
   assert.doesNotMatch(source, /stopImmediatePropagation/);
   assert.doesNotMatch(source, /renderRound31ExternalOverview\(activeExternal\.data\)/);
   assert.doesNotMatch(source, /data-mc-tab=['"]overview['"]/);

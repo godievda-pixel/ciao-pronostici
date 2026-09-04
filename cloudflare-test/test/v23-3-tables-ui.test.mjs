@@ -44,7 +44,7 @@ function coppaMatch(id, stage, home, away, extra = {}) {
   };
 }
 
-test('v23.3 Tables exposes all five compact tournament destinations and full UEFA rows', () => {
+test('v23.3 Tables exposes all five compact tournament destinations and compact UEFA rows', () => {
   const html = renderTablesHub({
     selectedCompetition: 'ucl',
     data: {
@@ -71,7 +71,8 @@ test('v23.3 Tables exposes all five compact tournament destinations and full UEF
     assert.match(html, new RegExp(`data-cw233-tables-competition="${competition}"[^>]*>${label}</button>`));
   }
   assert.match(html, /<p>Лига Чемпионов<\/p>/);
-  assert.match(html, /<th>#<\/th><th>Команда<\/th><th>И<\/th><th>В<\/th><th>Н<\/th><th>П<\/th><th>Г<\/th><th>РМ<\/th><th>О<\/th>/);
+  assert.match(html, /<th>#<\/th><th>Команда<\/th><th>И<\/th><th>РМ<\/th><th>О<\/th>/);
+  assert.doesNotMatch(html, /<th>В<\/th>|<th>Н<\/th>|<th>П<\/th>|<th>Г<\/th>/);
   assert.match(html, /Арсенал/);
   assert.match(html, /Интер/);
   assert.match(html, /19/);

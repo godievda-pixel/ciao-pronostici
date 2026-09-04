@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { normalizeFavoriteTeam } from '../src/v23.3/prediction-auth.mjs';
 import { resolveCanonicalMatchTarget } from '../src/v23.3/match-center-links.mjs';
+import { captureMatchSource } from '../src/v23.3/match-center-lifecycle.mjs';
 
 const indexSource = readFileSync(new URL('../src/v23.3/index.mjs', import.meta.url), 'utf8');
 const predictorProfileUrl = new URL('../src/v23.3/predictor-profile-ui.mjs', import.meta.url);
@@ -27,10 +28,15 @@ function predictionMatchTarget() {
   };
 }
 
-test('Round 37 match routing remembers that a match was opened from Predictions', () => {
-  const payload = resolveCanonicalMatchTarget(predictionMatchTarget());
+test('Round 38 match routing identifies that a match was opened from Predictions', () => {
+  const target = predictionMatchTarget();
+  const payload = resolveCanonicalMatchTarget(target);
   assert.equal(payload?.source?.surface, 'predictions');
   assert.equal(payload?.source?.tab, 'mine');
+  const source = captureMatchSource({ querySelector:() => null, getElementById:() => null }, target);
+  assert.equal(source.surface, 'predictions');
+  assert.equal(source.navTab, 'mine');
+  assert.equal(source.competition, 'coppa_italia');
 });
 
 test('Round 37 favorite-team normalization accepts flattened legacy state fields', () => {
@@ -46,19 +52,15 @@ test('Round 37 favorite-team normalization accepts flattened legacy state fields
   });
 });
 
-test('Round 37 runtime defines source-aware Match Center back navigation', async () => {
+test('Round 38 replaces Round 37 Match Center lifecycle ownership', async () => {
   assert.equal(existsSync(round37Url), true, 'round37-runtime.mjs must exist');
   const runtime = await import(round37Url.href);
-  assert.deepEqual(runtime.normalizeMatchSource({ surface:'predictions', tab:'mine', competition:'ucl' }), {
-    surface:'predictions', tab:'mine', competition:'ucl',
-  });
-  assert.deepEqual(runtime.normalizeMatchSource({ surface:'unknown' }), {
-    surface:'home', tab:'predict', competition:'',
-  });
-  assert.equal(runtime.MATCH_CENTER_BACK_EVENT, 'ciao-v233-match-center-back');
+  assert.equal('normalizeMatchSource' in runtime, false);
+  assert.equal('MATCH_CENTER_BACK_EVENT' in runtime, false);
+  assert.match(indexSource, /match-center-lifecycle\.mjs/);
 });
 
-test('Round 37 Ranking restores clickable predictor profiles through the legacy public_predictor contract', async () => {
+test('Ranking keeps predictor profile public contract', async () => {
   assert.equal(existsSync(predictorProfileUrl), true, 'predictor-profile-ui.mjs must exist');
   const source = existsSync(predictorProfileUrl) ? readFileSync(predictorProfileUrl, 'utf8') : '';
   assert.match(source, /public_predictor/);
@@ -66,7 +68,7 @@ test('Round 37 Ranking restores clickable predictor profiles through the legacy 
   assert.match(indexSource, /predictor-profile-ui\.mjs/);
 });
 
-test('Round 37 favorite-club badges can render the legacy custom emoji asset instead of a football placeholder', async () => {
+test('favorite-club asset resolver supports legacy custom emoji', async () => {
   const profiles = await import(predictorProfileUrl.href);
   assert.equal(
     profiles.favoriteTeamAssetUrl({ customEmojiId:'emoji-123' }),
@@ -79,15 +81,13 @@ test('Round 37 favorite-club badges can render the legacy custom emoji asset ins
   assert.equal(profiles.favoriteTeamAssetUrl({ crestUrl:'https://img.test/club.png' }), 'https://img.test/club.png');
 });
 
-test('Round 37 compact tables keep only #, team, played, goal difference and points', async () => {
-  assert.equal(existsSync(round37Url), true, 'round37-runtime.mjs must exist');
+test('Round 37 no longer performs post-render standings compaction', async () => {
   const runtime = await import(round37Url.href);
-  assert.deepEqual(runtime.COMPACT_STANDING_KEEP, [0, 1, 2, 7, 8]);
-  assert.deepEqual(runtime.compactStandingValues(['#','Команда','И','В','Н','П','Г','РМ','О']), ['#','Команда','И','РМ','О']);
+  assert.equal('COMPACT_STANDING_KEEP' in runtime, false);
+  assert.equal('compactStandingValues' in runtime, false);
 });
 
 test('Round 37 prediction card theme variables follow the selected tournament', async () => {
-  assert.equal(existsSync(round37Url), true, 'round37-runtime.mjs must exist');
   const runtime = await import(round37Url.href);
   assert.deepEqual(runtime.predictionCardTheme('coppa'), { accent:'#e53b49', accent2:'#087e46' });
   assert.deepEqual(runtime.predictionCardTheme('champions'), { accent:'#4b63ff', accent2:'#222b9d' });

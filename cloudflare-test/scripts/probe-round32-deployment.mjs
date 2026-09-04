@@ -19,58 +19,55 @@ function compact(value) {
 }
 
 export async function probeRound32Deployment({ fetchImpl = fetch, writeArtifact = true } = {}) {
-  const [runtimeResponse, shellResponse] = await Promise.all([
+  const [compatResponse, lifecycleResponse] = await Promise.all([
     fetchText('/v23.3/round31-match-center-stability.mjs', fetchImpl),
-    fetchText('/', fetchImpl),
+    fetchText('/v23.3/match-center-lifecycle.mjs', fetchImpl),
   ]);
 
-  const runtimeText = compact(runtimeResponse.text);
-  const shellText = compact(shellResponse.text);
+  const compatText = compact(compatResponse.text);
+  const lifecycleText = compact(lifecycleResponse.text);
 
-  const forbiddenOverlayHiddenMutation = /overlay\.hidden\s*=\s*true/.test(runtimeText);
-  const forbiddenOverlayAriaMutation = /overlay\?\.setAttribute\?\.\(['"]aria-hidden['"]/.test(runtimeText);
-  const forbiddenOverlayObserver = /observer\?\.observe\?\.\(matchesOverlay/.test(runtimeText);
-  const forbiddenSubtreeObserver = /subtree\s*:\s*true/.test(runtimeText);
+  const noLegacyViewportOwner = !compatText.includes('syncViewportOwnership')
+    && !compatText.includes('cw233-r31-match-center-owned')
+    && !compatText.includes('MutationObserver')
+    && !/overlay\.hidden\s*=\s*true/.test(compatText);
+
+  const singleLifecycleOwner = lifecycleText.includes("MATCH_CENTER_OWNER_CLASS = 'cw238-match-center-owner'")
+    && lifecycleText.includes("MATCH_CENTER_SUSPENDED_ATTR = 'cw238MatchCenterSuspended'")
+    && lifecycleText.includes('export function suspendMatchSource')
+    && lifecycleText.includes('export function restoreMatchSource')
+    && lifecycleText.includes('ciao-v233-open-external-legacy-match')
+    && lifecycleText.includes('ciao-v233-open-serie-a-match');
 
   const runtime = {
-    status:runtimeResponse.status,
-    responseOk:runtimeResponse.ok,
-    buildMarker:runtimeText.includes("USER_FEEDBACK_ROUND32_BUILD = '2026-09-04-r32'"),
-    syncViewportOwnership:runtimeText.includes('const syncViewportOwnership = () =>')
-      && runtimeText.includes("root.classList?.contains?.('match-center-open')")
-      && runtimeText.includes('html?.classList?.add?.(OWNED_CLASS)'),
-    classOnlyObserver:/observer\?\.observe\?\.\(root,\s*\{\s*attributes:true,\s*attributeFilter:\['class'\]\s*\}\)/.test(runtimeText),
-    cssViewportIsolation:runtimeText.includes('html.${OWNED_CLASS} #ciao-v232-matches-overlay')
-      && runtimeText.includes('display:none!important'),
-    noDirectOverlayStateMutation:!forbiddenOverlayHiddenMutation && !forbiddenOverlayAriaMutation,
-    noSelfObservingOverlay:!forbiddenOverlayObserver && !forbiddenSubtreeObserver,
+    status:compatResponse.status,
+    responseOk:compatResponse.ok,
+    round32BuildMarker:compatText.includes("USER_FEEDBACK_ROUND32_BUILD = '2026-09-04-r32'"),
+    round38LifecycleMarker:compatText.includes("USER_FEEDBACK_ROUND38_LIFECYCLE_BUILD = '2026-09-04-r38-lifecycle'"),
+    noLegacyViewportOwner,
   };
 
   const lifecycle = {
-    status:shellResponse.status,
-    responseOk:shellResponse.ok,
-    suspendOwnerPresent:shellText.includes('__cw233SuspendMatchesOverlay'),
-    externalOpenWired:shellText.includes('ciao-v233-open-external-legacy-match'),
-    serieAOpenWired:shellText.includes('ciao-v233-open-serie-a-match'),
-    closeRestoreWired:shellText.includes('function __cw233RestoreMatchesOverlay(context)')
-      && shellText.includes('const __cw233R21FinalClose = closeMatchCenter')
-      && shellText.includes('__cw233RestoreMatchesOverlay(context)')
-      && shellText.includes("if (tab !== 'calendar') return"),
+    status:lifecycleResponse.status,
+    responseOk:lifecycleResponse.ok,
+    singleLifecycleOwner,
+    ownerClass:lifecycleText.includes('cw238-match-center-owner'),
+    suspendedAttribute:lifecycleText.includes('cw238MatchCenterSuspended'),
+    restoreMatchSource:lifecycleText.includes('restoreMatchSource'),
+    noGlobalMutationObserver:!lifecycleText.includes('MutationObserver'),
   };
 
   const checks = [
     runtime.responseOk,
-    runtime.buildMarker,
-    runtime.syncViewportOwnership,
-    runtime.classOnlyObserver,
-    runtime.cssViewportIsolation,
-    runtime.noDirectOverlayStateMutation,
-    runtime.noSelfObservingOverlay,
+    runtime.round32BuildMarker,
+    runtime.round38LifecycleMarker,
+    runtime.noLegacyViewportOwner,
     lifecycle.responseOk,
-    lifecycle.suspendOwnerPresent,
-    lifecycle.externalOpenWired,
-    lifecycle.serieAOpenWired,
-    lifecycle.closeRestoreWired,
+    lifecycle.singleLifecycleOwner,
+    lifecycle.ownerClass,
+    lifecycle.suspendedAttribute,
+    lifecycle.restoreMatchSource,
+    lifecycle.noGlobalMutationObserver,
   ];
 
   const report = {

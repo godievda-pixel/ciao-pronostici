@@ -1,8 +1,8 @@
 export const USER_FEEDBACK_ROUND31_BUILD = '2026-09-04-r31';
 export const USER_FEEDBACK_ROUND32_BUILD = '2026-09-04-r32';
+export const USER_FEEDBACK_ROUND38_LIFECYCLE_BUILD = '2026-09-04-r38-lifecycle';
 
 const STYLE_ID = 'ciao-v233-round31-match-center-stability';
-const OWNED_CLASS = 'cw233-r31-match-center-owned';
 const EXTERNAL_OPEN_EVENT = 'ciao-v233-open-external-legacy-match';
 const SERIE_A_OPEN_EVENT = 'ciao-v233-open-serie-a-match';
 const EXTERNAL_COMPETITIONS = new Set([
@@ -33,10 +33,10 @@ function finite(value) {
 function numberText(value, { pct = false, digits = 2 } = {}) {
   const number = finite(value);
   if (number === null) return '—';
-  const text = Number.isInteger(number)
+  const rendered = Number.isInteger(number)
     ? String(number)
     : number.toFixed(digits).replace(/0+$/, '').replace(/\.$/, '');
-  return pct ? `${text}%` : text;
+  return pct ? `${rendered}%` : rendered;
 }
 
 export function isRound31ExternalCompetition(value) {
@@ -65,7 +65,7 @@ export function externalMatchCenterSnapshotSignature(snapshot = {}) {
   const away = legacyStats(snapshot, 'away');
   const incidents = snapshotEvents(snapshot);
   const players = snapshotPlayers(snapshot);
-  const signature = {
+  return JSON.stringify({
     status:String(snapshot?.status || ''),
     id:String(snapshot?.match_id || match?.id || ''),
     score:[match?.home_score ?? null, match?.away_score ?? null],
@@ -80,8 +80,7 @@ export function externalMatchCenterSnapshotSignature(snapshot = {}) {
     incidents:incidents.map(item => [item?.type ?? '', item?.minute ?? null, item?.home_score ?? null, item?.away_score ?? null]),
     players:players.map(item => [item?.player_id ?? null, item?.rating ?? null, item?.goals ?? null, item?.goal_assist ?? null]),
     lineupStatus:String(snapshot?.lineups?.lineup_status || ''),
-  };
-  return JSON.stringify(signature);
+  });
 }
 
 function statCell(label, home, away, options) {
@@ -98,8 +97,6 @@ function matchInfoHtml(snapshot) {
   return `<section class="mc-section cw233-r31-info"><div class="mc-section-head"><div class="mc-section-title">Информация о матче</div></div><div class="cw233-r31-info-grid">${venue ? `<div><span>Стадион</span><b>${esc(venue)}</b></div>` : ''}${referee ? `<div><span>Судья</span><b>${esc(referee)}</b></div>` : ''}</div></section>`;
 }
 
-// Kept as a compatibility export for existing tests/tools. Round 33 no longer uses
-// this minimal renderer as the live external Overview owner.
 export function renderRound31ExternalOverview(snapshot = {}) {
   const home = legacyStats(snapshot, 'home');
   const away = legacyStats(snapshot, 'away');
@@ -128,12 +125,7 @@ export function renderRound31ExternalOverview(snapshot = {}) {
 }
 
 export const ROUND31_CSS = `
-/* Match Center owns only the visual viewport. Overlay hidden/aria state stays with the legacy lifecycle. */
-html.${OWNED_CLASS} #ciao-v232-matches-overlay{
-  display:none!important;
-  visibility:hidden!important;
-  pointer-events:none!important;
-}
+/* Round 38 owns viewport lifecycle. Round 31 keeps only stable content presentation. */
 #ciao-miniapp-root.match-center-open .content{
   overflow-anchor:none!important;
 }
@@ -231,31 +223,11 @@ export function installRound31MatchCenterStability(
   documentRef = globalThis.document,
   windowRef = globalThis,
 ) {
-  if (!documentRef?.addEventListener || !documentRef?.getElementById) return null;
+  if (!documentRef?.addEventListener) return null;
   ensureStyle(documentRef);
 
-  const root = documentRef.getElementById('ciao-miniapp-root');
-  if (!root) return null;
-  const html = documentRef.documentElement;
   let activeExternal = null;
   let lastSnapshotSignature = '';
-
-  const syncViewportOwnership = () => {
-    const open = !!root.classList?.contains?.('match-center-open');
-    if (open) {
-      html?.classList?.add?.(OWNED_CLASS);
-      return true;
-    }
-    html?.classList?.remove?.(OWNED_CLASS);
-    activeExternal = null;
-    lastSnapshotSignature = '';
-    return false;
-  };
-
-  const afterLegacyOpen = callback => {
-    const defer = windowRef.queueMicrotask || (fn => Promise.resolve().then(fn));
-    defer(callback);
-  };
 
   const onExternalOpen = event => {
     const detail = event?.detail || {};
@@ -263,19 +235,12 @@ export function installRound31MatchCenterStability(
     if (!isRound31ExternalCompetition(competition) || !detail?.data) return;
     activeExternal = { competition, matchId:String(detail?.matchId || ''), data:detail.data };
     lastSnapshotSignature = externalMatchCenterSnapshotSignature(detail.data);
-    afterLegacyOpen(syncViewportOwnership);
   };
 
   const onSerieAOpen = () => {
     activeExternal = null;
     lastSnapshotSignature = '';
-    afterLegacyOpen(syncViewportOwnership);
   };
-
-  const onClick = event => {
-    if (event?.target?.closest?.('.mc-back')) afterLegacyOpen(syncViewportOwnership);
-  };
-  documentRef.addEventListener('click', onClick, true);
 
   windowRef.addEventListener?.(EXTERNAL_OPEN_EVENT, onExternalOpen);
   windowRef.addEventListener?.(SERIE_A_OPEN_EVENT, onSerieAOpen);
@@ -300,20 +265,10 @@ export function installRound31MatchCenterStability(
     } catch {}
   }
 
-  const MutationObserverCtor = windowRef.MutationObserver;
-  const observer = typeof MutationObserverCtor === 'function'
-    ? new MutationObserverCtor(syncViewportOwnership)
-    : null;
-  observer?.observe?.(root, { attributes:true, attributeFilter:['class'] });
-  syncViewportOwnership();
-
   return Object.freeze({
     disconnect(){
-      observer?.disconnect?.();
-      documentRef.removeEventListener?.('click', onClick, true);
       windowRef.removeEventListener?.(EXTERNAL_OPEN_EVENT, onExternalOpen);
       windowRef.removeEventListener?.(SERIE_A_OPEN_EVENT, onSerieAOpen);
-      html?.classList?.remove?.(OWNED_CLASS);
     },
   });
 }

@@ -1,5 +1,8 @@
+import './boot-gate.mjs';
+import './app-theme.mjs';
 import './navigation-ui.mjs';
 import './legacy-match-center-theme.mjs';
+import './match-center-lifecycle.mjs';
 import './home-integration.mjs';
 import './tables-ui.mjs';
 import './serie-a-legacy-bridge.mjs';
@@ -24,10 +27,13 @@ import './round37-runtime.mjs';
 
 export const CiaoV233 = Object.freeze({
   version: '23.3',
+  bootGate: 'round38',
+  appTheme: 'premium-blue',
   navigation: 'enabled',
   home: 'enabled',
   tables: 'enabled',
   matchCenter: 'enabled',
+  matchCenterLifecycle: 'enabled',
   predictions: 'enabled',
   ranking: 'enabled',
   predictorProfiles: 'enabled',

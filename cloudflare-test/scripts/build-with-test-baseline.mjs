@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from './build.mjs';
 import { applyRound34ExternalOverviewFormOnlySourcePatch } from './round34-external-overview-form-only-source-patch.mjs';
+import { applyRound38BootGateSourcePatch } from './round38-boot-gate-source-patch.mjs';
 import { loadBaseHtml } from './test-baseline.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -20,7 +21,8 @@ async function run() {
     const result = await build();
     const builtHtml = await readFile(distIndexPath, 'utf8');
     const formOnlyHtml = applyRound34ExternalOverviewFormOnlySourcePatch(builtHtml);
-    await writeFile(distIndexPath, formOnlyHtml, 'utf8');
+    const bootGatedHtml = applyRound38BootGateSourcePatch(formOnlyHtml);
+    await writeFile(distIndexPath, bootGatedHtml, 'utf8');
     await mkdir(dirname(baselineOutPath), { recursive:true });
     await writeFile(baselineOutPath, html, 'utf8');
     console.log(JSON.stringify({
@@ -28,6 +30,7 @@ async function run() {
       ...result,
       baseSource:sourceUrl,
       baseline:baselineOutPath,
+      bootGate:'round38',
     }));
   } finally {
     if (previousBaseFile === undefined) delete process.env.BASE_FILE;

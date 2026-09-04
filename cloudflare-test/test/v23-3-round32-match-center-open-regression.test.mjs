@@ -12,7 +12,7 @@ function functionBody(source, name) {
   return source.slice(start, end + 5);
 }
 
-test('Round 32 open events do not mutate/hide the Matches overlay before the legacy lifecycle captures it', async () => {
+test('Round 32 open events do not mutate/hide the Matches overlay before the lifecycle owner captures it', async () => {
   const source = await read('../src/v23.3/round31-match-center-stability.mjs');
   const externalOpen = functionBody(source, 'onExternalOpen');
   const serieAOpen = functionBody(source, 'onSerieAOpen');
@@ -23,46 +23,39 @@ test('Round 32 open events do not mutate/hide the Matches overlay before the leg
   assert.doesNotMatch(source, /overlay\?\.setAttribute\?\.\(['"]aria-hidden['"]/);
 });
 
-test('Round 32 Match Center ownership reacts only to root open/close class transitions, not its own subtree mutations', async () => {
+test('Round 32 compatibility code no longer reacts to root class transitions or observes Match Center DOM', async () => {
   const source = await read('../src/v23.3/round31-match-center-stability.mjs');
 
-  assert.match(source, /observer\?\.observe\?\.\(root,\s*\{\s*attributes:true,\s*attributeFilter:\['class'\]\s*\}\)/s);
+  assert.doesNotMatch(source, /MutationObserver/);
+  assert.doesNotMatch(source, /observer\?\.observe\?\./);
   assert.doesNotMatch(source, /subtree:true/);
   assert.doesNotMatch(source, /observer\?\.observe\?\.\(matchesOverlay/);
 });
 
-test('Round 32 keeps the outer tournament header hidden by ownership CSS while leaving the real overlay state to the legacy close/restore lifecycle', async () => {
+test('Round 32 compatibility code no longer owns the outer tournament header or viewport lifecycle', async () => {
   const source = await read('../src/v23.3/round31-match-center-stability.mjs');
 
-  assert.match(source, /html\.\$\{OWNED_CLASS\} #ciao-v232-matches-overlay\s*\{[^}]*display:none!important/s);
-  assert.match(source, /const syncViewportOwnership = \(\) =>/);
-  assert.match(source, /root\.classList\?\.contains\?\.\('match-center-open'\)[\s\S]*html\?\.classList\?\.add\?\.\(OWNED_CLASS\)/);
+  assert.doesNotMatch(source, /OWNED_CLASS/);
+  assert.doesNotMatch(source, /syncViewportOwnership/);
+  assert.doesNotMatch(source, /html\.\$\{OWNED_CLASS\} #ciao-v232-matches-overlay/);
 });
 
 test('Round 32 has a dedicated live deployment probe for the viewport-owner regression', async () => {
   const probe = await read('../scripts/probe-round32-deployment.mjs');
   assert.match(probe, /USER_FEEDBACK_ROUND32_BUILD/);
-  assert.match(probe, /syncViewportOwnership/);
-  assert.match(probe, /__cw233SuspendMatchesOverlay/);
-  assert.match(probe, /ciao-v233-open-external-legacy-match/);
-  assert.match(probe, /ciao-v233-open-serie-a-match/);
-  assert.match(probe, /observer\\\?\\\.observe/);
-  assert.match(probe, /overlay\\\.hidden/);
+  assert.match(probe, /USER_FEEDBACK_ROUND38_LIFECYCLE_BUILD/);
+  assert.match(probe, /match-center-lifecycle\.mjs/);
+  assert.match(probe, /noLegacyViewportOwner/);
+  assert.match(probe, /singleLifecycleOwner/);
 });
 
-test('Round 32 live probe validates the real close/restore lifecycle instead of a nonexistent close event', async () => {
+test('Round 32 live probe now validates the Round 38 lifecycle owner instead of the superseded legacy close path', async () => {
   const probe = await read('../scripts/probe-round32-deployment.mjs');
-  const lifecycleSource = await read('../scripts/home-v23-3-source-patch.mjs');
-
-  assert.match(lifecycleSource, /function __cw233RestoreMatchesOverlay\(context\)/);
-  assert.match(lifecycleSource, /const __cw233R21FinalClose = closeMatchCenter/);
-  assert.match(lifecycleSource, /__cw233RestoreMatchesOverlay\(context\)/);
-  assert.match(lifecycleSource, /if \(tab !== 'calendar'\) return/);
-
-  assert.match(probe, /__cw233RestoreMatchesOverlay/);
-  assert.match(probe, /__cw233R21FinalClose/);
-  assert.match(probe, /tab !== ['"]calendar['"]/);
-  assert.doesNotMatch(probe, /ciao-v233-legacy-match-center-closed/);
+  assert.match(probe, /cw238-match-center-owner/);
+  assert.match(probe, /cw238MatchCenterSuspended/);
+  assert.match(probe, /restoreMatchSource/);
+  assert.match(probe, /!compatText\.includes\(['"]syncViewportOwnership['"]\)/);
+  assert.doesNotMatch(probe, /__cw233R21FinalClose/);
 });
 
 test('Round 32 live probe is a required develop-push gate and uploads its observation', async () => {

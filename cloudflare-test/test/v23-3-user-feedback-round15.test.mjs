@@ -44,7 +44,8 @@ test('Ranking no longer uses the extra Round 13 full-screen loading overlay', as
   assert.doesNotMatch(round13, /showRankingLoading\(/);
   assert.doesNotMatch(round13, /RANKING_LOADING_ID/);
   assert.match(ranking, /setHtmlIfChanged/);
-  assert.match(ranking, /RANKING_FILTERS\.filter\(filter=>filter\.key!=='overall'\)/);
+  assert.match(ranking, /RANKING_FILTERS\.map\(filter=>/);
+  assert.doesNotMatch(ranking, /RANKING_FILTERS\.filter\(filter=>filter\.key!=='overall'\)/);
 });
 
 test('TEST reset explicitly reports cleared profile participant rows', async () => {
