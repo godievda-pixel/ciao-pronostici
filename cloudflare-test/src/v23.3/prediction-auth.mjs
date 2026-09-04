@@ -65,6 +65,17 @@ export function normalizeFavoriteTeam(source = {}) {
   });
 }
 
+function normalizedParticipant(source, userId) {
+  const participant = {
+    userId,
+    displayName: displayName(source),
+    username: text(source.username) || null,
+  };
+  const favoriteTeam = normalizeFavoriteTeam(source);
+  if (favoriteTeam) participant.favoriteTeam = favoriteTeam;
+  return Object.freeze(participant);
+}
+
 function participantRoster(payload = {}, currentUser = null) {
   const standings = extractStandings(payload);
   if (!standings.length) return Object.freeze([]);
@@ -77,23 +88,13 @@ function participantRoster(payload = {}, currentUser = null) {
       : row;
     const userId = stableUserId(source);
     if (!userId) continue;
-    byId.set(userId, Object.freeze({
-      userId,
-      displayName: displayName(source),
-      username: text(source.username) || null,
-      favoriteTeam: normalizeFavoriteTeam(source),
-    }));
+    byId.set(userId, normalizedParticipant(source, userId));
   }
 
   if (currentUser && typeof currentUser === 'object') {
     const userId = stableUserId(currentUser);
     if (userId) {
-      const current = Object.freeze({
-        userId,
-        displayName: displayName(currentUser),
-        username: text(currentUser.username) || null,
-        favoriteTeam: normalizeFavoriteTeam(currentUser),
-      });
+      const current = normalizedParticipant(currentUser, userId);
       byId.delete(userId);
       return Object.freeze([current, ...byId.values()]);
     }
@@ -144,8 +145,9 @@ export async function resolveAuthenticatedUser({ request, env } = {}) {
     userId,
     displayName: displayName(user),
     username: text(user?.username) || null,
-    favoriteTeam: normalizeFavoriteTeam(user),
   };
+  const favoriteTeam = normalizeFavoriteTeam(user);
+  if (favoriteTeam) result.favoriteTeam = favoriteTeam;
   const participants = participantRoster(payload, user);
   if (participants.length) result.participants = participants;
 
