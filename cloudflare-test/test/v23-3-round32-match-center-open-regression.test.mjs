@@ -50,6 +50,21 @@ test('Round 32 has a dedicated live deployment probe for the viewport-owner regr
   assert.match(probe, /overlay\\\.hidden/);
 });
 
+test('Round 32 live probe validates the real close/restore lifecycle instead of a nonexistent close event', async () => {
+  const probe = await read('../scripts/probe-round32-deployment.mjs');
+  const lifecycleSource = await read('../scripts/home-v23-3-source-patch.mjs');
+
+  assert.match(lifecycleSource, /function __cw233RestoreMatchesOverlay\(context\)/);
+  assert.match(lifecycleSource, /const __cw233R21FinalClose = closeMatchCenter/);
+  assert.match(lifecycleSource, /__cw233RestoreMatchesOverlay\(context\)/);
+  assert.match(lifecycleSource, /if \(tab !== 'calendar'\) return/);
+
+  assert.match(probe, /__cw233RestoreMatchesOverlay/);
+  assert.match(probe, /__cw233R21FinalClose/);
+  assert.match(probe, /tab !== ['"]calendar['"]/);
+  assert.doesNotMatch(probe, /ciao-v233-legacy-match-center-closed/);
+});
+
 test('Round 32 live probe is a required develop-push gate and uploads its observation', async () => {
   const workflow = await read('../../.github/workflows/ciao-test-check.yml');
   assert.match(workflow, /Probe deployed Round 32 fixes/);

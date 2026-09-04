@@ -52,7 +52,10 @@ export async function probeRound32Deployment({ fetchImpl = fetch, writeArtifact 
     suspendOwnerPresent:shellText.includes('__cw233SuspendMatchesOverlay'),
     externalOpenWired:shellText.includes('ciao-v233-open-external-legacy-match'),
     serieAOpenWired:shellText.includes('ciao-v233-open-serie-a-match'),
-    closeRestoreWired:shellText.includes('ciao-v233-legacy-match-center-closed'),
+    closeRestoreWired:shellText.includes('function __cw233RestoreMatchesOverlay(context)')
+      && shellText.includes('const __cw233R21FinalClose = closeMatchCenter')
+      && shellText.includes('__cw233RestoreMatchesOverlay(context)')
+      && shellText.includes("if (tab !== 'calendar') return"),
   };
 
   const checks = [
