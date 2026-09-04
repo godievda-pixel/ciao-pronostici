@@ -26,19 +26,28 @@ export async function probeRound33Deployment({ fetchImpl = fetch, writeArtifact 
 
   const shellText = compact(shellResponse.text);
   const runtimeText = compact(runtimeResponse.text);
+  const sanitizerStart = shellText.indexOf('function __cw233Round33IsFormSection');
+  const sanitizerEnd = sanitizerStart >= 0
+    ? shellText.indexOf('matchTabContent = function', sanitizerStart)
+    : -1;
+  const sanitizerText = sanitizerStart >= 0 && sanitizerEnd > sanitizerStart
+    ? shellText.slice(sanitizerStart, sanitizerEnd)
+    : '';
 
   const overview = {
     status:shellResponse.status,
     responseOk:shellResponse.ok,
     round33Marker:shellText.includes('cw233-round33-match-center-overview-ownership'),
+    round34FormOnlyMarker:shellText.includes('cw233-round34-external-overview-form-only'),
     preservesLegacyOverview:shellText.includes('const __cw233Round33LegacyMatchTabContent = matchTabContent')
       && shellText.includes('const html = __cw233Round33LegacyMatchTabContent(d,key)')
       && shellText.includes("String(key || '') !== 'overview'")
       && shellText.includes('return __cw233Round33SanitizeExternalOverviewHtml(html)'),
-    removesOnlySerieAContextAndForm:shellText.includes('__cw233Round33SanitizeExternalOverviewHtml')
-      && shellText.includes("querySelectorAll?.('.cw14-form-card')")
-      && shellText.includes('Контекст')
-      && shellText.includes('Серии'),
+    removesOnlyExternalForm:!!sanitizerText
+      && sanitizerText.includes("querySelectorAll?.('.cw14-form-card')")
+      && sanitizerText.includes('Форма')
+      && !sanitizerText.includes('Контекст')
+      && !sanitizerText.includes('Серии'),
   };
 
   const ownership = {
@@ -60,8 +69,9 @@ export async function probeRound33Deployment({ fetchImpl = fetch, writeArtifact 
   const checks = [
     overview.responseOk,
     overview.round33Marker,
+    overview.round34FormOnlyMarker,
     overview.preservesLegacyOverview,
-    overview.removesOnlySerieAContextAndForm,
+    overview.removesOnlyExternalForm,
     ownership.persistentSuspendedMarker,
     ownership.suspendedCssIsolation,
     runtime.responseOk,
