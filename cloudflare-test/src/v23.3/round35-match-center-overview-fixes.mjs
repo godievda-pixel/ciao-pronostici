@@ -1,4 +1,5 @@
 export const ROUND35_MATCH_CENTER_BUILD = '2026-09-04-r35';
+export const ROUND36_SERIE_A_HEADER_BUILD = '2026-09-04-r36';
 const STYLE_ID = 'ciao-v233-round35-match-center-overview-fixes';
 
 const EXTERNAL_COMPETITIONS = new Set([
@@ -48,6 +49,11 @@ export const ROUND35_CSS = `
 #ciao-miniapp-root.match-center-open .cw18-match-context .cw18-context-scorer{
   border-color:color-mix(in srgb,var(--cw233-serie-context-accent) 28%,transparent)!important;
   color:#dceafb!important;
+}
+
+/* Serie A legacy Match Center owns the viewport: hide only the parent Matches tournament header while it is open. */
+#ciao-miniapp-root.match-center-open .cw232-competition[data-cw232-competition="serie_a"] > .cw232-competition__head{
+  display:none!important;
 }
 
 /* External Overview Form fail-safe: hide the WHOLE legacy Form section, never only its contents. */
