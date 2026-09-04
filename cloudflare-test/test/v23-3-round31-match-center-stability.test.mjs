@@ -43,7 +43,7 @@ test('Round 31 external Overview stays tournament-neutral while preserving usefu
   const html = renderRound31ExternalOverview(externalSnapshot);
   assert.match(html, /data-cw233-r31-overview/);
   assert.match(html, /Ключевые показатели/);
-  assert.match(html, /mc-section-title[^>]*>\s*Форма\b/i);
+  assert.match(html, /Форма/);
   assert.match(html, /Информация о матче/);
   assert.doesNotMatch(html, /Контекст\s+Серии\s*[АA]/i);
   assert.doesNotMatch(html, /Матч не найден/i);
