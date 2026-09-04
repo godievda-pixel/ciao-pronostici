@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { renderCompetitionScreen } from '../src/v23.2/matches-ui.mjs';
 
 const read = path => readFile(new URL(path, import.meta.url), 'utf8');
 
@@ -46,4 +47,39 @@ test('Round 28 Serie A context cards use premium competition surfaces instead of
     theme,
     /\.cw14-info-item,[\s\S]*?\.cw14-form-card\s*\{[\s\S]*?box-shadow:/,
   );
+});
+
+test('Round 28 every competition renders the same rich scheduled-match card structure', () => {
+  const competitions = ['serie_a', 'coppa_italia', 'ucl', 'uel', 'uecl'];
+  for (const competition of competitions) {
+    const html = renderCompetitionScreen(competition, {
+      matches:[{
+        matchId:`${competition}:9001`,
+        kickoffAt:'2026-09-05T18:45:00Z',
+        status:'scheduled',
+        stage:'Round 1',
+        round:1,
+        homeTeam:{ name:'Home', crestUrl:'https://example.test/home.png' },
+        awayTeam:{ name:'Away', crestUrl:'https://example.test/away.png' },
+      }],
+    }, { now:new Date('2026-09-04T10:00:00Z') });
+
+    assert.match(html, /cw232-match-card__meta/);
+    assert.match(html, /cw232-match-card__status/);
+    assert.match(html, /cw232-match-card__kickoff/);
+    assert.match(html, /cw232-match-card__score[^>]*>—\s*:\s*—</);
+    assert.match(html, /МАТЧ НЕ НАЧАЛСЯ/);
+    assert.match(html, /ОЖИДАЕМ НАЧАЛО/);
+  }
+});
+
+test('Round 28 match cards and group tabs inherit per-tournament CSS variables', async () => {
+  const source = await read('../src/v23.2/matches-ui.mjs');
+  assert.match(source, /--cw232-match-accent:#0c5aa8/);
+  assert.match(source, /data-cw232-theme='coppa'[\s\S]*--cw232-match-accent:#ce2b37[\s\S]*--cw232-match-accent-2:#009246/);
+  assert.match(source, /data-cw232-theme='champions'[\s\S]*--cw232-match-accent:#3157ff[\s\S]*--cw232-match-accent-2:#7b42ff/);
+  assert.match(source, /data-cw232-theme='europa'[\s\S]*--cw232-match-accent:#f06722[\s\S]*--cw232-match-accent-2:#ff9b32/);
+  assert.match(source, /data-cw232-theme='conference'[\s\S]*--cw232-match-accent:#22a866[\s\S]*--cw232-match-accent-2:#55d68e/);
+  assert.match(source, /\.cw232-match-card\{[\s\S]*var\(--cw232-match-accent\)[\s\S]*var\(--cw232-match-accent-2\)/);
+  assert.match(source, /\.cw232-group-tabs button\[aria-selected='true'\][\s\S]*var\(--cw232-match-accent\)[\s\S]*var\(--cw232-match-accent-2\)/);
 });
