@@ -87,6 +87,7 @@ export function normalizeCanonicalBase(input = {}, competition, matchId) {
     competition:canonicalCompetition,
     matchId:canonicalMatchId,
     status:textOrNull(source.status) || 'scheduled',
+    minute:numberOrNull(source.minute),
     kickoffAt:textOrNull(source.kickoffAt, source.kickoff_at, source.startAt, source.start_at),
     homeTeam:normalizeTeam(sourceTeam(source, 'home'), fallbackTeam(source, 'home')),
     awayTeam:normalizeTeam(sourceTeam(source, 'away'), fallbackTeam(source, 'away')),
