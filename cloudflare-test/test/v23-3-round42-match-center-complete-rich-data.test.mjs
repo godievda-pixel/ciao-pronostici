@@ -195,6 +195,99 @@ test('Round 42 Overview provider composes normalized match stats into the canoni
   assert.deepEqual(result.data.form.home, ['W','D','W','L','W']);
 });
 
+test('Round 42 Overview joins the historical summary prediction and nested user split with rich section data', async () => {
+  const calls = [];
+  const summaryPayload = {
+    ok:true,
+    status:'finished',
+    match:{
+      id:77,
+      kickoff_at:'2026-09-04T19:45:00Z',
+      is_finished:true,
+      home:{ id:1, name:'Дженоа' },
+      away:{ id:2, name:'Комо' },
+      home_logo_url:'https://img.test/genoa.png',
+      away_logo_url:'https://img.test/como.png',
+      home_score:2,
+      away_score:1,
+      prediction:{ home_score:1, away_score:1, points:0 },
+    },
+    prediction_split:{
+      total:42,
+      home:{ pct:52 },
+      draw:{ pct:27 },
+      away:{ pct:21 },
+    },
+  };
+  const richPayload = {
+    ok:true,
+    match:{
+      id:77,
+      home:{ id:1, name:'Дженоа' },
+      away:{ id:2, name:'Комо' },
+    },
+    detail:{
+      stadium:'Luigi Ferraris',
+      city:'Genova',
+      stadium_capacity:33205,
+      referee:'Marco Guida',
+    },
+    overview_meta:{
+      form:{
+        home:['W','D','W','L','W'],
+        away:['D','W','L','W','D'],
+      },
+    },
+    stats:{
+      stats:{
+        home:{ expected_goals:1.42, total_shots:15 },
+        away:{ expected_goals:0.88, total_shots:10 },
+      },
+    },
+  };
+  const env = {
+    CIAO_WEB_API:{
+      async fetch(request) {
+        const path = new URL(request.url).pathname;
+        calls.push(path);
+        const payload = path.endsWith('/ciao-match-summary-fast-v2') ? summaryPayload : richPayload;
+        return new Response(JSON.stringify(payload), {
+          status:200,
+          headers:{ 'content-type':'application/json' },
+        });
+      },
+    },
+  };
+
+  const result = await loadSerieAMatchCenterSection({
+    request:new Request('https://test.example/match'),
+    env,
+    initData:'test-init',
+    matchId:'serie_a:77',
+    section:'overview',
+  });
+
+  assert.deepEqual(calls.slice().sort(), [
+    '/api/ciao-match-center-fast-v3',
+    '/api/ciao-match-summary-fast-v2',
+  ]);
+  assert.equal(result.data.prediction.kind, 'user');
+  assert.equal(result.data.prediction.homeScore, 1);
+  assert.equal(result.data.prediction.awayScore, 1);
+  assert.deepEqual(result.data.predictionSplit, { total:42, home:52, draw:27, away:21 });
+
+  const html = renderMatchCenterOverview(result.data, {
+    coverage:result.coverage,
+    match:{ homeTeam:{ name:'Дженоа' }, awayTeam:{ name:'Комо' } },
+  });
+  assert.match(html, /Твой прогноз/);
+  assert.match(html, /1:1/);
+  assert.match(html, /42 прогноз/);
+  assert.match(html, /52%/);
+  assert.match(html, /27%/);
+  assert.match(html, /21%/);
+});
+
 test('Round 42 Overview renders form and prediction data already present in the canonical section', () => {
   const html = renderMatchCenterOverview({
     venue:{ name:'Luigi Ferraris', city:'Genova', capacity:33205 },
