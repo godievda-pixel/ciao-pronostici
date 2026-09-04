@@ -38,3 +38,22 @@ test('Round 32 keeps the outer tournament header hidden by ownership CSS while l
   assert.match(source, /const syncViewportOwnership = \(\) =>/);
   assert.match(source, /root\.classList\?\.contains\?\.\('match-center-open'\)[\s\S]*html\?\.classList\?\.add\?\.\(OWNED_CLASS\)/);
 });
+
+test('Round 32 has a dedicated live deployment probe for the viewport-owner regression', async () => {
+  const probe = await read('../scripts/probe-round32-deployment.mjs');
+  assert.match(probe, /USER_FEEDBACK_ROUND32_BUILD/);
+  assert.match(probe, /syncViewportOwnership/);
+  assert.match(probe, /__cw233SuspendMatchesOverlay/);
+  assert.match(probe, /ciao-v233-open-external-legacy-match/);
+  assert.match(probe, /ciao-v233-open-serie-a-match/);
+  assert.match(probe, /observer\\\?\\\.observe/);
+  assert.match(probe, /overlay\\\.hidden/);
+});
+
+test('Round 32 live probe is a required develop-push gate and uploads its observation', async () => {
+  const workflow = await read('../../.github/workflows/ciao-test-check.yml');
+  assert.match(workflow, /Probe deployed Round 32 fixes/);
+  assert.match(workflow, /node scripts\/probe-round32-deployment\.mjs/);
+  assert.match(workflow, /name: ciao-v23-3-round32-deployment/);
+  assert.match(workflow, /path: cloudflare-test\/artifacts\/v23-3-round32-deployment\.json/);
+});
