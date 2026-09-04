@@ -1,5 +1,6 @@
 import './navigation-ui.mjs';
 import './legacy-match-center-theme.mjs';
+import './match-center-lifecycle.mjs';
 import './home-integration.mjs';
 import './tables-ui.mjs';
 import './serie-a-legacy-bridge.mjs';
@@ -28,6 +29,7 @@ export const CiaoV233 = Object.freeze({
   home: 'enabled',
   tables: 'enabled',
   matchCenter: 'enabled',
+  matchCenterLifecycle: 'enabled',
   predictions: 'enabled',
   ranking: 'enabled',
   predictorProfiles: 'enabled',
