@@ -153,19 +153,9 @@ export function createMatchCenterStore({
     const competition = state.competition;
     const matchId = state.matchId;
     const status = String(state?.match?.status || '') || null;
-    const coverage = state?.match?.coverage;
-
-    if (coverage && coverage[key] === false) {
-      state = {
-        ...state,
-        sections:{ ...state.sections, [key]:null },
-        sectionState:{ ...state.sectionState, [key]:{ status:'unavailable', error:'' } },
-      };
-      emit();
-      return getState();
-    }
 
     if (!force && state.sectionState[key]?.status === 'ready') return getState();
+    if (!force && state.sectionState[key]?.status === 'unavailable') return getState();
 
     state = {
       ...state,
