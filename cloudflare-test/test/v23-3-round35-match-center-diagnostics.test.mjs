@@ -128,6 +128,17 @@ test('Round 35 pins Контекст Серии А to the Serie A blue palette i
   assert.doesNotMatch(contextCss, /var\(--cw233-mc-accent(?:-2)?\)/);
 });
 
+test('Serie A Match Center hides the parent Matches tournament header only while Match Center is open', () => {
+  assert.match(
+    ROUND35_CSS,
+    /#ciao-miniapp-root\.match-center-open[\s\S]*?\.cw232-competition\[data-cw232-competition=["']serie_a["']\]\s*>\s*\.cw232-competition__head\s*\{[\s\S]*?display:none!important/,
+  );
+  assert.doesNotMatch(
+    ROUND35_CSS,
+    /#ciao-miniapp-root(?!\.match-center-open)[^{]*?\.cw232-competition\[data-cw232-competition=["']serie_a["']\][^{]*?\.cw232-competition__head\s*\{[\s\S]*?display:none!important/,
+  );
+});
+
 test('Round 35 runtime is loaded after the older Match Center stability layer', async () => {
   const source = await read('../src/v23.3/index.mjs');
   const round31 = source.indexOf("import './round31-match-center-stability.mjs';");
