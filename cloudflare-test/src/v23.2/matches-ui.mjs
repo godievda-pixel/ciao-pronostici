@@ -180,8 +180,12 @@ function ensureOverlay(documentRef) { let overlay = documentRef.getElementById(O
 function clearMatchesAmbientTheme(overlay) { if (!overlay?.dataset) return; delete overlay.dataset.cw233Round10Theme; overlay.removeAttribute?.('data-cw233-round10-theme'); }
 function switchCoppaView(overlay, view) { if (!overlay?.querySelectorAll || !['matches','bracket'].includes(view)) return; for (const tab of overlay.querySelectorAll('[data-cw232-coppa-view]')) { const active = tab.dataset?.cw232CoppaView === view; tab.classList?.toggle?.('is-active', active); tab.setAttribute?.('aria-selected', active ? 'true' : 'false'); } for (const panel of overlay.querySelectorAll('[data-cw232-coppa-panel]')) panel.hidden = panel.dataset?.cw232CoppaPanel !== view; }
 function switchGroupView(overlay, key) { if (!overlay?.querySelectorAll || !key) return; for (const tab of overlay.querySelectorAll('[data-cw232-group-key]')) tab.setAttribute?.('aria-selected', tab.dataset?.cw232GroupKey === key ? 'true' : 'false'); for (const panel of overlay.querySelectorAll('[data-cw232-group-panel]')) panel.hidden = panel.dataset?.cw232GroupPanel !== key; }
+function deferMatchesNav(fn) {
+  if (typeof globalThis.queueMicrotask === 'function') globalThis.queueMicrotask(fn);
+  else Promise.resolve().then(fn);
+}
 
-export function installMatchesUi(documentRef = globalThis.document, { defer = fn => setTimeout(fn, 0), loadScreen = loadCompetitionScreen } = {}) {
+export function installMatchesUi(documentRef = globalThis.document, { defer = deferMatchesNav, loadScreen = loadCompetitionScreen } = {}) {
   if (!documentRef?.addEventListener || !documentRef?.createElement) return null;
   ensureStyles(documentRef); const overlay = ensureOverlay(documentRef);
   const controller = createMatchesUiController({ show(html){ overlay.innerHTML = html; overlay.hidden = false; if (typeof overlay.scrollTo === 'function') overlay.scrollTo(0,0); }, hide(){ overlay.hidden = true; overlay.innerHTML = ''; }, loadScreen });
