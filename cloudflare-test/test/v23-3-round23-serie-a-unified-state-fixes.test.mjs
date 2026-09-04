@@ -32,7 +32,11 @@ test('Round 23 toolbar frame stays removed while the Match Center back control r
 
 test('Round 23 context surfaces and lineup switches inherit current tournament variables', async () => {
   const source = await read('../src/v23.3/legacy-match-center-theme.mjs');
-  for (const selector of ['.cw14-info-item', '.cw14-form-card', '.cw20-stat-mini', '.cw20-player-row', '.cw20-event-card']) {
+  for (const selector of ['.cw14-info-item', '.cw14-form-card']) {
+    assert.ok(source.includes(`#ciao-miniapp-root.match-center-open ${selector}`), `${selector} must remain competition-themed`);
+  }
+  assert.match(source, /\.cw14-info-item,[\s\S]*?\.cw14-form-card[\s\S]*?var\(--cw233-mc-accent\)[\s\S]*?var\(--cw233-mc-accent-2\)/);
+  for (const selector of ['.cw20-stat-mini', '.cw20-player-row', '.cw20-event-card']) {
     assert.match(source, new RegExp(selector.replace('.', '\\.') + '[\\s\\S]*?background:var\\(--cw233-mc-surface\\)!important'));
   }
   assert.match(source, /\.mc-lineup-switch button[\s\S]*?background:var\(--cw233-mc-surface\)!important/);
