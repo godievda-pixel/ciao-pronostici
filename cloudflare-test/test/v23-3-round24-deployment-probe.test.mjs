@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { probeRound23Deployment } from '../scripts/probe-round23-deployment.mjs';
 
 const ORIGIN = 'https://ciao-web-app-test.ciao-web.workers.dev/';
@@ -47,4 +48,12 @@ test('Round 24 deployment probe fails closed when the Round 23 built-state marke
     probeRound23Deployment({ fetchImpl:fixtureFetch({ '/':'<html>old build</html>' }), writeArtifact:false }),
     /Round 23 deployment markers are incomplete/,
   );
+});
+
+test('Round 24 live probe is enforced on develop pushes and uploaded as an artifact', async () => {
+  const workflow = await readFile(new URL('../../.github/workflows/ciao-test-check.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /Probe deployed Round 23 fixes/);
+  assert.match(workflow, /node scripts\/probe-round23-deployment\.mjs/);
+  assert.match(workflow, /name:\s*ciao-v23-3-round23-deployment/);
+  assert.match(workflow, /path:\s*cloudflare-test\/artifacts\/v23-3-round23-deployment\.json/);
 });
