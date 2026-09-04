@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { adaptSerieALegacyMatchCenter } from '../src/v23.3/serie-a-match-center-adapter.mjs';
+import { normalizeSerieALegacyMatchCenter } from '../src/v23.3/serie-a-match-center-legacy-normalizer.mjs';
+import { loadSerieAMatchCenterSection } from '../src/v23.3/serie-a-match-center-provider.mjs';
 import { renderMatchCenterOverview } from '../src/v23.3/match-center-overview.mjs';
 import { renderMatchCenterView } from '../src/v23.3/match-center-view.mjs';
 
@@ -109,8 +111,9 @@ const legacyRichMatch = {
   },
 };
 
-test('Round 42 Serie A adapter restores the complete legacy rich payload instead of only exact-key fragments', () => {
-  const adapted = adaptSerieALegacyMatchCenter(legacyRichMatch);
+test('Round 42 provider-boundary normalizer restores the complete legacy rich payload before the thin canonical adapter', () => {
+  const normalized = normalizeSerieALegacyMatchCenter(legacyRichMatch);
+  const adapted = adaptSerieALegacyMatchCenter(normalized);
 
   assert.equal(adapted.base.status, 'finished');
   assert.equal(adapted.base.homeScore, 2);
@@ -137,13 +140,13 @@ test('Round 42 Serie A adapter restores the complete legacy rich payload instead
   assert.equal(adapted.overview.prediction.awayScore, 1);
   assert.deepEqual(adapted.overview.predictionSplit, { home:52, draw:27, away:21 });
 
-  assert.equal(adapted.overview.summaryStats.home.xg, 1.42);
-  assert.equal(adapted.overview.summaryStats.home.possession, 53);
-  assert.equal(adapted.overview.summaryStats.home.shots, 15);
-  assert.equal(adapted.overview.summaryStats.home.shotsOnTarget, 6);
-  assert.equal(adapted.overview.summaryStats.home.bigChances, 4);
-  assert.equal(adapted.overview.summaryStats.home.corners, 5);
-  assert.equal(adapted.overview.summaryStats.home.tackles, 14);
+  assert.equal(adapted.stats.home.xg, 1.42);
+  assert.equal(adapted.stats.home.possession, 53);
+  assert.equal(adapted.stats.home.shots, 15);
+  assert.equal(adapted.stats.home.shotsOnTarget, 6);
+  assert.equal(adapted.stats.home.bigChances, 4);
+  assert.equal(adapted.stats.home.corners, 5);
+  assert.equal(adapted.stats.home.tackles, 14);
   assert.equal(adapted.stats.away.xg, 0.88);
   assert.equal(adapted.stats.away.possession, 47);
   assert.equal(adapted.stats.away.shots, 10);
@@ -162,6 +165,34 @@ test('Round 42 Serie A adapter restores the complete legacy rich payload instead
   assert.equal(adapted.events[0].assist, 'Morten Frendrup');
   assert.equal(adapted.lineups.home.starters[0].shirtNumber, 1);
   assert.equal(adapted.players[0].rating, 7.8);
+});
+
+test('Round 42 Overview provider composes normalized match stats into the canonical overview section', async () => {
+  const env = {
+    CIAO_WEB_API:{
+      async fetch() {
+        return new Response(JSON.stringify({ ok:true, ...legacyRichMatch }), {
+          status:200,
+          headers:{ 'content-type':'application/json' },
+        });
+      },
+    },
+  };
+  const result = await loadSerieAMatchCenterSection({
+    request:new Request('https://test.example/match'),
+    env,
+    initData:'test-init',
+    matchId:'serie_a:77',
+    section:'overview',
+  });
+
+  assert.equal(result.available, true);
+  assert.equal(result.coverage.overview, true);
+  assert.equal(result.data.summaryStats.home.xg, 1.42);
+  assert.equal(result.data.summaryStats.home.shots, 15);
+  assert.equal(result.data.summaryStats.away.xg, 0.88);
+  assert.equal(result.data.summaryStats.away.shots, 10);
+  assert.deepEqual(result.data.form.home, ['W','D','W','L','W']);
 });
 
 test('Round 42 Overview renders form and prediction data already present in the canonical section', () => {
