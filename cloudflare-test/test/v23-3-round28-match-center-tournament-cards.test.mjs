@@ -55,6 +55,7 @@ test('Round 28 every competition renders the same rich scheduled-match card stru
     const html = renderCompetitionScreen(competition, {
       matches:[{
         matchId:`${competition}:9001`,
+        competition,
         kickoffAt:'2026-09-05T18:45:00Z',
         status:'scheduled',
         stage:'Round 1',
