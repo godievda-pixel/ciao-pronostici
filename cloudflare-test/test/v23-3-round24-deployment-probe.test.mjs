@@ -33,6 +33,7 @@ function fixtureFetch(overrides = {}) {
 test('Round 24 deployment probe proves the live TEST contains all Round 23 fixes', async () => {
   const report = await probeRound23Deployment({ fetchImpl:fixtureFetch(), writeArtifact:false });
   assert.equal(report.ok, true);
+  assert.equal(report.origin, ORIGIN);
   assert.equal(report.home.round23StateMarker, true);
   assert.equal(report.matchCenter.serieAPalette, true);
   assert.equal(report.matchCenter.duplicateBackRemoved, true);
