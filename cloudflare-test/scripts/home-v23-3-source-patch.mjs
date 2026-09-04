@@ -205,6 +205,7 @@ function __cw233RestoreMatchesOverlay(context){
 }
 
 globalThis.addEventListener?.('ciao-v233-open-external-legacy-match', __cw233SuspendMatchesOverlay);
+globalThis.addEventListener?.('ciao-v233-open-serie-a-match', __cw233SuspendMatchesOverlay);
 
 const __cw233R21FinalClose = closeMatchCenter;
 closeMatchCenter = function(){
