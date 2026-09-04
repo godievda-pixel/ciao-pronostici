@@ -49,11 +49,15 @@ const indexFixture = `
 
 const round35Fixture = `
   export const ROUND35_MATCH_CENTER_BUILD = '2026-09-04-r35';
+  export const ROUND36_SERIE_A_HEADER_BUILD = '2026-09-04-r36';
   const ROUND35_CSS = \`
     #ciao-miniapp-root.match-center-open .cw18-match-context{
       --cw233-serie-context-bg:#071626;
       --cw233-serie-context-accent:#0c5aa8;
       --cw233-serie-context-accent-2:#287fc7;
+    }
+    #ciao-miniapp-root.match-center-open .cw232-competition[data-cw232-competition="serie_a"] > .cw232-competition__head{
+      display:none!important;
     }
     #ciao-miniapp-root.match-center-open:is(
       [data-cw233-mc-competition="coppa_italia"],
@@ -90,7 +94,7 @@ function fixtureFetch(overrides = {}) {
   };
 }
 
-test('Round 33/35 deployment probe verifies final external Form removal and Serie A context palette', async () => {
+test('Round 33/36 deployment probe verifies final external Form removal, Serie A context palette and header ownership', async () => {
   const report = await probeRound33Deployment({ fetchImpl:fixtureFetch(), writeArtifact:false });
   assert.equal(report.ok, true);
   assert.equal(report.overview.round33Marker, true);
@@ -104,9 +108,11 @@ test('Round 33/35 deployment probe verifies final external Form removal and Seri
   assert.equal(report.round35Import.wired, true);
   assert.equal(report.round35Import.afterRound31, true);
   assert.equal(report.round35.buildMarker, true);
+  assert.equal(report.round35.round36SerieAHeaderMarker, true);
   assert.equal(report.round35.externalFormSectionRemoval, true);
   assert.equal(report.round35.externalFormCssFailsafe, true);
   assert.equal(report.round35.serieAContextPalette, true);
+  assert.equal(report.round35.serieAParentHeaderHidden, true);
   assert.equal(report.round35.lateMutationGuard, true);
 });
 
@@ -160,6 +166,20 @@ test('Round 35 deployment probe rejects a runtime that hides only Form contents 
 
 test('Round 35 deployment probe rejects a runtime that loses the Serie A context palette', async () => {
   const broken = round35Fixture.replace('--cw233-serie-context-accent:#0c5aa8;', '');
+  await assert.rejects(
+    probeRound33Deployment({
+      fetchImpl:fixtureFetch({ '/v23.3/round35-match-center-overview-fixes.mjs':broken }),
+      writeArtifact:false,
+    }),
+    /Round 33\/35 deployment markers are incomplete/,
+  );
+});
+
+test('Round 36 deployment probe rejects a runtime that leaks the parent Serie A tournament header', async () => {
+  const broken = round35Fixture.replace(
+    '#ciao-miniapp-root.match-center-open .cw232-competition[data-cw232-competition="serie_a"] > .cw232-competition__head{\n      display:none!important;\n    }',
+    '',
+  );
   await assert.rejects(
     probeRound33Deployment({
       fetchImpl:fixtureFetch({ '/v23.3/round35-match-center-overview-fixes.mjs':broken }),
