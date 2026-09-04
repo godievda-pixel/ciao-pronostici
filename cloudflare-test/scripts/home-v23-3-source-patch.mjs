@@ -2,6 +2,7 @@ const SEASON_LABEL = 'SERIE A 2026/27';
 const ALL_CALCIO_LABEL = 'ВСЁ О КАЛЬЧО';
 const MARKER = 'cw233-home-multicompetition';
 const EXTERNAL_MARKER = 'cw233-single-legacy-match-center-r20';
+const OVERLAY_LIFECYCLE_MARKER = 'cw233-external-match-overlay-lifecycle-r21';
 const LATE_MATCH_CENTER_MARKER = '/* ===== /Ciao, Web! v20.15 stable match center live patch ===== */';
 
 function replaceSeasonLabel(input) {
@@ -135,9 +136,67 @@ globalThis.addEventListener?.('ciao-v233-open-external-legacy-match', event => {
   return source;
 }
 
+function applyExternalOverlayLifecyclePatch(input) {
+  let source = String(input);
+  if (source.includes(OVERLAY_LIFECYCLE_MARKER)) return source;
+
+  const externalAt = source.lastIndexOf(EXTERNAL_MARKER);
+  if (externalAt < 0) throw new Error('v23.3 external Match Center lifecycle anchor missing');
+
+  const externalTail = 'main.scrollTop = 0;\n});';
+  const tailAt = source.indexOf(externalTail, externalAt);
+  if (tailAt < 0) throw new Error('v23.3 external Match Center lifecycle tail missing');
+  const insertionAt = tailAt + externalTail.length;
+
+  const lifecycle = `
+
+/* ${OVERLAY_LIFECYCLE_MARKER} */
+let __cw233R21MatchesOverlayState = null;
+
+function __cw233SuspendMatchesOverlay(){
+  const matchesOverlay = document.getElementById?.('ciao-v232-matches-overlay');
+  if (!matchesOverlay || matchesOverlay.hidden) {
+    __cw233R21MatchesOverlayState = null;
+    return;
+  }
+  __cw233R21MatchesOverlayState = {
+    matchesOverlayScrollTop:Number(matchesOverlay.scrollTop) || 0,
+  };
+  matchesOverlay.hidden = true;
+}
+
+function __cw233RestoreMatchesOverlay(context){
+  if (!context) return;
+  const matchesOverlay = document.getElementById?.('ciao-v232-matches-overlay');
+  if (!matchesOverlay) return;
+  matchesOverlay.hidden = false;
+  matchesOverlay.scrollTop = context.matchesOverlayScrollTop;
+  requestAnimationFrame?.(()=>{
+    matchesOverlay.scrollTop = context.matchesOverlayScrollTop;
+  });
+}
+
+globalThis.addEventListener?.('ciao-v233-open-external-legacy-match', __cw233SuspendMatchesOverlay);
+
+const __cw233R21FinalClose = closeMatchCenter;
+closeMatchCenter = function(){
+  const context = __cw233R21MatchesOverlayState;
+  __cw233R21MatchesOverlayState = null;
+  const result = __cw233R21FinalClose();
+  __cw233RestoreMatchesOverlay(context);
+  return result;
+};
+`;
+
+  source = source.slice(0, insertionAt) + lifecycle + source.slice(insertionAt);
+  if (!source.includes(OVERLAY_LIFECYCLE_MARKER)) throw new Error('v23.3 external Match Center overlay lifecycle patch did not apply');
+  return source;
+}
+
 export function applyHomeV233SourcePatch(input) {
   let source = replaceSeasonLabel(input);
   source = applyHomePatch(source);
   source = applyExternalLegacyPatch(source);
+  source = applyExternalOverlayLifecyclePatch(source);
   return source;
 }
