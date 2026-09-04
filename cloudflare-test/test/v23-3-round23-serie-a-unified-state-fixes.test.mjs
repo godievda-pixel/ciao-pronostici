@@ -23,9 +23,10 @@ refreshMatchCenter=async function(){ return 'cw20-final'; };
 /* ===== /Ciao, Web! v20.15 stable match center live patch ===== */
 `;
 
-test('Round 23 Serie A Match Center removes only the duplicate inner back control and toolbar frame', async () => {
+test('Round 23 toolbar frame stays removed while the Match Center back control remains available', async () => {
   const source = await read('../src/v23.3/legacy-match-center-theme.mjs');
-  assert.match(source, /match-center-open:not\(\[data-cw233-mc-competition\]\)[\s\S]*?\.mc-back[\s\S]*?display:\s*none!important/);
+  assert.doesNotMatch(source, /match-center-open:not\(\[data-cw233-mc-competition\]\)[\s\S]*?\.mc-back[\s\S]*?display:\s*none!important/);
+  assert.match(source, /match-center-open \.mc-back[\s\S]*?display:\s*flex!important/);
   assert.match(source, /match-center-open \.mc-toolbar[\s\S]*?border-bottom:\s*0!important/);
 });
 
