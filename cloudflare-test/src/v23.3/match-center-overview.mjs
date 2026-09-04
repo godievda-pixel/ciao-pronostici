@@ -113,6 +113,20 @@ function percent(value) {
   return Math.max(0, Math.min(100, normalized));
 }
 
+function predictionCountLabel(value) {
+  const number = Math.max(0, Math.trunc(finite(value) ?? 0));
+  const lastTwo = number % 100;
+  const last = number % 10;
+  const word = lastTwo >= 11 && lastTwo <= 14
+    ? 'прогнозов'
+    : last === 1
+      ? 'прогноз'
+      : last >= 2 && last <= 4
+        ? 'прогноза'
+        : 'прогнозов';
+  return `${number} ${word}`;
+}
+
 function predictionHtml(prediction, split) {
   const model = prediction && typeof prediction === 'object' ? prediction : {};
   const result = split && typeof split === 'object' ? split : {};
@@ -121,6 +135,9 @@ function predictionHtml(prediction, split) {
   const home = percent(result.home ?? result.prob_home ?? result.probHome);
   const draw = percent(result.draw ?? result.prob_draw ?? result.probDraw);
   const away = percent(result.away ?? result.prob_away ?? result.probAway);
+  const total = finite(result.total);
+  const points = finite(model.points);
+  const userPrediction = text(model.kind).toLowerCase() === 'user' || total !== null;
   const hasScore = homeScore !== null || awayScore !== null;
   const hasSplit = [home, draw, away].some(item => item !== null);
   if (!hasScore && !hasSplit) return '';
@@ -130,9 +147,16 @@ function predictionHtml(prediction, split) {
     ['Х', draw],
     ['П2', away],
   ];
+  const heading = userPrediction ? 'Прогнозы пользователей' : 'Прогноз';
+  const headingMeta = userPrediction
+    ? (total === null ? 'Распределение' : predictionCountLabel(total))
+    : 'Модель матча';
+  const scoreLabel = userPrediction
+    ? `Твой прогноз${points === null ? '' : ` · ${Math.round(points)} оч.`}`
+    : 'ожидаемый счёт';
   return `<section class="cw233-mc-overview-card" data-cw233-mc-overview-region="prediction">
-    <div class="cw233-mc-overview-title"><span>Прогноз</span><b>Модель матча</b></div>
-    ${hasScore ? `<div class="cw233-mc-prediction-score"><strong>${esc(score)}</strong><span>ожидаемый счёт</span></div>` : ''}
+    <div class="cw233-mc-overview-title"><span>${heading}</span><b>${esc(headingMeta)}</b></div>
+    ${hasScore ? `<div class="cw233-mc-prediction-score"><strong>${esc(score)}</strong><span>${esc(scoreLabel)}</span></div>` : ''}
     ${hasSplit ? `<div class="cw233-mc-prediction-split">${outcomes.map(([label, value]) => `<div class="cw233-mc-prediction-outcome"><strong>${value === null ? '—' : `${Math.round(value)}%`}</strong><span>${label}</span></div>`).join('')}</div>` : ''}
   </section>`;
 }
