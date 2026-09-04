@@ -179,8 +179,8 @@ test('v23.3 BSD match center returns canonical live score and minute', async () 
     assert.equal(body.data.match.matchId, 'ucl:601024');
     assert.equal(body.data.match.status, 'live');
     assert.equal(body.data.match.minute, 67);
-    assert.equal(body.data.match.homeScore, 2);
-    assert.equal(body.data.match.awayScore, 1);
+    assert.equal(body.data.match.score.home, 2);
+    assert.equal(body.data.match.score.away, 1);
     assert.equal(requests.every(item => item.authorization === 'Token bsd-server-secret'), true);
   } finally {
     globalThis.fetch = previousFetch;
