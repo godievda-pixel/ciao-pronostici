@@ -42,8 +42,7 @@ export function primeTablesOverlay(documentRef = globalThis.document) {
   return true;
 }
 
-function hideStaleOverlays(documentRef, activeTab) {
-  if (activeTab !== 'calendar') documentRef.getElementById?.('ciao-v232-matches-overlay')?.setAttribute('hidden','');
+function hideStaleOverlays(documentRef) {
   documentRef.getElementById?.('ciao-v233-match-center-overlay')?.setAttribute('hidden','');
 }
 
@@ -75,7 +74,7 @@ export function installRound16Runtime(documentRef = globalThis.document) {
     const nav=event.target?.closest?.('button[data-tab]');
     if (nav) {
       const tab=nav.dataset?.tab;
-      hideStaleOverlays(documentRef,tab);
+      hideStaleOverlays(documentRef);
       if (tab === 'seriea') primeTablesOverlay(documentRef);
     }
     stabilizeTournamentBack(documentRef,event);
