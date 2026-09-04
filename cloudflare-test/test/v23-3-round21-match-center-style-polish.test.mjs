@@ -45,4 +45,7 @@ test('Round 21 external tournament theme outranks legacy #ciao-miniapp-root blue
   }
   assert.match(source, /border-color:var\(--cw233-mc-border\)/);
   assert.match(source, /data-cw233-mc-competition="coppa_italia"[\s\S]*--cw233-mc-border:rgba\(231,7,46,/);
+  for (const key of ['ucl', 'uel', 'uecl']) {
+    assert.match(source, new RegExp(`data-cw233-mc-competition="${key}"`), `${key} must have its own canonical tournament theme`);
+  }
 });
