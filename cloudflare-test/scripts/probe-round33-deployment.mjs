@@ -82,6 +82,7 @@ export async function probeRound33Deployment({ fetchImpl = fetch, writeArtifact 
     status:round35Response.status,
     responseOk:round35Response.ok,
     buildMarker:round35Text.includes("ROUND35_MATCH_CENTER_BUILD = '2026-09-04-r35'"),
+    round36SerieAHeaderMarker:round35Text.includes("ROUND36_SERIE_A_HEADER_BUILD = '2026-09-04-r36'"),
     externalFormSectionRemoval:round35Text.includes("querySelector?.('[data-mc-tab-content=\"overview\"]')")
       && round35Text.includes("querySelectorAll?.('.cw14-form-card')")
       && round35Text.includes("closest?.('.mc-section')")
@@ -97,6 +98,7 @@ export async function probeRound33Deployment({ fetchImpl = fetch, writeArtifact 
       && round35Text.includes('--cw233-serie-context-bg:#071626')
       && round35Text.includes('--cw233-serie-context-accent:#0c5aa8')
       && round35Text.includes('--cw233-serie-context-accent-2:#287fc7'),
+    serieAParentHeaderHidden:/#ciao-miniapp-root\.match-center-open\s+\.cw232-competition\[data-cw232-competition="serie_a"\]\s*>\s*\.cw232-competition__head\s*\{\s*display:none!important/.test(round35Text),
     lateMutationGuard:round35Text.includes('new Observer')
       && round35Text.includes('{ childList:true, subtree:true }')
       && round35Text.includes('removeRound35ExternalOverviewForm(root)'),
@@ -118,9 +120,11 @@ export async function probeRound33Deployment({ fetchImpl = fetch, writeArtifact 
     round35Import.afterRound31,
     round35.responseOk,
     round35.buildMarker,
+    round35.round36SerieAHeaderMarker,
     round35.externalFormSectionRemoval,
     round35.externalFormCssFailsafe,
     round35.serieAContextPalette,
+    round35.serieAParentHeaderHidden,
     round35.lateMutationGuard,
   ];
 
