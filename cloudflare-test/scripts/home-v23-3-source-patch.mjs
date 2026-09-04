@@ -110,6 +110,13 @@ let __cw233ExternalMatchContext = null;
 const __cw233LegacyFinalRefresh = refreshMatchCenter;
 const __cw233LegacyFinalClose = closeMatchCenter;
 
+function __cw233ExternalRuntimeId(detail){
+  const canonical = String(detail?.matchId || detail?.data?.match_id || detail?.data?.match?.id || '').trim();
+  const tail = canonical.includes(':') ? canonical.slice(canonical.lastIndexOf(':') + 1) : canonical;
+  const value = Number(tail);
+  return Number.isFinite(value) && value > 0 ? value : 1;
+}
+
 refreshMatchCenter = async function(){
   if (!__cw233ExternalMatchContext) return __cw233LegacyFinalRefresh();
   if (!matchViewId || matchLoading || document.hidden || String(matchData?.status ?? '').toLowerCase() === 'finished') return;
@@ -147,7 +154,7 @@ globalThis.addEventListener?.('ciao-v233-open-external-legacy-match', event => {
   };
   root.dataset.cw233McCompetition = __cw233ExternalMatchContext.competition;
   matchReturnTab = tab;
-  matchViewId = -1;
+  matchViewId = __cw233ExternalRuntimeId(detail);
   matchCenterTab = 'overview';
   matchData = detail.data;
   root.classList.add('match-center-open');
@@ -205,6 +212,7 @@ function __cw233RestoreMatchesOverlay(context){
 }
 
 globalThis.addEventListener?.('ciao-v233-open-external-legacy-match', __cw233SuspendMatchesOverlay);
+globalThis.addEventListener?.('ciao-v233-open-serie-a-match', __cw233SuspendMatchesOverlay);
 
 const __cw233R21FinalClose = closeMatchCenter;
 closeMatchCenter = function(){

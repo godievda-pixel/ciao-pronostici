@@ -1,5 +1,5 @@
 const STYLE_ID = 'cw233-legacy-match-center-theme';
-export const LEGACY_MATCH_CENTER_THEME_BUILD = 'r23-final-themes';
+export const LEGACY_MATCH_CENTER_THEME_BUILD = 'r28-match-center-fixes';
 
 export const LEGACY_MATCH_CENTER_THEME_KEYS = Object.freeze({
   coppa_italia:'coppa_italia',
@@ -78,12 +78,15 @@ const CSS = `
   --cw233-mc-glow-2:rgba(85,214,142,.14);
 }
 
-/* Remove the old Serie A blue frame/background from the full Match Center viewport. */
+/* The Match Center owns the viewport: no inherited frame from the legacy shell. */
 #ciao-miniapp-root.match-center-open .mc-shell {
   background:
     radial-gradient(90% 46% at 12% -8%, var(--cw233-mc-glow), transparent 68%),
     radial-gradient(90% 46% at 90% -4%, var(--cw233-mc-glow-2), transparent 70%),
     var(--cw233-mc-bg) !important;
+  border:0!important;
+  outline:0!important;
+  border-radius:0!important;
   box-shadow:none!important;
 }
 #ciao-miniapp-root.match-center-open .mc-toolbar {
@@ -91,10 +94,9 @@ const CSS = `
   border-bottom:0!important;
   box-shadow:none!important;
 }
-#ciao-miniapp-root.match-center-open:not([data-cw233-mc-competition]) .mc-back {
-  display:none!important;
-}
+/* The back control inside the Match Center is the only back control that remains. */
 #ciao-miniapp-root.match-center-open .mc-back {
+  display:flex!important;
   border-color:var(--cw233-mc-border)!important;
   background:var(--cw233-mc-surface)!important;
 }
@@ -174,8 +176,19 @@ const CSS = `
 #ciao-miniapp-root.match-center-open .mc-event {
   background:var(--cw233-mc-surface)!important;
 }
+/* Premium context cards: the old cw14 blocks now inherit the active competition rather than legacy blue. */
 #ciao-miniapp-root.match-center-open .cw14-info-item,
-#ciao-miniapp-root.match-center-open .cw14-form-card,
+#ciao-miniapp-root.match-center-open .cw14-form-card {
+  border:1px solid color-mix(in srgb,var(--cw233-mc-accent) 36%,transparent)!important;
+  border-radius:18px!important;
+  background:linear-gradient(145deg,
+    color-mix(in srgb,var(--cw233-mc-accent) 14%,var(--cw233-mc-bg)),
+    color-mix(in srgb,var(--cw233-mc-accent-2) 8%,var(--cw233-mc-bg)))!important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.025),
+    0 10px 28px color-mix(in srgb,var(--cw233-mc-accent) 9%,transparent)!important;
+  backdrop-filter:blur(14px)!important;
+}
 #ciao-miniapp-root.match-center-open .cw20-stat-mini,
 #ciao-miniapp-root.match-center-open .cw20-player-row,
 #ciao-miniapp-root.match-center-open .cw20-event-card {

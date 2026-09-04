@@ -54,10 +54,10 @@ export async function probeRound23Deployment({ fetchImpl = fetch, writeArtifact 
     responseOk:matchCenterResponse.ok,
     serieAPalette:matchCenterText.includes('--cw233-mc-accent:#0c5aa8')
       && matchCenterText.includes('--cw233-mc-accent-2:#287fc7'),
-    duplicateBackRemoved:blockHas(
+    backControlVisible:blockHas(
       matchCenterText,
-      '#ciao-miniapp-root.match-center-open:not([data-cw233-mc-competition]) .mc-back',
-      'display:none!important',
+      '#ciao-miniapp-root.match-center-open .mc-back',
+      'display:flex!important',
     ),
     toolbarFrameRemoved:blockHas(
       matchCenterText,
@@ -96,7 +96,7 @@ export async function probeRound23Deployment({ fetchImpl = fetch, writeArtifact 
     home.round23StateMarker,
     matchCenter.responseOk,
     matchCenter.serieAPalette,
-    matchCenter.duplicateBackRemoved,
+    matchCenter.backControlVisible,
     matchCenter.toolbarFrameRemoved,
     matchCenter.contextSurfacesThemed,
     matchCenter.lineupSwitchThemed,
