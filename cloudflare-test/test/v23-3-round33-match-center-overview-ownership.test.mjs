@@ -4,13 +4,19 @@ import { readFile } from 'node:fs/promises';
 
 const read = path => readFile(new URL(path, import.meta.url), 'utf8');
 
-test('Round 33 external Overview preserves useful legacy blocks and removes only Serie A context/form', async () => {
+test('external Overview removes only Form and leaves every other legacy block intact', async () => {
   const patch = await read('../scripts/home-v23-3-source-patch.mjs');
-  assert.match(patch, /__cw233Round33SanitizeExternalOverviewHtml/);
-  assert.match(patch, /matchTabContent/);
-  assert.match(patch, /cw14-form-card/);
-  assert.match(patch, /Контекст\\\\s\+Серии/);
-  assert.doesNotMatch(patch, /querySelectorAll\?\.\(['"]\.cw14-form-card,\.cw14-match-info['"]\)/);
+  const start = patch.indexOf('function __cw233Round33IsFormSection');
+  const end = patch.indexOf('matchTabContent = function', start);
+  assert.ok(start >= 0, 'Form section detector must exist');
+  assert.ok(end > start, 'external Overview sanitizer block must be present');
+  const sanitizer = patch.slice(start, end);
+
+  assert.match(sanitizer, /cw14-form-card/);
+  assert.match(sanitizer, /Форма/);
+  assert.doesNotMatch(sanitizer, /Контекст/);
+  assert.doesNotMatch(sanitizer, /Серии/);
+  assert.match(patch, /if \(!__cw233ExternalMatchContext \|\| String\(key \|\| ''\) !== 'overview'\) return html/);
 });
 
 test('Round 33 runtime no longer replaces external Overview with the minimal Round31 renderer', async () => {
