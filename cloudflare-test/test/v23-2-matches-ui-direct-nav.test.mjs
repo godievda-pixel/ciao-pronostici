@@ -125,3 +125,26 @@ test('matches overlay mounts inside the miniapp root so it cannot sit behind the
   assert.ok(mounted, 'overlay must be mounted inside #ciao-miniapp-root');
   assert.equal(mounted.id, 'ciao-v232-matches-overlay');
 });
+
+test('default calendar navigation exposes the new Matches hub before the browser can paint legacy calendar', async () => {
+  const { documentRef, documentListeners, nodes } = fakeDocument([]);
+  installMatchesUi(documentRef);
+
+  const capture = documentListeners.find(item => item.type === 'click' && item.options === true);
+  assert.ok(capture, 'calendar navigation must be observed in capture phase');
+
+  const calendar = { dataset: { tab: 'calendar' } };
+  capture.handler({
+    target: {
+      closest(selector) {
+        return selector === 'button[data-tab]' ? calendar : null;
+      },
+    },
+  });
+
+  await Promise.resolve();
+
+  const overlay = nodes.get('ciao-v232-matches-overlay');
+  assert.equal(overlay.hidden, false);
+  assert.match(overlay.innerHTML, /data-cw232-view="hub"/);
+});
