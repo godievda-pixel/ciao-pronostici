@@ -225,6 +225,7 @@ export function createMatchCenterStore({
     if (!canonicalCompetition || !canonicalMatchId) throw new Error('match_center_target_required');
 
     generation += 1;
+    const token = generation;
     clearPoll();
     state = {
       open:true,
@@ -239,7 +240,16 @@ export function createMatchCenterStore({
       updatedAt:null,
     };
     emit();
-    return loadBase({ force:false, revealLoading:false, schedule:true });
+
+    await loadBase({ force:false, revealLoading:false, schedule:false });
+    if (!isCurrent(token, canonicalCompetition, canonicalMatchId)) return getState();
+
+    if (state.match && SECTION_SET.has(state.activeTab)) {
+      await loadSection(state.activeTab, { force:false });
+    }
+
+    if (isCurrent(token, canonicalCompetition, canonicalMatchId)) schedulePoll();
+    return getState();
   }
 
   function close() {
