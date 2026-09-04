@@ -78,10 +78,10 @@ function participantRoster(authenticated) {
 function favoriteTeamMap(authenticated) {
   const byId = new Map();
   const currentId = text(authenticated?.userId);
-  if (currentId) byId.set(currentId, authenticated?.favoriteTeam || null);
+  if (currentId && authenticated?.favoriteTeam) byId.set(currentId, authenticated.favoriteTeam);
   for (const participant of Array.isArray(authenticated?.participants) ? authenticated.participants : []) {
     const userId = text(participant?.userId);
-    if (userId) byId.set(userId, participant?.favoriteTeam || null);
+    if (userId && participant?.favoriteTeam) byId.set(userId, participant.favoriteTeam);
   }
   return byId;
 }
@@ -323,11 +323,15 @@ export function createPredictionService({ request, env, now = new Date(), deps =
       const payload = await internalJson(stub, `/rankings?${params}`);
       const ranking = Array.isArray(payload.ranking) ? payload.ranking : [];
       const clubs = favoriteTeamMap(authenticated);
-      return ranking.map(row => ({
-        ...row,
-        favorite_team: clubs.get(text(row?.user_id)) || null,
-        is_current:text(row?.user_id) === authenticated.userId,
-      }));
+      return ranking.map(row => {
+        const enriched = {
+          ...row,
+          is_current:text(row?.user_id) === authenticated.userId,
+        };
+        const favoriteTeam = clubs.get(text(row?.user_id));
+        if (favoriteTeam) enriched.favorite_team = favoriteTeam;
+        return enriched;
+      });
     } catch (error) { throw mapError(error); }
   }
 
@@ -340,7 +344,9 @@ export function createPredictionService({ request, env, now = new Date(), deps =
       const params = new URLSearchParams({ user_id:authenticated.userId });
       const payload = await internalJson(stub, `/rankings/me?${params}`);
       if (!payload.ranking || typeof payload.ranking !== 'object') return null;
-      return { ...payload.ranking, favorite_team:authenticated.favoriteTeam || null };
+      const ranking = { ...payload.ranking };
+      if (authenticated.favoriteTeam) ranking.favorite_team = authenticated.favoriteTeam;
+      return ranking;
     } catch (error) { throw mapError(error); }
   }
 
