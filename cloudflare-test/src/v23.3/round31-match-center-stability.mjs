@@ -1,4 +1,5 @@
 export const USER_FEEDBACK_ROUND31_BUILD = '2026-09-04-r31';
+export const USER_FEEDBACK_ROUND32_BUILD = '2026-09-04-r32';
 
 const STYLE_ID = 'ciao-v233-round31-match-center-stability';
 const OWNED_CLASS = 'cw233-r31-match-center-owned';
@@ -125,7 +126,7 @@ export function renderRound31ExternalOverview(snapshot = {}) {
 }
 
 export const ROUND31_CSS = `
-/* Match Center owns the viewport even if the legacy root class is briefly rewritten. */
+/* Match Center owns only the visual viewport. Overlay hidden/aria state stays with the legacy lifecycle. */
 html.${OWNED_CLASS} #ciao-v232-matches-overlay{
   display:none!important;
   visibility:hidden!important;
@@ -263,24 +264,27 @@ export function installRound31MatchCenterStability(
   let lastSnapshotSignature = '';
   let rendering = false;
 
-  const claimViewport = () => {
-    html?.classList?.add?.(OWNED_CLASS);
-    const overlay = documentRef.getElementById('ciao-v232-matches-overlay');
-    if (overlay && overlay.hidden !== true) overlay.hidden = true;
-    if (overlay?.getAttribute?.('aria-hidden') !== 'true') overlay?.setAttribute?.('aria-hidden', 'true');
-  };
-
-  const releaseViewportIfClosed = () => {
-    if (root.classList?.contains?.('match-center-open')) return;
+  const syncViewportOwnership = () => {
+    const open = !!root.classList?.contains?.('match-center-open');
+    if (open) {
+      html?.classList?.add?.(OWNED_CLASS);
+      return true;
+    }
     html?.classList?.remove?.(OWNED_CLASS);
     activeExternal = null;
+    lastSnapshotSignature = '';
+    return false;
+  };
+
+  const afterLegacyOpen = callback => {
+    const defer = windowRef.queueMicrotask || (fn => Promise.resolve().then(fn));
+    defer(callback);
   };
 
   const renderExternalOverview = () => {
     if (rendering || !activeExternal || !root.classList?.contains?.('match-center-open')) return;
     rendering = true;
     try {
-      claimViewport();
       removeExternalSerieASurfaces(root);
       if (!activeOverview(root)) return;
       const host = root.querySelector?.('[data-mc-tab-content]');
@@ -299,15 +303,17 @@ export function installRound31MatchCenterStability(
     if (!isRound31ExternalCompetition(competition) || !detail?.data) return;
     activeExternal = { competition, matchId:String(detail?.matchId || ''), data:detail.data };
     lastSnapshotSignature = externalMatchCenterSnapshotSignature(detail.data);
-    claimViewport();
-    setOverviewTabState(root, root.querySelector?.('[data-mc-tab="overview"]'));
-    renderExternalOverview();
+    afterLegacyOpen(() => {
+      if (!syncViewportOwnership() || !activeExternal) return;
+      setOverviewTabState(root, root.querySelector?.('[data-mc-tab="overview"]'));
+      renderExternalOverview();
+    });
   };
 
   const onSerieAOpen = () => {
     activeExternal = null;
     lastSnapshotSignature = '';
-    claimViewport();
+    afterLegacyOpen(syncViewportOwnership);
   };
 
   const onClick = event => {
@@ -322,10 +328,7 @@ export function installRound31MatchCenterStability(
       renderExternalOverview();
       return;
     }
-    if (event?.target?.closest?.('.mc-back')) {
-      const defer = windowRef.queueMicrotask || (fn => Promise.resolve().then(fn));
-      defer(releaseViewportIfClosed);
-    }
+    if (event?.target?.closest?.('.mc-back')) afterLegacyOpen(syncViewportOwnership);
   };
   documentRef.addEventListener('click', onClick, true);
 
@@ -355,17 +358,15 @@ export function installRound31MatchCenterStability(
   const MutationObserverCtor = windowRef.MutationObserver;
   const observer = typeof MutationObserverCtor === 'function'
     ? new MutationObserverCtor(() => {
-        if (root.classList?.contains?.('match-center-open')) {
-          claimViewport();
-          if (activeExternal) renderExternalOverview();
-        } else {
-          releaseViewportIfClosed();
+        const open = syncViewportOwnership();
+        if (open && activeExternal) {
+          setOverviewTabState(root, root.querySelector?.('[data-mc-tab="overview"]'));
+          renderExternalOverview();
         }
       })
     : null;
-  observer?.observe?.(root, { subtree:true, childList:true, attributes:true, attributeFilter:['class','hidden','aria-selected','data-mc-tab-content'] });
-  const matchesOverlay = documentRef.getElementById('ciao-v232-matches-overlay');
-  if (matchesOverlay) observer?.observe?.(matchesOverlay, { attributes:true, attributeFilter:['hidden','aria-hidden'] });
+  observer?.observe?.(root, { attributes:true, attributeFilter:['class'] });
+  syncViewportOwnership();
 
   return Object.freeze({
     disconnect(){
