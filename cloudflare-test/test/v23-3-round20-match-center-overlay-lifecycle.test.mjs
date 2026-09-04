@@ -40,8 +40,11 @@ test('Round 20 restores the suspended Matches overlay after the real legacy Matc
   assert.match(patched, /__cw233RestoreMatchesOverlay\(context\)/);
   assert.match(patched, /matchesOverlay\.hidden\s*=\s*false/);
   assert.match(patched, /matchesOverlay\.scrollTop\s*=\s*context\.matchesOverlayScrollTop/);
+  const closeWrapperAt = patched.indexOf('const __cw233R21FinalClose = closeMatchCenter');
+  assert.ok(closeWrapperAt >= 0);
+  const closeWrapper = patched.slice(closeWrapperAt);
   assert.ok(
-    patched.indexOf('const result = __cw233R21FinalClose()') < patched.indexOf('__cw233RestoreMatchesOverlay(context)'),
+    closeWrapper.indexOf('const result = __cw233R21FinalClose()') < closeWrapper.indexOf('__cw233RestoreMatchesOverlay(context)'),
     'Legacy Match Center must close before the suspended Matches overlay is restored',
   );
 });
