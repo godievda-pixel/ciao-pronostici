@@ -68,7 +68,7 @@ test('prediction UI exposes progressive competition loading so one slow provider
   assert.deepEqual(snapshots.at(-1), ['serie_a', 'ucl']);
 });
 
-test('all standings expose the full football stat line: #, team, played, W, D, L, goals, GD and points', () => {
+test('all standings expose the Round 38 compact football stat line: #, team, played, GD and points', () => {
   const row = {
     position:1,
     team:{ id:'65', name:'Рома', crestUrl:'https://img.test/roma.png' },
@@ -84,19 +84,20 @@ test('all standings expose the full football stat line: #, team, played, W, D, L
 
   for (const competition of ['serie_a', 'ucl', 'uel', 'uecl']) {
     const html = renderTablesHub({ selectedCompetition:competition, data:{ rows:[row] } });
-    assert.match(html, /<th>#<\/th><th>Команда<\/th><th>И<\/th><th>В<\/th><th>Н<\/th><th>П<\/th><th>Г<\/th><th>РМ<\/th><th>О<\/th>/);
-    assert.match(html, /data-cw233-stat="wins">2<\/td>/);
-    assert.match(html, /data-cw233-stat="draws">0<\/td>/);
-    assert.match(html, /data-cw233-stat="losses">0<\/td>/);
-    assert.match(html, /data-cw233-stat="goals">6:2<\/td>/);
+    assert.match(html, /<th>#<\/th><th>Команда<\/th><th>И<\/th><th>РМ<\/th><th>О<\/th>/);
+    assert.doesNotMatch(html, /data-cw233-stat="wins"|data-cw233-stat="draws"|data-cw233-stat="losses"|data-cw233-stat="goals"/);
+    assert.match(html, /data-cw233-stat="played">2<\/td>/);
+    assert.match(html, /data-cw233-stat="goal-difference">4<\/td>/);
+    assert.match(html, /data-cw233-stat="points">6<\/td>/);
     assert.match(html, /cw233-standing-goal-difference/);
   }
 });
 
-test('table selectors keep the v22.5 clean horizontal scroller without a visible scrollbar', async () => {
+test('table selectors fit as one five-column strip without a horizontal scrollbar', async () => {
   const source = await readFile(new URL('../src/v23.3/tables-ui.mjs', import.meta.url), 'utf8');
-  assert.match(source, /\.cw233-table-selectors-viewport[^}]*scrollbar-width:none/);
-  assert.match(source, /\.cw233-table-selectors-viewport::-webkit-scrollbar\{display:none/);
+  assert.match(source, /\.cw233-table-selectors-viewport\{[^}]*overflow:hidden/);
+  assert.match(source, /\.cw233-table-selectors\{[^}]*grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/);
+  assert.doesNotMatch(source, /\.cw233-table-selectors-viewport[^}]*scrollbar-width:none/);
 });
 
 test('Serie A standings enrich missing crests from the stable Serie A schedule instead of rendering initials', async () => {
