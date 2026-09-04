@@ -34,16 +34,16 @@ test('Round 21 legacy Match Center logo helper renders BSD crest URLs before emo
   assert.match(patched, /⚽/);
 });
 
-test('Round 21 external tournament theme outranks legacy #ciao-miniapp-root blue borders', () => {
+test('Round 21 tournament theme outranks legacy #ciao-miniapp-root blue borders for every Match Center', () => {
   const source = readFileSync(new URL('../src/v23.3/legacy-match-center-theme.mjs', import.meta.url), 'utf8');
   for (const selector of ['.mc-toolbar', '.mc-hero', '.mc-tabs', '.mc-section']) {
     assert.ok(
-      source.includes(`#ciao-miniapp-root[data-cw233-mc-competition] ${selector}`),
-      `${selector} must be themed with root-id specificity`,
+      source.includes(`#ciao-miniapp-root.match-center-open ${selector}`),
+      `${selector} must be themed through the shared Match Center root`,
     );
   }
   assert.match(source, /border-color:var\(--cw233-mc-border\)/);
-  assert.match(source, /data-cw233-mc-competition="coppa_italia"[\s\S]*--cw233-mc-border:rgba\(231,7,46,/);
+  assert.match(source, /data-cw233-mc-competition="coppa_italia"[\s\S]*--cw233-mc-border:rgba\(206,43,55,/);
   for (const key of ['ucl', 'uel', 'uecl']) {
     assert.match(source, new RegExp(`data-cw233-mc-competition="${key}"`), `${key} must have its own canonical tournament theme`);
   }
