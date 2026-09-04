@@ -30,8 +30,8 @@ test('Round 30 keeps Overall/All neutral while tournament scopes keep tournament
   assert.equal(round30SurfaceTheme('ranking', 'ucl'), 'champions');
   assert.equal(round30SurfaceTheme('ranking', 'uel'), 'europa');
   assert.equal(round30SurfaceTheme('ranking', 'uecl'), 'conference');
-  assert.match(ROUND30_CSS, /data-cw233-rank-filter='overall'[^\]]*aria-selected='true'/);
-  assert.match(ROUND30_CSS, /data-cw233-filter='all'[^\]]*aria-selected='true'/);
+  assert.match(ROUND30_CSS, /\[data-cw233-rank-filter='overall'\]\[aria-selected='true'\]/);
+  assert.match(ROUND30_CSS, /\[data-cw233-filter='all'\]\[aria-selected='true'\]/);
   assert.match(ROUND30_CSS, /--r11soft/);
   assert.match(ROUND30_CSS, /\.cw233-ranking-row/);
   assert.match(ROUND30_CSS, /\.cw233-ranking-hero/);
