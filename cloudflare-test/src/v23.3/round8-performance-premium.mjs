@@ -33,8 +33,8 @@ const ROUND8_CSS = `
 #ciao-v232-matches-overlay .cw232-competition[data-cw232-theme='conference']{--cw232-accent:#24c873;--cw232-accent-2:#087844;--cw232-soft:rgba(36,200,115,.14);--cw232-border:rgba(73,216,139,.27);--cw232-glow:rgba(22,163,91,.2);--cw232-surface:rgba(13,48,35,.92)}
 #ciao-v232-matches-overlay .cw232-competition__head{margin-bottom:2px}
 #ciao-v232-matches-overlay .cw232-group-tabs{gap:9px;padding:3px 1px 17px;scroll-snap-type:x proximity}
-#ciao-v232-matches-overlay .cw232-group-tabs button{min-width:54px;height:46px;padding:0 16px;border-radius:14px;border:1px solid rgba(121,145,212,.13);background:linear-gradient(180deg,rgba(28,43,87,.9),rgba(15,27,62,.9));color:#fff;font-size:12px;font-weight:850;scroll-snap-align:start;box-shadow:inset 0 1px 0 rgba(255,255,255,.025)}
-#ciao-v232-matches-overlay .cw232-group-tabs button[aria-selected='true']{background:linear-gradient(145deg,var(--cw232-accent),var(--cw232-accent-2));border-color:rgba(255,255,255,.2);box-shadow:0 9px 24px var(--cw232-glow),inset 0 1px 0 rgba(255,255,255,.22)}
+#ciao-v232-matches-overlay .cw232-group-tabs button{min-width:54px;height:46px;padding:0 16px;border-radius:14px;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.10);color:rgba(255,255,255,.86);font-size:12px;font-weight:850;scroll-snap-align:start;box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}
+#ciao-v232-matches-overlay .cw232-group-tabs button[aria-selected='true']{background:linear-gradient(145deg,var(--cw232-match-accent),var(--cw232-match-accent-2));border-color:rgba(255,255,255,.2);box-shadow:0 9px 24px color-mix(in srgb,var(--cw232-match-accent) 28%,transparent),inset 0 1px 0 rgba(255,255,255,.22);color:#fff}
 #ciao-v232-matches-overlay .cw232-stage__title{margin:2px 0 11px;align-items:baseline}
 #ciao-v232-matches-overlay .cw232-stage__title h3{font-size:22px;line-height:1.05;letter-spacing:-.045em;font-weight:900}
 #ciao-v232-matches-overlay .cw232-stage__title span{font-size:10px;color:#8ca5ef;opacity:1}
@@ -42,7 +42,7 @@ const ROUND8_CSS = `
 #ciao-v232-matches-overlay .cw232-match-card{position:relative;min-height:138px;padding:13px 14px 17px;border-radius:22px;border:1px solid var(--cw232-border);background:radial-gradient(circle at 50% -28%,var(--cw232-soft),transparent 58%),linear-gradient(145deg,var(--cw232-surface),rgba(7,16,42,.94));box-shadow:0 14px 32px rgba(0,0,0,.17),inset 0 1px 0 rgba(255,255,255,.025);overflow:hidden;backdrop-filter:blur(15px)}
 #ciao-v232-matches-overlay .cw232-match-card:before{content:'';position:absolute;inset:0 auto 0 0;width:2px;background:linear-gradient(180deg,transparent,var(--cw232-accent),transparent);opacity:.7}
 #ciao-v232-matches-overlay .cw232-match-card__topline{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:25px;margin-bottom:8px}
-#ciao-v232-matches-overlay .cw232-match-card__status{display:inline-flex;align-items:center;min-height:24px;padding:0 9px;border:1px solid var(--cw232-border);border-radius:999px;background:var(--cw232-soft);font-size:9px;line-height:1;font-weight:900;letter-spacing:.035em;text-transform:uppercase;color:#d8e1ff;white-space:nowrap}
+#ciao-v232-matches-overlay .cw232-match-card__status{display:inline-flex;align-items:center;min-height:24px;padding:0 9px;border:1px solid color-mix(in srgb,var(--cw232-match-accent) 55%,transparent);border-radius:999px;background:linear-gradient(135deg,color-mix(in srgb,var(--cw232-match-accent) 22%,transparent),color-mix(in srgb,var(--cw232-match-accent-2) 16%,transparent));font-size:9px;line-height:1;font-weight:900;letter-spacing:.035em;text-transform:uppercase;color:#fff;white-space:nowrap}
 #ciao-v232-matches-overlay .cw232-match-card__kickoff{font-size:10px;font-weight:850;color:#a9bcff;font-variant-numeric:tabular-nums;white-space:nowrap}
 #ciao-v232-matches-overlay .cw232-match-card__teams{grid-template-columns:minmax(0,1fr) 84px minmax(0,1fr);gap:8px;align-items:center}
 #ciao-v232-matches-overlay .cw232-match-team,#ciao-v232-matches-overlay .cw232-match-team--away{flex-direction:column;justify-content:center;gap:6px;text-align:center}
@@ -89,6 +89,10 @@ function matchStatusLabel(card) {
 
 function decorateMatchCard(card) {
   if (!card || card.dataset?.cw233Round8 === '1') return;
+  if (card.querySelector?.('.cw232-match-card__meta')) {
+    if (card.dataset) card.dataset.cw233Round8 = '1';
+    return;
+  }
   const center = card.querySelector?.('.cw232-match-card__center');
   const score = card.querySelector?.('.cw232-match-card__score');
   const meta = center?.querySelector?.('small');
