@@ -9,6 +9,7 @@ import { installCanonicalMatchLinks } from './match-center-links.mjs';
 import { rememberMatchBootstrap } from './match-bootstrap-cache.mjs';
 
 const DEFAULT_TTL_MS = 60_000;
+const HOME_SETTLED_EVENT = 'ciao-v233-home-settled';
 
 function esc(value) {
   return String(value ?? '')
@@ -83,26 +84,14 @@ function renderCard(match, timeZone) {
   </article>`;
 }
 
-function renderHomeBootstrapCard() {
-  return `<article class="cw231-today-card cw233-home-bootstrap-card" aria-hidden="true">
-    <div class="cw231-today-card-top"><span class="cw231-today-competition">&nbsp;</span><time>&nbsp;</time></div>
-    <div class="cw231-today-match">
-      <div class="cw231-today-team"><span class="cw231-today-logo-placeholder"></span><b>&nbsp;</b></div>
-      <div class="cw231-today-score"><strong class="cw231-today-score-value">—</strong><span class="cw231-today-score-status">&nbsp;</span></div>
-      <div class="cw231-today-team away"><b>&nbsp;</b><span class="cw231-today-logo-placeholder"></span></div>
-    </div>
-    <div class="cw231-today-bottom"><span>&nbsp;</span><button type="button" tabindex="-1">&nbsp;</button></div>
-  </article>`;
-}
-
-export function renderHomeBootstrapSection() {
-  return `<section class="cw231-today cw231-today-premium cw233-home-view cw233-home-bootstrap" data-cw233-home aria-busy="true">
+export function renderHomeBootstrapSection({ failed = false } = {}) {
+  return `<section class="cw231-today cw231-today-premium cw233-home-view cw233-home-bootstrap" data-cw233-home aria-busy="${failed ? 'false' : 'true'}">
     <div class="cw231-today-glow" aria-hidden="true"></div>
     <div class="cw231-today-head">
       <div class="cw231-today-heading"><h2>Кальчо сегодня</h2><p class="cw231-today-subtitle">Матчи и события дня · все турниры</p></div>
-      <time aria-hidden="true">&nbsp;</time>
+      <time aria-hidden="true"></time>
     </div>
-    <div class="cw231-today-list">${renderHomeBootstrapCard()}${renderHomeBootstrapCard()}</div>
+    ${failed ? '<div class="cw231-empty"><div class="cw231-empty__title">Данные матчей временно недоступны</div></div>' : '<div class="cw233-home-wait" aria-hidden="true"></div>'}
   </section>`;
 }
 
@@ -127,12 +116,24 @@ export function renderHomeTodaySection(matches = [], { now = new Date(), timeZon
   </section>`;
 }
 
-function dispatchUpdated(target) {
-  if (typeof target?.dispatchEvent !== 'function') return;
+function dispatchEvent(target, name) {
+  if (typeof target?.dispatchEvent !== 'function') return false;
   try {
     const EventCtor = target?.Event || globalThis.Event;
-    if (typeof EventCtor === 'function') target.dispatchEvent(new EventCtor('ciao-v233-home-updated'));
-  } catch {}
+    if (typeof EventCtor !== 'function') return false;
+    target.dispatchEvent(new EventCtor(name));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function dispatchUpdated(target) {
+  dispatchEvent(target, 'ciao-v233-home-updated');
+}
+
+function dispatchSettled(target) {
+  dispatchEvent(target, HOME_SETTLED_EVENT);
 }
 
 export function createHomeRuntime({
@@ -148,6 +149,8 @@ export function createHomeRuntime({
   let feeds = {};
   let errors = {};
   let hydrated = false;
+  let settled = false;
+  let failed = false;
   let loadedAt = 0;
   let pending = null;
 
@@ -155,6 +158,8 @@ export function createHomeRuntime({
     const matches = flattenCompetitionFeeds(feeds);
     return Object.freeze({
       hydrated,
+      settled,
+      failed,
       loading:Boolean(pending),
       loadedAt,
       data:Object.freeze({ ...feeds }),
@@ -164,13 +169,23 @@ export function createHomeRuntime({
     });
   };
 
+  const markSettled = () => {
+    if (settled) return;
+    settled = true;
+    dispatchSettled(dispatchTarget);
+  };
+
   const ensure = ({ force = false } = {}) => {
     if (pending) return pending;
     const current = validDate(now());
     const currentMs = current.getTime();
-    if (hydrated && !force && currentMs - loadedAt < Math.max(0, Number(ttlMs) || 0)) return Promise.resolve(snapshot());
+    if (hydrated && !force && currentMs - loadedAt < Math.max(0, Number(ttlMs) || 0)) {
+      markSettled();
+      return Promise.resolve(snapshot());
+    }
 
     const { from, to } = seasonRange(current);
+    failed = false;
     pending = loadAllCompetitionMatches({ loadMatches, from, to })
       .then(result => {
         const nextFeeds = { ...feeds };
@@ -183,8 +198,14 @@ export function createHomeRuntime({
         loadedAt = currentMs;
         return snapshot();
       })
+      .catch(error => {
+        failed = true;
+        errors = { ...errors, home:String(error?.message || error || 'home_load_failed') };
+        throw error;
+      })
       .finally(() => {
         pending = null;
+        markSettled();
         dispatchUpdated(dispatchTarget);
       });
     return pending;
@@ -192,7 +213,7 @@ export function createHomeRuntime({
 
   const state = () => snapshot();
   const html = () => {
-    if (!hydrated) return renderHomeBootstrapSection();
+    if (!hydrated) return renderHomeBootstrapSection({ failed:settled && failed });
     return renderHomeTodaySection(flattenCompetitionFeeds(feeds), { now:validDate(now()), timeZone });
   };
 
