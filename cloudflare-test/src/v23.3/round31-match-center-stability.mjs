@@ -59,6 +59,7 @@ function snapshotPlayers(snapshot) {
 
 export function externalMatchCenterSnapshotSignature(snapshot = {}) {
   const match = snapshot?.match && typeof snapshot.match === 'object' ? snapshot.match : {};
+  const detail = snapshot?.detail && typeof snapshot.detail === 'object' ? snapshot.detail : {};
   const home = legacyStats(snapshot, 'home');
   const away = legacyStats(snapshot, 'away');
   const incidents = snapshotEvents(snapshot);
@@ -67,7 +68,12 @@ export function externalMatchCenterSnapshotSignature(snapshot = {}) {
     status:String(snapshot?.status || ''),
     id:String(snapshot?.match_id || match?.id || ''),
     score:[match?.home_score ?? null, match?.away_score ?? null],
-    minute:match?.live_elapsed ?? snapshot?.detail?.current_minute ?? null,
+    minute:match?.live_elapsed ?? detail?.current_minute ?? null,
+    detail:[
+      String(detail?.stadium || detail?.venue || '').trim(),
+      String(detail?.city || '').trim(),
+      String(detail?.referee || '').trim(),
+    ],
     home:[home.expected_goals ?? null, home.ball_possession ?? null, home.total_shots ?? null, home.shots_on_target ?? null],
     away:[away.expected_goals ?? null, away.ball_possession ?? null, away.total_shots ?? null, away.shots_on_target ?? null],
     incidents:incidents.map(item => [item?.type ?? '', item?.minute ?? null, item?.home_score ?? null, item?.away_score ?? null]),
