@@ -125,6 +125,39 @@ test('Round 40 Serie A worker can resolve rich overview after a summary-only bas
   ]);
 });
 
+test('Round 40 base coverage hints never disable idle tabs before the rich API is checked', () => {
+  const html = renderMatchCenterView({
+    open:true,
+    phase:'ready',
+    competition:'serie_a',
+    matchId:'serie_a:77',
+    activeTab:'overview',
+    match:{
+      competition:'serie_a',
+      matchId:'serie_a:77',
+      status:'scheduled',
+      kickoffAt:'2026-09-20T18:00:00Z',
+      homeTeam:{ name:'Интер', crestUrl:'' },
+      awayTeam:{ name:'Ювентус', crestUrl:'' },
+      score:{ home:null, away:null },
+      coverage:falseCoverage(),
+    },
+    sections:{ overview:null, stats:null, events:null, lineups:null, players:null },
+    sectionState:{
+      overview:{ status:'loading', error:'' },
+      stats:{ status:'idle', error:'' },
+      events:{ status:'idle', error:'' },
+      lineups:{ status:'idle', error:'' },
+      players:{ status:'unavailable', error:'' },
+    },
+  });
+
+  const statsButton = html.match(/<button[^>]*data-cw239-tab="stats"[^>]*>/)?.[0] || '';
+  const playersButton = html.match(/<button[^>]*data-cw239-tab="players"[^>]*>/)?.[0] || '';
+  assert.doesNotMatch(statsButton, /aria-disabled="true"/);
+  assert.match(playersButton, /aria-disabled="true"/);
+});
+
 test('Round 40 Match Center tabs are one premium segmented control themed by competition accent', () => {
   const html = renderMatchCenterView({
     open:true,
