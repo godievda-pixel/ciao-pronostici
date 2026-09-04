@@ -31,3 +31,19 @@ test('Round 28 external Match Center uses a positive legacy-compatible runtime i
   assert.match(homePatch, /function\s+__cw233ExternalRuntimeId\s*\(/);
   assert.match(homePatch, /matchViewId\s*=\s*__cw233ExternalRuntimeId\(detail\)\s*;/);
 });
+
+test('Round 28 Serie A context cards use premium competition surfaces instead of the old flat blue cards', async () => {
+  const theme = await read('../src/v23.3/legacy-match-center-theme.mjs');
+  assert.match(
+    theme,
+    /\.cw14-info-item,[\s\S]*?\.cw14-form-card\s*\{[\s\S]*?linear-gradient\(145deg,[\s\S]*?var\(--cw233-mc-accent\)[\s\S]*?var\(--cw233-mc-accent-2\)/,
+  );
+  assert.match(
+    theme,
+    /\.cw14-info-item,[\s\S]*?\.cw14-form-card\s*\{[\s\S]*?border:\s*1px solid color-mix\(in srgb,var\(--cw233-mc-accent\)/,
+  );
+  assert.match(
+    theme,
+    /\.cw14-info-item,[\s\S]*?\.cw14-form-card\s*\{[\s\S]*?box-shadow:/,
+  );
+});
