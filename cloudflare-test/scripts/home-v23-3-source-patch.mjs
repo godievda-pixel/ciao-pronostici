@@ -5,6 +5,7 @@ const EXTERNAL_MARKER = 'cw233-single-legacy-match-center-r20';
 const OVERLAY_LIFECYCLE_MARKER = 'cw233-external-match-overlay-lifecycle-r21';
 const LOGO_PATCH_MARKER = 'cw233-legacy-direct-crest-r22';
 const ROUND23_UNIFIED_STATE_MARKER = 'cw233-round23-unified-state-fixes';
+const ROUND33_MATCH_CENTER_MARKER = 'cw233-round33-match-center-overview-ownership';
 const LATE_MATCH_CENTER_MARKER = '/* ===== /Ciao, Web! v20.15 stable match center live patch ===== */';
 
 function replaceSeasonLabel(input) {
@@ -283,6 +284,106 @@ bindMatchCenter = function(){
   return source;
 }
 
+function applyRound33MatchCenterFixes(input) {
+  let source = String(input);
+  if (source.includes(ROUND33_MATCH_CENTER_MARKER)) return source;
+  if (!source.includes(ROUND23_UNIFIED_STATE_MARKER)) throw new Error('v23.3 round33 unified state anchor missing');
+
+  const oldSuspend = `function __cw233SuspendMatchesOverlay(){
+  const matchesOverlay = document.getElementById?.('ciao-v232-matches-overlay');
+  if (!matchesOverlay || matchesOverlay.hidden) {
+    __cw233R21MatchesOverlayState = null;
+    return;
+  }
+  __cw233R21MatchesOverlayState = {
+    matchesOverlayScrollTop:Number(matchesOverlay.scrollTop) || 0,
+  };
+  matchesOverlay.hidden = true;
+}`;
+  const newSuspend = `function __cw233SuspendMatchesOverlay(){
+  const matchesOverlay = document.getElementById?.('ciao-v232-matches-overlay');
+  if (!matchesOverlay) {
+    __cw233R21MatchesOverlayState = null;
+    return;
+  }
+  if (!__cw233R21MatchesOverlayState) {
+    __cw233R21MatchesOverlayState = {
+      matchesOverlayScrollTop:Number(matchesOverlay.scrollTop) || 0,
+    };
+  }
+  matchesOverlay.dataset.cw233MatchCenterSuspended = '1';
+  matchesOverlay.hidden = true;
+}`;
+  if (!source.includes(oldSuspend)) throw new Error('v23.3 round33 suspend anchor missing');
+  source = source.replace(oldSuspend, newSuspend);
+
+  const oldRestore = `function __cw233RestoreMatchesOverlay(context){
+  if (!context) return;
+  const matchesOverlay = document.getElementById?.('ciao-v232-matches-overlay');
+  if (!matchesOverlay) return;
+  matchesOverlay.hidden = false;
+  matchesOverlay.scrollTop = context.matchesOverlayScrollTop;
+  requestAnimationFrame?.(()=>{
+    matchesOverlay.scrollTop = context.matchesOverlayScrollTop;
+  });
+}`;
+  const newRestore = `function __cw233RestoreMatchesOverlay(context){
+  const matchesOverlay = document.getElementById?.('ciao-v232-matches-overlay');
+  if (!matchesOverlay) return;
+  delete matchesOverlay.dataset.cw233MatchCenterSuspended;
+  if (!context) return;
+  matchesOverlay.hidden = false;
+  matchesOverlay.scrollTop = context.matchesOverlayScrollTop;
+  requestAnimationFrame?.(()=>{
+    matchesOverlay.scrollTop = context.matchesOverlayScrollTop;
+  });
+}`;
+  if (!source.includes(oldRestore)) throw new Error('v23.3 round33 restore anchor missing');
+  source = source.replace(oldRestore, newRestore);
+
+  const patch = `
+
+/* ${ROUND33_MATCH_CENTER_MARKER} */
+const __cw233Round33StyleId = 'ciao-v233-round33-match-center-ownership';
+if (!document.getElementById?.(__cw233Round33StyleId)) {
+  const style = document.createElement('style');
+  style.id = __cw233Round33StyleId;
+  style.textContent = '#ciao-v232-matches-overlay[data-cw233-match-center-suspended="1"]{display:none!important;visibility:hidden!important;pointer-events:none!important;}';
+  document.head?.appendChild?.(style);
+}
+
+const __cw233Round33LegacyMatchTabContent = matchTabContent;
+function __cw233Round33SanitizeExternalOverviewHtml(html){
+  const holder = document.createElement('div');
+  holder.innerHTML = String(html || '');
+  for (const marker of holder.querySelectorAll?.('.cw14-form-card') || []) {
+    const section = marker.closest?.('.mc-section') || marker.closest?.('section');
+    (section || marker).remove?.();
+  }
+  for (const section of holder.querySelectorAll?.('.mc-section,section') || []) {
+    if (/Контекст\\s+Серии\\s*[АA]/i.test(String(section?.textContent || ''))) section.remove?.();
+  }
+  return holder.innerHTML;
+}
+matchTabContent = function(d,key){
+  const html = __cw233Round33LegacyMatchTabContent(d,key);
+  if (!__cw233ExternalMatchContext || String(key || '') !== 'overview') return html;
+  return __cw233Round33SanitizeExternalOverviewHtml(html);
+};
+
+document.addEventListener?.('click', event => {
+  const button = event?.target?.closest?.('button[data-tab]');
+  if (!button) return;
+  const matchesOverlay = document.getElementById?.('ciao-v232-matches-overlay');
+  if (matchesOverlay) delete matchesOverlay.dataset.cw233MatchCenterSuspended;
+}, true);
+`;
+
+  source += patch;
+  if (!source.includes(ROUND33_MATCH_CENTER_MARKER)) throw new Error('v23.3 round33 Match Center patch did not apply');
+  return source;
+}
+
 export function applyHomeV233SourcePatch(input) {
   let source = replaceSeasonLabel(input);
   source = applyLegacyLogoPatch(source);
@@ -290,5 +391,6 @@ export function applyHomeV233SourcePatch(input) {
   source = applyExternalLegacyPatch(source);
   source = applyExternalOverlayLifecyclePatch(source);
   source = applyRound23UnifiedStateFixes(source);
+  source = applyRound33MatchCenterFixes(source);
   return source;
 }
