@@ -15,6 +15,7 @@ const CSS = `
    table/crest polish are owned by Round 10 so older runtime code cannot undo them. */
 html.${SERIE_A_ACTIVE} #ciao-miniapp-root .${SERIE_A_LEGACY_HERO}{display:none!important}
 html.${SERIE_A_ACTIVE} #ciao-miniapp-root .cw232-serie-a-back{display:none!important}
+#ciao-miniapp-root.match-center-open .cw233-serie-a-competition-head{display:none!important}
 .${SERIE_A_HEAD}{display:grid;grid-template-columns:44px minmax(0,1fr);gap:13px;align-items:center;margin:0 0 20px;padding:4px 0 0;color:#fff}
 .${SERIE_A_HEAD}__back{width:44px;height:44px;border:1px solid rgba(132,150,205,.22);border-radius:15px;background:linear-gradient(180deg,rgba(30,43,70,.92),rgba(16,27,47,.94));color:#fff;font:900 18px/1 inherit;box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}
 .${SERIE_A_HEAD}__copy{min-width:0}
@@ -78,6 +79,7 @@ function activateSerieA(documentRef = globalThis.document) {
   documentRef.documentElement?.classList?.add?.(SERIE_A_ACTIVE);
   for (const delay of [0, 40, 120, 260]) setTimeout(() => ensureSerieAHeader(documentRef), delay);
 }
+
 function deactivateSerieA(documentRef = globalThis.document) {
   serieAActive = false;
   documentRef.documentElement?.classList?.remove?.(SERIE_A_ACTIVE);

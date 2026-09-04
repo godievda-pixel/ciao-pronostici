@@ -34,7 +34,7 @@ const externalSnapshot = Object.freeze({
   form:{ home:['В','В','Н'], away:['П','В','В'] },
 });
 
-test('Round 31 external Overview is tournament-neutral and never renders Serie A-only Form/context/error blocks', () => {
+test('Round 31 external Overview stays tournament-neutral while preserving useful match blocks', () => {
   for (const competition of ['coppa_italia', 'ucl', 'uel', 'uecl']) {
     assert.equal(isRound31ExternalCompetition(competition), true);
   }
@@ -43,9 +43,9 @@ test('Round 31 external Overview is tournament-neutral and never renders Serie A
   const html = renderRound31ExternalOverview(externalSnapshot);
   assert.match(html, /data-cw233-r31-overview/);
   assert.match(html, /Ключевые показатели/);
+  assert.match(html, /Форма/);
   assert.match(html, /Информация о матче/);
   assert.doesNotMatch(html, /Контекст\s+Серии\s*[АA]/i);
-  assert.doesNotMatch(html, /mc-section-title[^>]*>\s*Форма\b/i);
   assert.doesNotMatch(html, /Матч не найден/i);
   assert.doesNotMatch(html, /cw14-form-card|cw14-match-info/);
 });
