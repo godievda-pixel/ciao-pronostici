@@ -87,6 +87,7 @@ export function installCanonicalMatchLinks(
   const handler = event => {
     const payload = resolveCanonicalMatchTarget(event?.target);
     if (!payload) return;
+    globalThis.CiaoV233Round37?.rememberMatchSource?.(payload.source);
     event.preventDefault?.();
     event.stopPropagation?.();
     event.stopImmediatePropagation?.();
