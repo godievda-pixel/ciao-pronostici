@@ -18,6 +18,7 @@ import './round13-mobile-regressions.mjs';
 import './round16-runtime.mjs';
 import './round30-feedback-fixes.mjs';
 import './round31-match-center-stability.mjs';
+import './round35-match-center-overview-fixes.mjs';
 
 export const CiaoV233 = Object.freeze({
   version: '23.3',
@@ -40,6 +41,7 @@ export const CiaoV233 = Object.freeze({
   round16Runtime: 'enabled',
   round30FeedbackFixes: 'enabled',
   round31MatchCenterStability: 'enabled',
+  round35MatchCenterOverviewFixes: 'enabled',
 });
 
 globalThis.CiaoV233 = CiaoV233;
