@@ -7,8 +7,6 @@ import { createPredictionService } from '../src/v23.3/prediction-service.mjs';
 const runtimeUrl = new URL('../src/v23.3/round30-feedback-fixes.mjs', import.meta.url);
 const indexSource = readFileSync(new URL('../src/v23.3/index.mjs', import.meta.url), 'utf8');
 const rankingSource = readFileSync(new URL('../src/v23.3/ranking-ui.mjs', import.meta.url), 'utf8');
-const legacyThemeSource = readFileSync(new URL('../src/v23.3/legacy-match-center-theme.mjs', import.meta.url), 'utf8');
-const premiumSource = readFileSync(new URL('../src/v23.3/premium-polish-ui.mjs', import.meta.url), 'utf8');
 
 function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -32,7 +30,8 @@ test('Round 30 keeps Overall/All neutral while tournament scopes keep tournament
   assert.equal(round30SurfaceTheme('ranking', 'ucl'), 'champions');
   assert.equal(round30SurfaceTheme('ranking', 'uel'), 'europa');
   assert.equal(round30SurfaceTheme('ranking', 'uecl'), 'conference');
-  assert.match(ROUND30_CSS, /data-cw233-round30-theme=['"]neutral['"]/);
+  assert.match(ROUND30_CSS, /data-cw233-rank-filter='overall'[^\]]*aria-selected='true'/);
+  assert.match(ROUND30_CSS, /data-cw233-filter='all'[^\]]*aria-selected='true'/);
   assert.match(ROUND30_CSS, /--r11soft/);
   assert.match(ROUND30_CSS, /\.cw233-ranking-row/);
   assert.match(ROUND30_CSS, /\.cw233-ranking-hero/);
@@ -129,16 +128,16 @@ test('ranking service enriches returned ranking rows with favorite clubs without
 test('ranking UI renders favorite-club badges instead of name initials', () => {
   assert.match(rankingSource, /cw233-ranking-club-logo/);
   assert.match(rankingSource, /favorite_team|favoriteTeam/);
-  assert.doesNotMatch(rankingSource, /cw233-ranking-avatar--hero[^`]*\$\{esc\(initials\(name\)\)\}/s);
-  assert.doesNotMatch(rankingSource, /<div class="cw233-ranking-avatar">\$\{esc\(initials\(name\)\)\}<\/div>/);
+  assert.doesNotMatch(rankingSource, /initials\(/);
 });
 
-test('legacy Match Center exclusively owns the viewport and centers its back arrow', () => {
-  assert.match(legacyThemeSource, /match-center-open\s+#ciao-v232-matches-overlay/);
-  assert.match(legacyThemeSource, /match-center-open\s+#ciao-v232-matches-overlay\s*\{[^}]*display:none!important/s);
-  assert.match(legacyThemeSource, /\.mc-back\s*\{[^}]*align-items:center!important[^}]*justify-content:center!important[^}]*padding:0!important/s);
+test('Match Center exclusively owns the viewport and centers its back arrow', async () => {
+  const { ROUND30_CSS } = await import(runtimeUrl.href);
+  assert.match(ROUND30_CSS, /match-center-open #ciao-v232-matches-overlay\s*\{[^}]*display:none!important/s);
+  assert.match(ROUND30_CSS, /match-center-open \.mc-back\s*\{[^}]*align-items:center!important[^}]*justify-content:center!important[^}]*padding:0!important/s);
 });
 
-test('ranking place and points cells are centered', () => {
-  assert.match(premiumSource, /\.cw233-ranking-stat\s*\{[^}]*align-items:center[^}]*justify-content:center[^}]*text-align:center/s);
+test('ranking place and points cells are centered', async () => {
+  const { ROUND30_CSS } = await import(runtimeUrl.href);
+  assert.match(ROUND30_CSS, /\.cw233-ranking-stat\s*\{[^}]*align-items:center!important[^}]*justify-content:center!important[^}]*text-align:center!important/s);
 });
