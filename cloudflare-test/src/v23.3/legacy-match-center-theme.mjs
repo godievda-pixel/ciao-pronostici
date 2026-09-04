@@ -1,5 +1,5 @@
 const STYLE_ID = 'cw233-legacy-match-center-theme';
-export const LEGACY_MATCH_CENTER_THEME_BUILD = 'r23-final-themes';
+export const LEGACY_MATCH_CENTER_THEME_BUILD = 'r28-match-center-fixes';
 
 export const LEGACY_MATCH_CENTER_THEME_KEYS = Object.freeze({
   coppa_italia:'coppa_italia',
@@ -78,12 +78,15 @@ const CSS = `
   --cw233-mc-glow-2:rgba(85,214,142,.14);
 }
 
-/* Remove the old Serie A blue frame/background from the full Match Center viewport. */
+/* The Match Center owns the viewport: no inherited frame from the legacy shell. */
 #ciao-miniapp-root.match-center-open .mc-shell {
   background:
     radial-gradient(90% 46% at 12% -8%, var(--cw233-mc-glow), transparent 68%),
     radial-gradient(90% 46% at 90% -4%, var(--cw233-mc-glow-2), transparent 70%),
     var(--cw233-mc-bg) !important;
+  border:0!important;
+  outline:0!important;
+  border-radius:0!important;
   box-shadow:none!important;
 }
 #ciao-miniapp-root.match-center-open .mc-toolbar {
@@ -91,10 +94,9 @@ const CSS = `
   border-bottom:0!important;
   box-shadow:none!important;
 }
-#ciao-miniapp-root.match-center-open:not([data-cw233-mc-competition]) .mc-back {
-  display:none!important;
-}
+/* The back control inside the Match Center is the only back control that remains. */
 #ciao-miniapp-root.match-center-open .mc-back {
+  display:flex!important;
   border-color:var(--cw233-mc-border)!important;
   background:var(--cw233-mc-surface)!important;
 }
