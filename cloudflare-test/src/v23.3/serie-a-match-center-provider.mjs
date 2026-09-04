@@ -77,6 +77,28 @@ async function postStable({ request, env, initData, path, body }) {
   return unwrapSerieAMatchCenterPayload(payload);
 }
 
+function mergeSerieALegacyPayload(summaryRaw, richRaw) {
+  const summary = object(summaryRaw) || {};
+  const rich = object(richRaw) || {};
+  const summaryMatch = object(summary.match) || {};
+  const richMatch = object(rich.match) || {};
+  const prediction = richMatch.prediction ?? summaryMatch.prediction;
+  const predictionSplit = rich.prediction_split
+    ?? rich.predictionSplit
+    ?? summary.prediction_split
+    ?? summary.predictionSplit;
+  return {
+    ...summary,
+    ...rich,
+    match:{
+      ...summaryMatch,
+      ...richMatch,
+      ...(prediction !== undefined ? { prediction } : {}),
+    },
+    ...(predictionSplit !== undefined ? { prediction_split:predictionSplit } : {}),
+  };
+}
+
 function adaptLegacy(raw) {
   return adaptSerieALegacyMatchCenter(normalizeSerieALegacyMatchCenter(raw));
 }
@@ -132,7 +154,7 @@ export async function loadSerieAMatchCenterBase({ request, env, initData, matchI
       path:SERIE_A_MATCH_CENTER_PATH,
       body:{ match_id:id, sections:[], include_split:false },
     });
-    adapted = adaptLegacy({ ...summaryRaw, ...fullRaw });
+    adapted = adaptLegacy(mergeSerieALegacyPayload(summaryRaw, fullRaw));
   }
   if (!richEnoughBase(adapted)) throw providerError('match_not_found', 404);
   return { match:canonicalBaseFromAdapted(adapted) };
@@ -142,12 +164,29 @@ export async function loadSerieAMatchCenterSection({ request, env, initData, mat
   const id = numericSerieAMatchId(matchId);
   const sections = SERIE_A_SECTION_REQUESTS[section];
   if (!sections) throw providerError('invalid_match_center_section', 400);
-  const raw = await postStable({
+
+  const richPromise = postStable({
     request,
     env,
     initData,
     path:SERIE_A_MATCH_CENTER_PATH,
     body:{ match_id:id, sections:[...sections], include_split:false },
   });
+
+  let raw;
+  if (section === 'overview') {
+    const summaryPromise = postStable({
+      request,
+      env,
+      initData,
+      path:SERIE_A_MATCH_SUMMARY_PATH,
+      body:{ match_id:id },
+    }).catch(() => null);
+    const [summaryRaw, richRaw] = await Promise.all([summaryPromise, richPromise]);
+    raw = mergeSerieALegacyPayload(summaryRaw, richRaw);
+  } else {
+    raw = await richPromise;
+  }
+
   return canonicalSectionPayload(adaptLegacy(raw), section);
 }
