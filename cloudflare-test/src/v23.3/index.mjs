@@ -1,4 +1,5 @@
 import './navigation-ui.mjs';
+import './legacy-match-center-theme.mjs';
 import './home-integration.mjs';
 import './tables-ui.mjs';
 import './serie-a-legacy-bridge.mjs';

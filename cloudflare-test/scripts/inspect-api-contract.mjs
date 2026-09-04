@@ -9,6 +9,7 @@ import {
   extractSourceHints,
   summarizeJsonShape,
 } from '../src/v23.2/api-contract-observer.mjs';
+import { loadBaseHtml } from './test-baseline.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const outputPath = resolve(root, 'artifacts/api-contract-observed.json');
@@ -139,12 +140,21 @@ export async function observeContract({ baseUrl, testOrigin, fetchImpl = fetch }
 }
 
 export async function main() {
-  const baseUrl = process.env.BASE_URL
-    || 'https://ciao-web-app.ciao-web.workers.dev/releases/v23.1/';
   const testOrigin = process.env.TEST_ORIGIN
     || 'https://ciao-web-app-test.ciao-web.workers.dev';
+  const baseline = await loadBaseHtml({ includeLegacyBase:false });
+  const baseUrl = baseline.sourceUrl;
+  const baselineFetch = async (url, init) => {
+    if (String(url) === String(baseUrl)) {
+      return new Response(baseline.html, {
+        status:200,
+        headers:{ 'content-type':'text/html; charset=utf-8' },
+      });
+    }
+    return fetch(url, init);
+  };
 
-  const result = await observeContract({ baseUrl, testOrigin });
+  const result = await observeContract({ baseUrl, testOrigin, fetchImpl:baselineFetch });
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(result, null, 2)}\n`, 'utf8');
 

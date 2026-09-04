@@ -2,6 +2,11 @@ import { adaptBsdEvents } from './bsd-adapter.mjs';
 import { dedupeMatches } from './match-deduper.mjs';
 import { normalizeStandingRows } from '../v23.3/standing-normalizer.mjs';
 import { canonicalMatchCenterSnapshot } from '../v23.3/match-center-snapshot.mjs';
+import {
+  canonicalCoverage,
+  canonicalMatchCenterBase,
+} from '../v23.3/match-center-sections.mjs';
+import { adaptBsdMatchCenterSections } from '../v23.3/bsd-match-center-adapter.mjs';
 
 const BSD_BASE = 'https://sports.bzzoiro.com/api/v2';
 const MAX_RANGE_DAYS = 370;
@@ -12,6 +17,20 @@ const LEAGUE_NAMES = Object.freeze({
   uecl: ['Conference League', 'UEFA Conference League'],
 });
 const STANDINGS_COMPETITIONS = new Set(['ucl', 'uel', 'uecl']);
+const MATCH_CENTER_SECTIONS = new Set(['overview', 'stats', 'events', 'lineups', 'players']);
+const MATCH_CENTER_LAZY_CAPABILITIES = Object.freeze({
+  overview:true,
+  stats:true,
+  events:true,
+  lineups:true,
+  players:true,
+});
+const MATCH_CENTER_RESOURCE = Object.freeze({
+  stats:'stats',
+  events:'incidents',
+  lineups:'lineups',
+  players:'player-stats',
+});
 
 export class BsdUpstreamError extends Error {
   constructor(stage, status, code = 'upstream_failed') {
@@ -29,6 +48,14 @@ function text(value) {
 
 function list(value) {
   return Array.isArray(value) ? value : [];
+}
+
+function object(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+}
+
+function hasOwn(source, key) {
+  return Boolean(source && Object.prototype.hasOwnProperty.call(source, key));
 }
 
 function isoDate(value) {
@@ -279,6 +306,108 @@ function canonicalBsdMatch(event, competition, sourceId) {
   return match;
 }
 
+async function fetchCanonicalBsdEvent(args) {
+  const { event, sourceId } = await fetchBsdEvent(args);
+  const match = canonicalBsdMatch(event, args.competition, sourceId);
+  return Object.freeze({ event, match, sourceId });
+}
+
+async function fetchOptionalEventResource({ sourceId, resource, apiKey, fetchImpl = fetch }) {
+  try {
+    return await fetchJson(
+      buildUrl(`/events/${encodeURIComponent(sourceId)}/${resource}/`),
+      apiKey,
+      fetchImpl,
+      `event_${resource.replaceAll('-', '_')}`,
+    );
+  } catch (error) {
+    if (error instanceof BsdUpstreamError && error.status === 404) return null;
+    throw error;
+  }
+}
+
+function baseMatchCenterCoverage(event = {}) {
+  const embedded = adaptBsdMatchCenterSections(event).coverage;
+  return canonicalCoverage({
+    ...embedded,
+    ...MATCH_CENTER_LAZY_CAPABILITIES,
+    momentum:embedded.momentum,
+    shotmap:embedded.shotmap,
+  });
+}
+
+function mergeSectionCoverage(baseCoverage, section, available, extra = {}) {
+  return canonicalCoverage({
+    ...baseCoverage,
+    [section]:available === true,
+    ...extra,
+  });
+}
+
+function resourceSections(payload) {
+  return adaptBsdMatchCenterSections(object(payload) || {});
+}
+
+function lineupPlayers(side) {
+  return [...list(side?.starters), ...list(side?.substitutes)];
+}
+
+function enrichPlayersFromLineups(players, lineups, match) {
+  const byId = new Map();
+  for (const [side, teamName] of [
+    ['home', match?.homeTeam?.name],
+    ['away', match?.awayTeam?.name],
+  ]) {
+    for (const player of lineupPlayers(lineups?.[side])) {
+      const id = text(player?.playerId ?? player?.player_id ?? player?.id);
+      if (!id) continue;
+      byId.set(id, {
+        name:text(player?.name ?? player?.short_name ?? player?.shortName),
+        teamName:text(teamName),
+      });
+    }
+  }
+
+  return Object.freeze(list(players).map(player => {
+    const found = byId.get(text(player?.playerId ?? player?.player_id ?? player?.id));
+    if (!found) return player;
+    const name = text(player?.name) || found.name;
+    const teamName = text(player?.teamName ?? player?.team_name) || found.teamName;
+    if (name === text(player?.name) && teamName === text(player?.teamName ?? player?.team_name)) return player;
+    return Object.freeze({ ...player, name, teamName });
+  }));
+}
+
+function predictionPayload(payload) {
+  const source = object(payload);
+  if (!source) return null;
+  if (object(source.prediction)) return source.prediction;
+  if (
+    hasOwn(source, 'home')
+    || hasOwn(source, 'draw')
+    || hasOwn(source, 'away')
+    || hasOwn(source, 'markets')
+    || hasOwn(source, 'probabilities')
+    || hasOwn(source, 'confidence')
+  ) return source;
+  return null;
+}
+
+function composeOverviewEvent(event, statsPayload, modelPayload) {
+  const combined = { ...event };
+  const stats = object(statsPayload);
+  if (stats) {
+    if (hasOwn(stats, 'stats')) combined.stats = stats.stats;
+    if (hasOwn(stats, 'statistics')) combined.statistics = stats.statistics;
+    if (hasOwn(stats, 'momentum')) combined.momentum = stats.momentum;
+    if (hasOwn(stats, 'shotmap')) combined.shotmap = stats.shotmap;
+    if (hasOwn(stats, 'shot_map')) combined.shot_map = stats.shot_map;
+  }
+  const prediction = predictionPayload(modelPayload);
+  if (prediction) combined.prediction = prediction;
+  return combined;
+}
+
 export async function fetchBsdMatches({
   competition,
   from,
@@ -317,13 +446,121 @@ export async function fetchBsdStandings({
 }
 
 export async function fetchBsdMatchSnapshot(args) {
-  const { event, sourceId } = await fetchBsdEvent(args);
-  return canonicalBsdMatch(event, args.competition, sourceId);
+  const { match } = await fetchCanonicalBsdEvent(args);
+  return match;
+}
+
+export async function fetchBsdMatchCenterBase(args) {
+  const { event, match } = await fetchCanonicalBsdEvent(args);
+  return canonicalMatchCenterBase(match, baseMatchCenterCoverage(event));
+}
+
+export async function fetchBsdMatchCenterSection(args) {
+  const section = text(args?.section).toLowerCase();
+  if (!MATCH_CENTER_SECTIONS.has(section)) {
+    throw new Error(`Unsupported Match Center section: ${section || 'empty'}`);
+  }
+
+  const { event, match, sourceId } = await fetchCanonicalBsdEvent(args);
+  const baseSections = adaptBsdMatchCenterSections(event);
+  const baseCoverage = baseMatchCenterCoverage(event);
+
+  if (section === 'overview') {
+    const [statsPayload, modelPayload] = await Promise.all([
+      fetchOptionalEventResource({
+        sourceId,
+        resource:'stats',
+        apiKey:args.apiKey,
+        fetchImpl:args.fetchImpl,
+      }),
+      fetchOptionalEventResource({
+        sourceId,
+        resource:'prediction',
+        apiKey:args.apiKey,
+        fetchImpl:args.fetchImpl,
+      }),
+    ]);
+    const combined = composeOverviewEvent(event, statsPayload, modelPayload);
+    const sections = adaptBsdMatchCenterSections(combined);
+    const available = sections.coverage.overview === true;
+    return Object.freeze({
+      section,
+      available,
+      coverage:mergeSectionCoverage(baseCoverage, section, available, {
+        momentum:sections.coverage.momentum,
+        shotmap:sections.coverage.shotmap,
+      }),
+      data:available ? sections.overview : null,
+    });
+  }
+
+  if (section === 'players') {
+    const [payload, lineupPayload] = await Promise.all([
+      fetchOptionalEventResource({
+        sourceId,
+        resource:'player-stats',
+        apiKey:args.apiKey,
+        fetchImpl:args.fetchImpl,
+      }),
+      fetchOptionalEventResource({
+        sourceId,
+        resource:'lineups',
+        apiKey:args.apiKey,
+        fetchImpl:args.fetchImpl,
+      }).catch(() => null),
+    ]);
+    const fetchedSections = resourceSections(payload);
+    const fetchedAvailable = fetchedSections.coverage.players === true;
+    const fallbackAvailable = payload === null && baseSections.coverage.players === true;
+    const available = fetchedAvailable || fallbackAvailable;
+    const rawData = fetchedAvailable
+      ? fetchedSections.players
+      : fallbackAvailable
+        ? baseSections.players
+        : null;
+    const fetchedLineups = resourceSections(lineupPayload);
+    const lineups = fetchedLineups.coverage.lineups
+      ? fetchedLineups.lineups
+      : baseSections.coverage.lineups
+        ? baseSections.lineups
+        : null;
+    const data = available ? enrichPlayersFromLineups(rawData, lineups, match) : null;
+
+    return Object.freeze({
+      section,
+      available,
+      coverage:mergeSectionCoverage(baseCoverage, section, available),
+      data,
+    });
+  }
+
+  const resource = MATCH_CENTER_RESOURCE[section];
+  const payload = await fetchOptionalEventResource({
+    sourceId,
+    resource,
+    apiKey:args.apiKey,
+    fetchImpl:args.fetchImpl,
+  });
+  const fetchedSections = resourceSections(payload);
+  const fetchedAvailable = fetchedSections.coverage[section] === true;
+  const fallbackAvailable = payload === null && baseSections.coverage[section] === true;
+  const available = fetchedAvailable || fallbackAvailable;
+  const data = fetchedAvailable
+    ? fetchedSections[section]
+    : fallbackAvailable
+      ? baseSections[section]
+      : null;
+
+  return Object.freeze({
+    section,
+    available,
+    coverage:mergeSectionCoverage(baseCoverage, section, available),
+    data,
+  });
 }
 
 export async function fetchBsdMatchCenterSnapshot(args) {
-  const { event, sourceId } = await fetchBsdEvent(args);
-  const match = canonicalBsdMatch(event, args.competition, sourceId);
+  const { event, match } = await fetchCanonicalBsdEvent(args);
   return canonicalMatchCenterSnapshot(match, extractBsdMatchDetails(event));
 }
 

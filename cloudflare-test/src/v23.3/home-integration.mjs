@@ -5,7 +5,6 @@ import {
   loadAllCompetitionMatches,
   selectHomeMatches,
 } from './competition-data.mjs';
-import { installCanonicalMatchCenter } from './match-center.mjs';
 import { installCanonicalMatchLinks } from './match-center-links.mjs';
 import { rememberMatchBootstrap } from './match-bootstrap-cache.mjs';
 
@@ -203,10 +202,7 @@ export function createHomeRuntime({
 const runtime = createHomeRuntime();
 globalThis.CiaoV233Home = Object.freeze({ ensure:runtime.ensure, html:runtime.html, state:runtime.state });
 
-if (typeof globalThis.document !== 'undefined') {
-  installCanonicalMatchCenter(globalThis.document);
-  installCanonicalMatchLinks(globalThis.document);
-}
+if (typeof globalThis.document !== 'undefined') installCanonicalMatchLinks(globalThis.document);
 
 try {
   if (typeof globalThis.dispatchEvent === 'function' && typeof globalThis.Event === 'function') globalThis.dispatchEvent(new globalThis.Event('ciao-v233-home-ready'));

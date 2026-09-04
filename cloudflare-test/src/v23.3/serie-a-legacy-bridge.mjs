@@ -23,6 +23,34 @@ function stateRoots(payload = {}) {
     .filter(item => item && typeof item === 'object');
 }
 
+function matchCenterRoots(payload = {}) {
+  return [
+    payload?.match_center,
+    payload?.matchCenter,
+    payload?.data?.match_center,
+    payload?.data?.matchCenter,
+    payload?.state?.match_center,
+    payload?.state?.matchCenter,
+    payload?.data?.state?.match_center,
+    payload?.data?.state?.matchCenter,
+  ].filter(item => item && typeof item === 'object' && !Array.isArray(item));
+}
+
+export function readSerieALegacyMatchCenterData(payload = {}) {
+  const source = matchCenterRoots(payload)[0]
+    || (payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : {});
+  const block = key => source?.[key] && typeof source[key] === 'object' ? source[key] : null;
+  return Object.freeze({
+    match:block('match'),
+    overview_meta:block('overview_meta') || block('overviewMeta'),
+    stats:block('stats'),
+    incidents:block('incidents'),
+    lineups:block('lineups'),
+    player_stats:block('player_stats') || block('playerStats'),
+    capabilities:block('capabilities'),
+  });
+}
+
 function legacyMatchTeam(match = {}, side) {
   const direct = match?.[side];
   const nested = match?.[`${side}_team`] || match?.[`${side}Team`];
