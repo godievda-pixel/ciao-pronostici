@@ -3,10 +3,37 @@ const ALL_CALCIO_LABEL = 'ВСЁ О КАЛЬЧО';
 const MARKER = 'cw233-home-multicompetition';
 const EXTERNAL_MARKER = 'cw233-single-legacy-match-center-r20';
 const OVERLAY_LIFECYCLE_MARKER = 'cw233-external-match-overlay-lifecycle-r21';
+const LOGO_PATCH_MARKER = 'cw233-legacy-direct-crest-r22';
 const LATE_MATCH_CENTER_MARKER = '/* ===== /Ciao, Web! v20.15 stable match center live patch ===== */';
 
 function replaceSeasonLabel(input) {
   return String(input).replaceAll(SEASON_LABEL, ALL_CALCIO_LABEL);
+}
+
+function applyLegacyLogoPatch(input) {
+  let source = String(input);
+  if (source.includes(LOGO_PATCH_MARKER)) return source;
+
+  const startNeedle = 'const logo = t => t?.custom_emoji_id ?';
+  const endNeedle = `'<span class="logo">⚽</span>';`;
+  const start = source.indexOf(startNeedle);
+  if (start < 0) return source;
+  const endStart = source.indexOf(endNeedle, start);
+  if (endStart < 0) return source;
+  const end = endStart + endNeedle.length;
+
+  const replacement = `/* ${LOGO_PATCH_MARKER} */
+const logo = t => {
+  const directLogo = String(t?.logo_url || t?.logoUrl || t?.crestUrl || '').trim();
+  if (directLogo) return \`<img class="logo" width="48" height="48" loading="eager" decoding="sync" fetchpriority="auto" data-cw231-stable-logo-load="1" src="\${esc(directLogo)}" alt="">\`;
+  return t?.custom_emoji_id
+    ? \`<img class="logo" width="48" height="48" loading="eager" decoding="sync" fetchpriority="auto" data-cw231-stable-logo-load="1" src="\${API_BASE}?asset=emoji&id=\${encodeURIComponent(t.custom_emoji_id)}" alt="">\`
+    : '<span class="logo">⚽</span>';
+};`;
+
+  source = source.slice(0, start) + replacement + source.slice(end);
+  if (!source.includes(LOGO_PATCH_MARKER)) throw new Error('v23.3 legacy crest source patch did not apply');
+  return source;
 }
 
 function applyHomePatch(input) {
@@ -195,6 +222,7 @@ closeMatchCenter = function(){
 
 export function applyHomeV233SourcePatch(input) {
   let source = replaceSeasonLabel(input);
+  source = applyLegacyLogoPatch(source);
   source = applyHomePatch(source);
   source = applyExternalLegacyPatch(source);
   source = applyExternalOverlayLifecyclePatch(source);
