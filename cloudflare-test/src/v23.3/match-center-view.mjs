@@ -91,10 +91,10 @@ function crest(team, side) {
   return `<img class="cw239-mc-crest" data-cw239-crest="${side}" src="${esc(src)}" alt="" width="64" height="64" loading="eager" decoding="async">`;
 }
 
-function tabsHtml(activeTab, coverage = {}) {
+function tabsHtml(activeTab, sectionState = {}) {
   return MATCH_CENTER_VIEW_TABS.map(tab => {
     const active = tab === activeTab;
-    const unavailable = coverage?.[tab] === false;
+    const unavailable = String(sectionState?.[tab]?.status || '').trim().toLowerCase() === 'unavailable';
     return `<button type="button" class="cw239-mc-tab${active ? ' is-active' : ''}" data-cw239-tab="${tab}" aria-selected="${active ? 'true' : 'false'}"${unavailable ? ' aria-disabled="true"' : ''}>${TAB_LABELS[tab]}</button>`;
   }).join('');
 }
@@ -117,7 +117,7 @@ function sectionView(state, match, activeTab) {
       html:`<div class="cw239-mc-message"><b>Раздел временно недоступен</b><span>Остальные вкладки продолжают работать.</span><button type="button" data-cw239-action="retry-section" data-cw239-section="${activeTab}">Повторить</button></div>`,
     };
   }
-  if (status === 'unavailable' || coverage?.[activeTab] === false) {
+  if (status === 'unavailable') {
     return {
       status:'unavailable',
       html:'<div class="cw239-mc-message"><b>Данные пока недоступны</b><span>Раздел появится автоматически, когда провайдер опубликует данные.</span></div>',
@@ -145,7 +145,7 @@ function viewStyles() {
     .cw239-mc-board{display:grid;grid-template-columns:minmax(0,1fr) 92px minmax(0,1fr);align-items:center;gap:8px;padding:18px 10px;border:1px solid var(--mc-border);border-radius:22px;background:linear-gradient(145deg,var(--mc-surface),rgba(255,255,255,.025));box-shadow:0 18px 42px rgba(0,0,0,.18)}
     .cw239-mc-team{min-width:0;display:grid;justify-items:center;gap:9px;text-align:center}.cw239-mc-team b{max-width:100%;font-size:13px;line-height:1.2;overflow-wrap:anywhere}.cw239-mc-crest{width:58px;height:58px;object-fit:contain}.cw239-mc-crest.is-empty{display:block;border-radius:50%;border:1px solid var(--mc-border);background:rgba(255,255,255,.04)}
     .cw239-mc-scorebox{display:grid;justify-items:center;gap:6px}.cw239-mc-scorebox strong{font-size:27px;line-height:1;font-weight:950;letter-spacing:-.04em}.cw239-mc-scorebox span{font-size:10px;line-height:1.2;color:var(--mc-muted);font-weight:800;text-align:center}
-    .cw239-mc-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin:12px 0}.cw239-mc-tab{min-width:0;padding:9px 2px;border:1px solid var(--mc-border);border-radius:10px;background:rgba(255,255,255,.035);color:var(--mc-muted);font:inherit;font-size:9px;font-weight:800;cursor:pointer;white-space:nowrap}.cw239-mc-tab.is-active{background:linear-gradient(135deg,var(--mc-accent),var(--mc-accent-2));border-color:transparent;color:#fff}.cw239-mc-tab[aria-disabled="true"]{opacity:.42}
+    .cw239-mc-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;margin:12px 0;padding:4px;border:1px solid var(--mc-border);border-radius:16px;background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.018));box-shadow:inset 0 1px 0 rgba(255,255,255,.045),0 12px 28px rgba(0,0,0,.16);overflow:hidden}.cw239-mc-tab{min-width:0;min-height:42px;padding:9px 2px;border:0;border-radius:12px;background:transparent;color:var(--mc-muted);font:inherit;font-size:9.5px;font-weight:850;cursor:pointer;white-space:nowrap;transition:background .18s ease,color .18s ease,box-shadow .18s ease,transform .18s ease}.cw239-mc-tab:not(.is-active):not([aria-disabled="true"]):active{background:rgba(255,255,255,.045);transform:scale(.985)}.cw239-mc-tab.is-active{background:linear-gradient(135deg,var(--mc-accent),var(--mc-accent-2));color:#fff;box-shadow:0 7px 20px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.2),inset 0 -1px 0 rgba(0,0,0,.12)}.cw239-mc-tab[aria-disabled="true"]{opacity:.42}
     .cw239-mc-detail{min-height:126px;border:1px solid var(--mc-border);border-radius:18px;background:rgba(255,255,255,.025);padding:12px;overflow:hidden}.cw239-mc-message{min-height:100px;display:grid;place-items:center;align-content:center;gap:7px;text-align:center;color:var(--mc-muted);font-size:12px}.cw239-mc-message b{color:var(--mc-text);font-size:13px}.cw239-mc-message button{margin-top:4px;border:1px solid var(--mc-border);border-radius:10px;padding:8px 13px;background:var(--mc-surface);color:var(--mc-text);font:inherit;font-weight:800}.cw239-mc-spinner{width:18px;height:18px;border:2px solid var(--mc-border);border-top-color:var(--mc-accent-2);border-radius:50%}
     .cw239-mc-notice{margin-top:10px;padding:10px 12px;border:1px solid var(--mc-border);border-radius:12px;background:rgba(255,255,255,.035);font-size:11px;color:var(--mc-muted)}
     .cw239-mc-loading-board{min-height:132px}.cw239-mc-loading-copy{min-height:54px;display:grid;place-items:center;color:var(--mc-muted);font-size:12px;font-weight:800}
@@ -163,7 +163,6 @@ export function renderMatchCenterView(state = {}) {
   const baseError = !match && String(state?.phase || '') === 'error-base';
   const viewState = baseError ? 'error' : loading ? 'loading' : 'ready';
   const theme = themeKey(competition);
-  const coverage = match?.coverage && typeof match.coverage === 'object' ? match.coverage : {};
   const section = sectionView(state, match, activeTab);
   const error = String(state?.error || '').trim();
 
@@ -187,7 +186,7 @@ export function renderMatchCenterView(state = {}) {
     <div class="cw239-mc-competition">${esc(competitionTitle(competition))}</div>
     <time class="cw239-mc-kickoff" datetime="${esc(match?.kickoffAt || '')}">${match ? esc(kickoffText(match.kickoffAt, state?.timeZone)) : 'Время уточняется'}</time>
     ${board}
-    <nav class="cw239-mc-tabs" aria-label="Разделы матча">${tabsHtml(activeTab, coverage)}</nav>
+    <nav class="cw239-mc-tabs" aria-label="Разделы матча">${tabsHtml(activeTab, state?.sectionState)}</nav>
     <div class="cw239-mc-detail" data-cw239-section-state="${esc(baseError ? 'error' : section.status)}" data-cw239-active-section="${esc(activeTab)}">${baseError ? baseErrorAction : section.html}</div>
     ${notice}
   </section>`;
