@@ -98,6 +98,8 @@ function matchInfoHtml(snapshot) {
   return `<section class="mc-section cw233-r31-info"><div class="mc-section-head"><div class="mc-section-title">Информация о матче</div></div><div class="cw233-r31-info-grid">${venue ? `<div><span>Стадион</span><b>${esc(venue)}</b></div>` : ''}${referee ? `<div><span>Судья</span><b>${esc(referee)}</b></div>` : ''}</div></section>`;
 }
 
+// Kept as a compatibility export for existing tests/tools. Round 33 no longer uses
+// this minimal renderer as the live external Overview owner.
 export function renderRound31ExternalOverview(snapshot = {}) {
   const home = legacyStats(snapshot, 'home');
   const away = legacyStats(snapshot, 'away');
@@ -225,31 +227,6 @@ function ensureStyle(documentRef) {
   documentRef.head.appendChild(style);
 }
 
-function activeOverview(root) {
-  const selected = root?.querySelector?.('[data-mc-tab].active,[data-mc-tab][aria-selected="true"]');
-  if (selected?.dataset?.mcTab) return selected.dataset.mcTab === 'overview';
-  const host = root?.querySelector?.('[data-mc-tab-content]');
-  return host?.dataset?.mcTabContent === 'overview';
-}
-
-function setOverviewTabState(root, button) {
-  for (const node of root?.querySelectorAll?.('[data-mc-tab]') || []) {
-    const active = node === button || node?.dataset?.mcTab === 'overview' && !button;
-    node.classList?.toggle?.('active', active);
-    node.setAttribute?.('aria-selected', active ? 'true' : 'false');
-  }
-}
-
-function removeExternalSerieASurfaces(root) {
-  for (const marker of root?.querySelectorAll?.('.cw14-form-card,.cw14-match-info') || []) {
-    const section = marker.closest?.('.mc-section') || marker.closest?.('section');
-    (section || marker).remove?.();
-  }
-  for (const section of root?.querySelectorAll?.('section') || []) {
-    if (/Контекст\s+Серии\s*[АA]/i.test(String(section?.textContent || ''))) section.remove?.();
-  }
-}
-
 export function installRound31MatchCenterStability(
   documentRef = globalThis.document,
   windowRef = globalThis,
@@ -262,7 +239,6 @@ export function installRound31MatchCenterStability(
   const html = documentRef.documentElement;
   let activeExternal = null;
   let lastSnapshotSignature = '';
-  let rendering = false;
 
   const syncViewportOwnership = () => {
     const open = !!root.classList?.contains?.('match-center-open');
@@ -281,33 +257,13 @@ export function installRound31MatchCenterStability(
     defer(callback);
   };
 
-  const renderExternalOverview = () => {
-    if (rendering || !activeExternal || !root.classList?.contains?.('match-center-open')) return;
-    rendering = true;
-    try {
-      removeExternalSerieASurfaces(root);
-      if (!activeOverview(root)) return;
-      const host = root.querySelector?.('[data-mc-tab-content]');
-      if (!host) return;
-      const nextHtml = renderRound31ExternalOverview(activeExternal.data);
-      host.dataset.mcTabContent = 'overview';
-      if (host.innerHTML !== nextHtml) host.innerHTML = nextHtml;
-    } finally {
-      rendering = false;
-    }
-  };
-
   const onExternalOpen = event => {
     const detail = event?.detail || {};
     const competition = String(detail?.competition || '').trim().toLowerCase();
     if (!isRound31ExternalCompetition(competition) || !detail?.data) return;
     activeExternal = { competition, matchId:String(detail?.matchId || ''), data:detail.data };
     lastSnapshotSignature = externalMatchCenterSnapshotSignature(detail.data);
-    afterLegacyOpen(() => {
-      if (!syncViewportOwnership() || !activeExternal) return;
-      setOverviewTabState(root, root.querySelector?.('[data-mc-tab="overview"]'));
-      renderExternalOverview();
-    });
+    afterLegacyOpen(syncViewportOwnership);
   };
 
   const onSerieAOpen = () => {
@@ -317,17 +273,6 @@ export function installRound31MatchCenterStability(
   };
 
   const onClick = event => {
-    const overview = event?.target?.closest?.('[data-mc-tab="overview"]');
-    if (overview && activeExternal) {
-      event.preventDefault?.();
-      event.stopPropagation?.();
-      event.stopImmediatePropagation?.();
-      setOverviewTabState(root, overview);
-      const host = root.querySelector?.('[data-mc-tab-content]');
-      if (host) host.dataset.mcTabContent = 'overview';
-      renderExternalOverview();
-      return;
-    }
     if (event?.target?.closest?.('.mc-back')) afterLegacyOpen(syncViewportOwnership);
   };
   documentRef.addEventListener('click', onClick, true);
@@ -357,13 +302,7 @@ export function installRound31MatchCenterStability(
 
   const MutationObserverCtor = windowRef.MutationObserver;
   const observer = typeof MutationObserverCtor === 'function'
-    ? new MutationObserverCtor(() => {
-        const open = syncViewportOwnership();
-        if (open && activeExternal) {
-          setOverviewTabState(root, root.querySelector?.('[data-mc-tab="overview"]'));
-          renderExternalOverview();
-        }
-      })
+    ? new MutationObserverCtor(syncViewportOwnership)
     : null;
   observer?.observe?.(root, { attributes:true, attributeFilter:['class'] });
   syncViewportOwnership();
