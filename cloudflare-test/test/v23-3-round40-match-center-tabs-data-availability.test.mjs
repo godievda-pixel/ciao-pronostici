@@ -84,5 +84,5 @@ test('Round 40 Match Center tabs are one premium segmented control themed by com
   assert.match(html, /\.cw239-mc-tab\.is-active\{[^}]*linear-gradient\([^)]*var\(--mc-accent\)[^)]*var\(--mc-accent-2\)[^)]*\)[^}]*box-shadow:/s);
   assert.match(html, /--mc-accent:#f06722;--mc-accent-2:#ff9b32/);
   assert.equal((html.match(/class="cw239-mc-tabs"/g) || []).length, 1);
-  assert.equal((html.match(/class="cw239-mc-tab/g) || []).length, 5);
+  assert.equal((html.match(/class="cw239-mc-tab(?: is-active)?"/g) || []).length, 5);
 });
