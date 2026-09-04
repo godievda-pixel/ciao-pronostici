@@ -10,10 +10,18 @@ function response(body, status = 200) {
 const shellFixture = `
   /* cw233-round33-match-center-overview-ownership */
   const __cw233Round33LegacyMatchTabContent = matchTabContent;
+  /* cw233-round34-external-overview-form-only */
+  function __cw233Round33IsFormSection(section){
+    const heading = section.querySelector?.('.mc-section-title,.cw14-form-title,[data-section-title],h2,h3');
+    const headingText = String(heading?.textContent || '').replace(/\\s+/g, ' ').trim();
+    return /^Форма(?:\\s|$)/i.test(headingText);
+  }
   function __cw233Round33SanitizeExternalOverviewHtml(html){
     const holder = document.createElement('div');
     holder.querySelectorAll?.('.cw14-form-card');
-    if (/Контекст\\s+Серии\\s*[АA]/i.test(section?.textContent || '')) section.remove?.();
+    for (const section of holder.querySelectorAll?.('.mc-section,section') || []) {
+      if (__cw233Round33IsFormSection(section)) section.remove?.();
+    }
   }
   matchTabContent = function(d,key){
     const html = __cw233Round33LegacyMatchTabContent(d,key);
@@ -48,12 +56,13 @@ function fixtureFetch(overrides = {}) {
   };
 }
 
-test('Round 33 deployment probe verifies external Overview preservation and Match Center ownership', async () => {
+test('Round 33 deployment probe verifies Form-only external Overview and Match Center ownership', async () => {
   const report = await probeRound33Deployment({ fetchImpl:fixtureFetch(), writeArtifact:false });
   assert.equal(report.ok, true);
   assert.equal(report.overview.round33Marker, true);
+  assert.equal(report.overview.round34FormOnlyMarker, true);
   assert.equal(report.overview.preservesLegacyOverview, true);
-  assert.equal(report.overview.removesOnlySerieAContextAndForm, true);
+  assert.equal(report.overview.removesOnlyExternalForm, true);
   assert.equal(report.ownership.persistentSuspendedMarker, true);
   assert.equal(report.ownership.suspendedCssIsolation, true);
   assert.equal(report.runtime.noRound31OverviewReplacement, true);
@@ -68,6 +77,17 @@ test('Round 33 deployment probe rejects a sanitizer that no longer removes Form'
       }),
       writeArtifact:false,
     }),
+    /Round 33 deployment markers are incomplete/,
+  );
+});
+
+test('Round 33 deployment probe rejects external sanitizer that removes non-Form Serie A context', async () => {
+  const withContextRemoval = shellFixture.replace(
+    'if (__cw233Round33IsFormSection(section)) section.remove?.();',
+    "if (__cw233Round33IsFormSection(section)) section.remove?.(); if (/Контекст\\s+Серии/i.test(section.textContent || '')) section.remove?.();",
+  );
+  await assert.rejects(
+    probeRound33Deployment({ fetchImpl:fixtureFetch({ '/':withContextRemoval }), writeArtifact:false }),
     /Round 33 deployment markers are incomplete/,
   );
 });
