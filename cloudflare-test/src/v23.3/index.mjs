@@ -5,6 +5,7 @@ import './tables-ui.mjs';
 import './serie-a-legacy-bridge.mjs';
 import './predictions-ui.mjs';
 import './ranking-ui.mjs';
+import './predictor-profile-ui.mjs';
 import './profile-rating-ui.mjs';
 import './premium-polish-ui.mjs';
 import './round6-polish-ui.mjs';
@@ -19,6 +20,7 @@ import './round16-runtime.mjs';
 import './round30-feedback-fixes.mjs';
 import './round31-match-center-stability.mjs';
 import './round35-match-center-overview-fixes.mjs';
+import './round37-runtime.mjs';
 
 export const CiaoV233 = Object.freeze({
   version: '23.3',
@@ -28,6 +30,7 @@ export const CiaoV233 = Object.freeze({
   matchCenter: 'enabled',
   predictions: 'enabled',
   ranking: 'enabled',
+  predictorProfiles: 'enabled',
   profileRating: 'enabled',
   premiumPolish: 'enabled',
   round6Polish: 'enabled',
@@ -42,6 +45,7 @@ export const CiaoV233 = Object.freeze({
   round30FeedbackFixes: 'enabled',
   round31MatchCenterStability: 'enabled',
   round35MatchCenterOverviewFixes: 'enabled',
+  round37Runtime: 'enabled',
 });
 
 globalThis.CiaoV233 = CiaoV233;
