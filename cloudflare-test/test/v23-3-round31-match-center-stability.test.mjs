@@ -34,7 +34,7 @@ const externalSnapshot = Object.freeze({
   form:{ home:['В','В','Н'], away:['П','В','В'] },
 });
 
-test('Round 31 external Overview is tournament-neutral and never renders Serie A-only Form/context/error blocks', () => {
+test('Round 31 compatibility Overview renderer remains tournament-neutral', () => {
   for (const competition of ['coppa_italia', 'ucl', 'uel', 'uecl']) {
     assert.equal(isRound31ExternalCompetition(competition), true);
   }
@@ -47,7 +47,6 @@ test('Round 31 external Overview is tournament-neutral and never renders Serie A
   assert.doesNotMatch(html, /Контекст\s+Серии\s*[АA]/i);
   assert.doesNotMatch(html, /mc-section-title[^>]*>\s*Форма\b/i);
   assert.doesNotMatch(html, /Матч не найден/i);
-  assert.doesNotMatch(html, /cw14-form-card|cw14-match-info/);
 });
 
 test('Round 31 snapshot signature is stable for identical data and changes when visible live/detail values change', () => {
@@ -82,13 +81,12 @@ test('Round 31 runtime is wired after the legacy Match Center modules', async ()
   );
 });
 
-test('Round 31 intercepts external Overview before target-level legacy listeners and coalesces refresh rewrites', async () => {
+test('Round 31 coalesces refreshes but no longer steals external Overview/tab ownership', async () => {
   const source = await read('../src/v23.3/round31-match-center-stability.mjs');
-  assert.match(source, /documentRef\.addEventListener\(['"]click['"][\s\S]*?true\)/);
-  assert.match(source, /data-mc-tab=['"]overview['"]/);
-  assert.match(source, /stopImmediatePropagation/);
-  assert.match(source, /MutationObserver/);
-  assert.match(source, /data-cw233-r31-overview/);
   assert.match(source, /externalMatchCenterSnapshotSignature/);
   assert.match(source, /if\s*\(signature\s*===\s*lastSnapshotSignature\)\s*return\s+null/);
+  assert.match(source, /MutationObserver/);
+  assert.doesNotMatch(source, /stopImmediatePropagation/);
+  assert.doesNotMatch(source, /renderRound31ExternalOverview\(activeExternal\.data\)/);
+  assert.doesNotMatch(source, /data-mc-tab=['"]overview['"]/);
 });
