@@ -7,6 +7,10 @@ function esc(value) {
     .replaceAll("'", '&#39;');
 }
 
+function text(value) {
+  return String(value ?? '').trim();
+}
+
 function list(value) {
   return Array.isArray(value) ? value : [];
 }
@@ -25,6 +29,13 @@ function fmt(value, digits = 2) {
 
 function overviewStyles() {
   return `<style data-cw233-mc-overview-parity-style>
+    .cw233-mc-context-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .cw233-mc-context-card{min-width:0;padding:13px 12px;border:1px solid var(--mc-border);border-radius:13px;background:linear-gradient(145deg,var(--mc-surface),rgba(255,255,255,.025))}
+    .cw233-mc-context-card span{display:block;margin-bottom:6px;color:var(--mc-muted);font-size:9px;font-weight:800;letter-spacing:.07em;text-transform:uppercase}
+    .cw233-mc-context-card strong{display:block;color:var(--mc-text);font-size:12px;line-height:1.3;font-weight:900;overflow-wrap:anywhere}
+    .cw233-mc-context-card small{display:block;margin-top:5px;color:var(--mc-muted);font-size:10px;line-height:1.3}
+    .cw233-mc-overview-empty{min-height:100px;display:grid;place-items:center;align-content:center;gap:7px;text-align:center;color:var(--mc-muted);font-size:11px;line-height:1.35}
+    .cw233-mc-overview-empty b{color:var(--mc-text);font-size:13px}
     .cw233-mc-key-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
     .cw233-mc-key{min-width:0;padding:13px 8px;border-radius:13px;background:rgba(255,255,255,.045);text-align:center}
     .cw233-mc-key strong{display:block;font-size:18px;line-height:1;color:var(--mc-text);font-weight:900}
@@ -36,7 +47,36 @@ function overviewStyles() {
     .cw233-mc-momentum-bar i{position:absolute;left:0;right:0;height:var(--mc-momentum-height);max-height:45%;min-height:2px;border-radius:2px;opacity:.88;background:var(--mc-accent)}
     .cw233-mc-momentum-bar.is-home i{bottom:50%}
     .cw233-mc-momentum-bar.is-away i{top:50%;background:var(--mc-accent-2);opacity:.68}
+    @media (max-width:380px){.cw233-mc-context-grid{grid-template-columns:1fr}}
   </style>`;
+}
+
+function contextHtml(source = {}) {
+  const venue = source?.venue && typeof source.venue === 'object' ? source.venue : {};
+  const venueName = text(venue.name);
+  const venueCity = text(venue.city);
+  const venueCapacity = finite(venue.capacity);
+  const refereeName = text(source?.referee?.name);
+  const cards = [];
+
+  if (venueName || venueCity || venueCapacity !== null) {
+    const primary = venueName || venueCity || 'Место проведения';
+    const detail = [
+      venueName && venueCity ? venueCity : '',
+      venueCapacity !== null ? `${Math.round(venueCapacity).toLocaleString('ru-RU')} мест` : '',
+    ].filter(Boolean).join(' · ');
+    cards.push(`<div class="cw233-mc-context-card"><span>Стадион</span><strong>${esc(primary)}</strong>${detail ? `<small>${esc(detail)}</small>` : ''}</div>`);
+  }
+
+  if (refereeName) {
+    cards.push(`<div class="cw233-mc-context-card"><span>Судья</span><strong>${esc(refereeName)}</strong></div>`);
+  }
+
+  if (!cards.length) return '';
+  return `<section class="cw233-mc-overview-card" data-cw233-mc-overview-region="context">
+    <div class="cw233-mc-overview-title"><span>О матче</span><b>Основная информация</b></div>
+    <div class="cw233-mc-context-grid">${cards.join('')}</div>
+  </section>`;
 }
 
 function summaryStatsHtml(summary = {}) {
@@ -113,14 +153,22 @@ function shotmapHtml(value, covered) {
   </section>`;
 }
 
+function emptyHtml() {
+  return `<div class="cw233-mc-overview-empty" data-cw233-mc-overview-empty>
+    <b>Подробности матча пока не опубликованы</b>
+    <span>Они появятся здесь, когда провайдер добавит данные.</span>
+  </div>`;
+}
+
 export function renderMatchCenterOverview(section = {}, context = {}) {
   const source = section && typeof section === 'object' ? section : {};
   const coverage = context?.coverage && typeof context.coverage === 'object' ? context.coverage : {};
   const blocks = [
+    contextHtml(source),
     summaryStatsHtml(source.summaryStats),
     momentumHtml(source.momentum, coverage.momentum === true),
     shotmapHtml(source.shotmap, coverage.shotmap === true),
   ].filter(Boolean);
 
-  return `${overviewStyles()}<div class="cw233-mc-overview" data-cw233-mc-overview>${blocks.join('')}</div>`;
+  return `${overviewStyles()}<div class="cw233-mc-overview" data-cw233-mc-overview>${blocks.length ? blocks.join('') : emptyHtml()}</div>`;
 }
