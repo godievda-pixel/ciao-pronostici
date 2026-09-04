@@ -27,8 +27,12 @@ function fakeDocument() {
     getElementById(id) { return nodes.get(id) || null; },
     querySelectorAll() { return []; },
     addEventListener(type, handler, options) { listeners.push({ type, handler, options }); },
+    removeEventListener(type, handler) {
+      const index = listeners.findIndex(item => item.type === type && item.handler === handler);
+      if (index >= 0) listeners.splice(index, 1);
+    },
     dispatchEvent(event) {
-      for (const item of listeners.filter(item => item.type === event?.type)) item.handler(event);
+      for (const item of [...listeners].filter(item => item.type === event?.type)) item.handler(event);
       return true;
     },
   };
@@ -67,17 +71,25 @@ test('Round 27 keeps Matches covering legacy calendar until each destination tab
   }
 });
 
-test('Round 27 destination modules publish readiness from their first visible shell', async () => {
-  const [navigation, predictions, ranking, tables] = await Promise.all([
-    readFile(new URL('../src/v23.3/navigation-ui.mjs', import.meta.url), 'utf8'),
-    readFile(new URL('../src/v23.3/predictions-ui.mjs', import.meta.url), 'utf8'),
-    readFile(new URL('../src/v23.3/ranking-ui.mjs', import.meta.url), 'utf8'),
-    readFile(new URL('../src/v23.3/tables-ui.mjs', import.meta.url), 'utf8'),
+test('Round 27 central navigation coordinator maps every destination to a visible-shell readiness check', async () => {
+  const navigation = await readFile(new URL('../src/v23.3/navigation-ui.mjs', import.meta.url), 'utf8');
+  assert.match(navigation, /dispatchNavigationReady/);
+  for (const tab of ['predict', 'mine', 'table', 'seriea', 'profile']) {
+    assert.match(navigation, new RegExp(`['"]${tab}['"]`), `navigation coordinator must cover ${tab}`);
+  }
+  assert.match(navigation, /cw233-prediction-page/);
+  assert.match(navigation, /cw233-ranking-page/);
+  assert.match(navigation, /ciao-v233-tables-overlay/);
+});
+
+test('Round 27 removes obsolete pointerdown paths that expose the legacy calendar before handoff completes', async () => {
+  const [round13, round16] = await Promise.all([
+    readFile(new URL('../src/v23.3/round13-mobile-regressions.mjs', import.meta.url), 'utf8'),
+    readFile(new URL('../src/v23.3/round16-runtime.mjs', import.meta.url), 'utf8'),
   ]);
 
-  assert.match(navigation, /dispatchNavigationReady\(['"]predict['"]/);
-  assert.match(navigation, /dispatchNavigationReady\(['"]profile['"]/);
-  assert.match(predictions, /dispatchNavigationReady\(['"]mine['"]/);
-  assert.match(ranking, /dispatchNavigationReady\(['"]table['"]/);
-  assert.match(tables, /dispatchNavigationReady\(['"]seriea['"]/);
+  assert.doesNotMatch(round13, /hideOverlay\(documentRef,\s*['"]ciao-v232-matches-overlay['"]\)/);
+  assert.doesNotMatch(round16, /getElementById\?\.\(['"]ciao-v232-matches-overlay['"]\)\?\.setAttribute\(['"]hidden['"]/);
+  assert.match(round13, /ciao-v233-match-center-overlay/);
+  assert.match(round16, /ciao-v233-match-center-overlay/);
 });
