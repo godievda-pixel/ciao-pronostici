@@ -1,4 +1,4 @@
-import { openCanonicalMatchCenter } from './match-center.mjs';
+import { openCanonicalMatchCenter } from './match-center-runtime.mjs';
 import { getMatchBootstrap } from './match-bootstrap-cache.mjs';
 
 const PREDICTION_CONTROL_SELECTOR = '[data-cw233-delta],[data-cw233-save-all],[data-cw231-action="predict"]';
@@ -87,11 +87,11 @@ export function installCanonicalMatchLinks(
   const handler = event => {
     const payload = resolveCanonicalMatchTarget(event?.target);
     if (!payload) return;
-    globalThis.CiaoV233Round37?.rememberMatchSource?.(payload.source);
+    const source = globalThis.CiaoV233MatchCenterLifecycle?.capture?.(event?.target) || payload.source;
     event.preventDefault?.();
     event.stopPropagation?.();
     event.stopImmediatePropagation?.();
-    void open(payload);
+    void open({ ...payload, source });
   };
 
   documentRef.addEventListener('click', handler, true);

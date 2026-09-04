@@ -93,8 +93,6 @@ test('Round 18 Match Center section endpoint returns exactly one canonical secti
       events:true,
       lineups:true,
       players:true,
-      momentum:false,
-      shotmap:false,
     });
     assert.equal(payload.data.data.home.xg, 1.42);
     assert.equal(payload.data.data.away.shotsOnTarget, 3);

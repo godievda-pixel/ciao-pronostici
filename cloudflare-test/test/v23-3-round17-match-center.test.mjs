@@ -123,24 +123,26 @@ test('Round 17 BSD detailed resolver returns the canonical Match Center snapshot
 });
 
 test('Round 17 Worker Match Center resolves Serie A through the same canonical endpoint', async () => {
+  let upstreamRequest = null;
   const env = {
     CIAO_WEB_API:{
       fetch:async request => {
-        assert.equal(new URL(request.url).pathname, '/api/ciao-schedule-fast-v1');
+        upstreamRequest = request;
+        assert.equal(new URL(request.url).pathname, '/api/ciao-match-summary-fast-v2');
         return jsonResponse({
           ok:true,
-          current_round:1,
-          rounds:[{
-            number:1,
-            matches:[{
-              id:123,
-              kickoff_at:'2026-09-06T18:45:00Z',
-              status:'SCHEDULED',
-              home:{ id:1, name:'Inter', logo_url:'inter.png' },
-              away:{ id:2, name:'Milan', logo_url:'milan.png' },
-              venue:'San Siro',
-            }],
-          }],
+          match:{
+            id:123,
+            kickoff_at:'2026-09-06T18:45:00Z',
+            status:'scheduled',
+            home:{ id:1, name:'Inter', logo_url:'inter.png' },
+            away:{ id:2, name:'Milan', logo_url:'milan.png' },
+          },
+          overview_meta:{ venue:{ name:'San Siro' } },
+          stats:{ stats:{ home:{}, away:{} } },
+          incidents:{ incidents:[] },
+          lineups:{ lineups:{ home:{ starters:[] }, away:{ starters:[] } } },
+          player_stats:{ player_stats:[] },
         });
       },
     },
@@ -155,6 +157,7 @@ test('Round 17 Worker Match Center resolves Serie A through the same canonical e
   assert.equal(payload.data.match.competition, 'serie_a');
   assert.equal(payload.data.match.matchId, 'serie_a:123');
   assert.equal(payload.data.match.homeTeam.name, 'Inter');
+  assert.deepEqual(JSON.parse(await upstreamRequest.text()), { match_id:123 });
 });
 
 test('Round 17 Worker maps filtered external Match Center requests to controlled 404', async () => {
