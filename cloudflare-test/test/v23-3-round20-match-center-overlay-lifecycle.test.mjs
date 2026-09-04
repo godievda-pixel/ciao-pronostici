@@ -21,27 +21,27 @@ predict = __cw231HomeHtml;
 `;
 }
 
-test('Round 20 external legacy bridge suspends the Matches overlay before mounting Match Center', () => {
+test('Round 20 adds one overlay lifecycle seam around the existing external legacy Match Center', () => {
   const patched = applyHomeV233SourcePatch(fixture());
+  assert.match(patched, /cw233-external-match-overlay-lifecycle-r21/);
   assert.match(patched, /ciao-v232-matches-overlay/);
-  assert.match(patched, /matchesOverlayWasVisible/);
+  assert.match(patched, /__cw233SuspendMatchesOverlay/);
+  assert.match(patched, /__cw233R21MatchesOverlayState/);
   assert.match(patched, /matchesOverlayScrollTop/);
   assert.match(patched, /matchesOverlay\.hidden\s*=\s*true/);
-  assert.match(patched, /main\.innerHTML\s*=\s*matchCenterHtml\(matchData\)/);
-  assert.ok(
-    patched.indexOf('matchesOverlay.hidden = true') < patched.indexOf('main.innerHTML = matchCenterHtml(matchData)'),
-    'Matches overlay must be hidden before legacy Match Center is mounted',
-  );
+  assert.match(patched, /ciao-v233-open-external-legacy-match/);
 });
 
-test('Round 20 external legacy close restores the same Matches overlay and scroll position', () => {
+test('Round 20 restores the suspended Matches overlay after the real legacy Match Center closes', () => {
   const patched = applyHomeV233SourcePatch(fixture());
+  assert.match(patched, /const __cw233R21FinalClose = closeMatchCenter/);
   assert.match(patched, /__cw233RestoreMatchesOverlay/);
+  assert.match(patched, /const result = __cw233R21FinalClose\(\)/);
+  assert.match(patched, /__cw233RestoreMatchesOverlay\(context\)/);
   assert.match(patched, /matchesOverlay\.hidden\s*=\s*false/);
   assert.match(patched, /matchesOverlay\.scrollTop\s*=\s*context\.matchesOverlayScrollTop/);
-  assert.match(patched, /const result = __cw233LegacyFinalClose\(\)/);
   assert.ok(
-    patched.indexOf('const result = __cw233LegacyFinalClose()') < patched.indexOf('__cw233RestoreMatchesOverlay(context)'),
+    patched.indexOf('const result = __cw233R21FinalClose()') < patched.indexOf('__cw233RestoreMatchesOverlay(context)'),
     'Legacy Match Center must close before the suspended Matches overlay is restored',
   );
 });
