@@ -24,7 +24,10 @@ function fixtureFetch(overrides = {}) {
       #ciao-miniapp-root .cw233-ranking-stat{align-items:center!important;justify-content:center!important;text-align:center!important;}
     `,
     '/v23.3/ranking-ui.mjs': `
-      function favoriteClub(row={}){ const team=row?.favorite_team||row?.favoriteTeam||{}; return '<img class="cw233-ranking-club-logo">'; }
+      function favoriteClub(row = {}, hero = false) {
+        const team = row?.favorite_team || row?.favoriteTeam || {};
+        return '<img class="cw233-ranking-club-logo">';
+      }
     `,
     '/v23.3/prediction-auth.mjs': `
       export function normalizeFavoriteTeam(source={}){}
