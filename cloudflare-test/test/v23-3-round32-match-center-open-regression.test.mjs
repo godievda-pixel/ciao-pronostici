@@ -51,7 +51,7 @@ test('Round 32 has a dedicated live deployment probe for the viewport-owner regr
 
 test('Round 32 live probe now validates the Round 38 lifecycle owner instead of the superseded legacy close path', async () => {
   const probe = await read('../scripts/probe-round32-deployment.mjs');
-  assert.match(probe, /cw238-match-center-owned/);
+  assert.match(probe, /cw238-match-center-owner/);
   assert.match(probe, /cw238MatchCenterSuspended/);
   assert.match(probe, /restoreMatchSource/);
   assert.doesNotMatch(probe, /syncViewportOwnership/);
