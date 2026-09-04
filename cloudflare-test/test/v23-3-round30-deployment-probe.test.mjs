@@ -12,8 +12,13 @@ function fixtureFetch(overrides = {}) {
     '/v23.3/index.mjs': "import './round30-feedback-fixes.mjs'; round30FeedbackFixes: 'enabled'",
     '/v23.3/round30-feedback-fixes.mjs': `
       export const USER_FEEDBACK_ROUND30_BUILD = '2026-09-04-r30';
-      #ciao-miniapp-root .cw233-ranking-page:has([data-cw233-rank-filter='overall'][aria-selected='true']){}
-      #ciao-miniapp-root .cw233-prediction-page:has([data-cw233-filter='all'][aria-selected='true']){}
+      #ciao-miniapp-root .cw233-ranking-page:has([data-cw233-rank-filter='overall'][aria-selected='true']),
+      #ciao-miniapp-root .cw233-prediction-page:has([data-cw233-filter='all'][aria-selected='true']){
+        --r11a:#546681;
+        --r11b:#334158;
+        --r11soft:rgba(255,255,255,.055);
+        --r11line:rgba(255,255,255,.11);
+      }
       #ciao-miniapp-root.match-center-open #ciao-v232-matches-overlay{display:none!important;}
       #ciao-miniapp-root.match-center-open .mc-back{display:flex!important;align-items:center!important;justify-content:center!important;padding:0!important;}
       #ciao-miniapp-root .cw233-ranking-stat{align-items:center!important;justify-content:center!important;text-align:center!important;}
