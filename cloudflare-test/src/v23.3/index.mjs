@@ -1,3 +1,4 @@
+import './boot-gate.mjs';
 import './app-theme.mjs';
 import './navigation-ui.mjs';
 import './legacy-match-center-theme.mjs';
@@ -26,6 +27,7 @@ import './round37-runtime.mjs';
 
 export const CiaoV233 = Object.freeze({
   version: '23.3',
+  bootGate: 'round38',
   appTheme: 'premium-blue',
   navigation: 'enabled',
   home: 'enabled',
