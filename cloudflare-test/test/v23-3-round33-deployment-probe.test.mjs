@@ -60,10 +60,12 @@ test('Round 33 deployment probe verifies external Overview preservation and Matc
   assert.equal(report.runtime.noRound31OverviewCaptureHijack, true);
 });
 
-test('Round 33 deployment probe rejects a missing sanitizer marker', async () => {
+test('Round 33 deployment probe rejects a sanitizer that no longer removes Form', async () => {
   await assert.rejects(
     probeRound33Deployment({
-      fetchImpl:fixtureFetch({ '/':shellFixture.replace('__cw233Round33SanitizeExternalOverviewHtml', '__missingSanitizer') }),
+      fetchImpl:fixtureFetch({
+        '/':shellFixture.replace("holder.querySelectorAll?.('.cw14-form-card');", ''),
+      }),
       writeArtifact:false,
     }),
     /Round 33 deployment markers are incomplete/,
