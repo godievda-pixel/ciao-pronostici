@@ -37,9 +37,8 @@ test('Round 21 legacy Match Center logo helper renders BSD crest URLs before emo
 test('Round 21 external tournament theme outranks legacy #ciao-miniapp-root blue borders', () => {
   const source = readFileSync(new URL('../src/v23.3/legacy-match-center-theme.mjs', import.meta.url), 'utf8');
   for (const selector of ['.mc-toolbar', '.mc-hero', '.mc-tabs', '.mc-section']) {
-    assert.match(
-      source,
-      new RegExp(`#ciao-miniapp-root\\[data-cw233-mc-competition\\] \\${selector.replace('.', '\\.')}`),
+    assert.ok(
+      source.includes(`#ciao-miniapp-root[data-cw233-mc-competition] ${selector}`),
       `${selector} must be themed with root-id specificity`,
     );
   }
