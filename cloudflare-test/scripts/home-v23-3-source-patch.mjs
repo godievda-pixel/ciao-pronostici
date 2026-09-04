@@ -4,6 +4,7 @@ const MARKER = 'cw233-home-multicompetition';
 const EXTERNAL_MARKER = 'cw233-single-legacy-match-center-r20';
 const OVERLAY_LIFECYCLE_MARKER = 'cw233-external-match-overlay-lifecycle-r21';
 const LOGO_PATCH_MARKER = 'cw233-legacy-direct-crest-r22';
+const ROUND23_UNIFIED_STATE_MARKER = 'cw233-round23-unified-state-fixes';
 const LATE_MATCH_CENTER_MARKER = '/* ===== /Ciao, Web! v20.15 stable match center live patch ===== */';
 
 function replaceSeasonLabel(input) {
@@ -220,11 +221,66 @@ closeMatchCenter = function(){
   return source;
 }
 
+function applyRound23UnifiedStateFixes(input) {
+  let source = String(input);
+  if (source.includes(ROUND23_UNIFIED_STATE_MARKER)) return source;
+  if (!source.includes(OVERLAY_LIFECYCLE_MARKER)) throw new Error('v23.3 round23 lifecycle anchor missing');
+
+  const patch = `
+
+/* ${ROUND23_UNIFIED_STATE_MARKER} */
+const __cw233Round23RestoreMatchesOverlay = __cw233RestoreMatchesOverlay;
+__cw233RestoreMatchesOverlay = function(context){
+  if (tab !== 'calendar') return;
+  return __cw233Round23RestoreMatchesOverlay(context);
+};
+
+document.addEventListener?.('click', event => {
+  const button = event?.target?.closest?.('button[data-tab]');
+  if (!button) return;
+  __cw233R21MatchesOverlayState = null;
+}, true);
+
+const __cw233Round23LegacyBindMatchCenter = bindMatchCenter;
+bindMatchCenter = function(){
+  __cw233Round23LegacyBindMatchCenter();
+  if (!__cw233ExternalMatchContext) return;
+  for (const button of root.querySelectorAll?.('[data-mc-tab]') || []) {
+    if (button.dataset?.cw233Round23TabBound === '1') continue;
+    button.dataset.cw233Round23TabBound = '1';
+    button.addEventListener?.('click', event => {
+      if (!__cw233ExternalMatchContext || !matchData) return;
+      event.preventDefault?.();
+      event.stopImmediatePropagation?.();
+      const nextTab = String(event.currentTarget?.dataset?.mcTab || '').trim();
+      if (!nextTab) return;
+      matchCenterTab = nextTab;
+      for (const node of root.querySelectorAll?.('[data-mc-tab]') || []) {
+        const active = node === event.currentTarget;
+        node.classList?.toggle?.('active', active);
+        node.setAttribute?.('aria-selected', active ? 'true' : 'false');
+      }
+      const host = main?.querySelector?.('[data-mc-tab-content]');
+      if (host) {
+        host.dataset.mcTabContent = nextTab;
+        host.innerHTML = matchTabContent(matchData, nextTab);
+      }
+    }, true);
+  }
+};
+`;
+
+  source += patch;
+  if (!source.includes(ROUND23_UNIFIED_STATE_MARKER)) throw new Error('v23.3 round23 unified state patch did not apply');
+  return source;
+}
+
 export function applyHomeV233SourcePatch(input) {
   let source = replaceSeasonLabel(input);
   source = applyLegacyLogoPatch(source);
   source = applyHomePatch(source);
   source = applyExternalLegacyPatch(source);
   source = applyExternalOverlayLifecyclePatch(source);
+  source = applyRound23UnifiedStateFixes(source);
   return source;
 }
