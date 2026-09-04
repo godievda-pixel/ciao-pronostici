@@ -75,6 +75,17 @@ function participantRoster(authenticated) {
   return [current, ...byId.values()];
 }
 
+function favoriteTeamMap(authenticated) {
+  const byId = new Map();
+  const currentId = text(authenticated?.userId);
+  if (currentId) byId.set(currentId, authenticated?.favoriteTeam || null);
+  for (const participant of Array.isArray(authenticated?.participants) ? authenticated.participants : []) {
+    const userId = text(participant?.userId);
+    if (userId) byId.set(userId, participant?.favoriteTeam || null);
+  }
+  return byId;
+}
+
 function predictionState(match, activeSeason, now, deps) {
   if (text(match?.status).toLowerCase() === 'finished') return 'finished';
   try {
@@ -311,7 +322,12 @@ export function createPredictionService({ request, env, now = new Date(), deps =
       if (scope === 'competition') params.set('competition', competition);
       const payload = await internalJson(stub, `/rankings?${params}`);
       const ranking = Array.isArray(payload.ranking) ? payload.ranking : [];
-      return ranking.map(row => ({ ...row, is_current:text(row?.user_id) === authenticated.userId }));
+      const clubs = favoriteTeamMap(authenticated);
+      return ranking.map(row => ({
+        ...row,
+        favorite_team: clubs.get(text(row?.user_id)) || null,
+        is_current:text(row?.user_id) === authenticated.userId,
+      }));
     } catch (error) { throw mapError(error); }
   }
 
@@ -323,7 +339,8 @@ export function createPredictionService({ request, env, now = new Date(), deps =
       reconcileInBackground(stub);
       const params = new URLSearchParams({ user_id:authenticated.userId });
       const payload = await internalJson(stub, `/rankings/me?${params}`);
-      return payload.ranking && typeof payload.ranking === 'object' ? payload.ranking : null;
+      if (!payload.ranking || typeof payload.ranking !== 'object') return null;
+      return { ...payload.ranking, favorite_team:authenticated.favoriteTeam || null };
     } catch (error) { throw mapError(error); }
   }
 
