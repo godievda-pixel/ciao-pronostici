@@ -172,7 +172,7 @@ test('Serie A standings preserve the stable logo_url supplied by ciao-web-api', 
   assert.equal(payload.data.rows[0].team.crestUrl, 'https://img.test/roma.svg');
 });
 
-test('Serie A Matches restores the previous stable legacy calendar instead of the generic tournament screen', async () => {
+test('Serie A Matches loads the new competition screen instead of restoring the legacy calendar', async () => {
   const shown = [];
   let hidden = 0;
   const loaded = [];
@@ -181,16 +181,18 @@ test('Serie A Matches restores the previous stable legacy calendar instead of th
     hide() { hidden += 1; },
     async loadScreen(competition) {
       loaded.push(competition);
-      return `<section>${competition}</section>`;
+      return `<section data-cw232-view="competition" data-cw232-competition="${competition}">${competition}</section>`;
     },
   });
 
   controller.openHub();
   const result = await controller.openCompetition('serie_a');
 
-  assert.equal(result, 'legacy');
-  assert.equal(hidden, 1);
-  assert.deepEqual(loaded, []);
+  assert.equal(result, 'loaded');
+  assert.equal(hidden, 0);
+  assert.deepEqual(loaded, ['serie_a']);
+  assert.match(shown.at(-1), /data-cw232-view="competition"/);
+  assert.match(shown.at(-1), /data-cw232-competition="serie_a"/);
 });
 
 // CI-only delayed live probe trigger; no runtime behavior changes.

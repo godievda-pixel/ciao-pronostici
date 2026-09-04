@@ -41,10 +41,11 @@ predict = __cw231HomeHtml;
   assert.doesNotMatch(patched, /openCanonicalMatchCenter/);
 });
 
-test('Serie A keeps the proven legacy calendar and full Match Center path', async () => {
+test('Serie A uses the new Matches competition screen while preserving the full legacy Match Center delegation', async () => {
   const matchesUi = await readFile(new URL('../src/v23.2/matches-ui.mjs', import.meta.url), 'utf8');
-  const round7 = await readFile(new URL('../src/v23.3/round7-regression-fixes.mjs', import.meta.url), 'utf8');
-  assert.match(matchesUi, /competition\s*===\s*['"]serie_a['"]\)\s*\{\s*close\(\);\s*return\s+['"]legacy['"]/);
-  assert.match(round7, /cw232-serie-a-back/);
-  assert.match(round7, /Назад к турнирам/);
+  const matchCenter = await readFile(new URL('../src/v23.3/match-center-core.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(matchesUi, /competition\s*===\s*['"]serie_a['"]\)\s*\{\s*close\(\);\s*return\s+['"]legacy['"]/);
+  assert.match(matchesUi, /await loadScreen\(competition\)/);
+  assert.match(matchCenter, /function delegateSerieA\(/);
+  assert.match(matchCenter, /ciao-v233-open-serie-a-match/);
 });
