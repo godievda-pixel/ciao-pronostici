@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import worker from '../src/worker.js';
 import { createMatchCenterStore } from '../src/v23.3/match-center-store.mjs';
 import { renderMatchCenterView } from '../src/v23.3/match-center-view.mjs';
 
@@ -12,6 +13,13 @@ function falseCoverage() {
     lineups:false,
     players:false,
   };
+}
+
+function json(payload, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers:{ 'content-type':'application/json' },
+  });
 }
 
 test('Round 40 summary coverage=false does not block the lazy rich overview request', async () => {
@@ -50,6 +58,71 @@ test('Round 40 summary coverage=false does not block the lazy rich overview requ
   assert.equal(state.sectionState.overview.status, 'ready');
   assert.equal(state.match.coverage.overview, true);
   assert.deepEqual(state.sections.overview, { venue:'San Siro', referee:'Orsato' });
+});
+
+test('Round 40 Serie A worker can resolve rich overview after a summary-only base response', async () => {
+  const calls = [];
+  const env = {
+    CIAO_WEB_API:{
+      fetch:async req => {
+        const url = new URL(req.url);
+        const body = req.method === 'POST' ? await req.clone().json() : null;
+        calls.push({ path:url.pathname, body });
+        if (url.pathname === '/api/ciao-match-summary-fast-v2') {
+          return json({
+            ok:true,
+            match:{
+              id:77,
+              kickoff_at:'2026-09-20T18:00:00Z',
+              status:'scheduled',
+              home:{ id:1, name:'Интер' },
+              away:{ id:2, name:'Ювентус' },
+            },
+          });
+        }
+        if (url.pathname === '/api/ciao-match-center-fast-v3') {
+          return json({
+            ok:true,
+            match:{
+              id:77,
+              kickoff_at:'2026-09-20T18:00:00Z',
+              status:'scheduled',
+              home:{ id:1, name:'Интер' },
+              away:{ id:2, name:'Ювентус' },
+            },
+            overview_meta:{
+              venue:{ name:'San Siro' },
+              referee:{ name:'Orsato' },
+            },
+          });
+        }
+        return json({ ok:false, error:'unexpected_route' }, 404);
+      },
+    },
+  };
+  const headers = { 'x-telegram-init-data':'signed-user' };
+
+  const baseResponse = await worker.fetch(new Request(
+    'https://test.local/api/v23.3/match-center?competition=serie_a&match_id=serie_a%3A77',
+    { headers },
+  ), env, {});
+  const basePayload = await baseResponse.json();
+  assert.equal(baseResponse.status, 200);
+  assert.equal(basePayload.data.match.coverage.overview, false);
+
+  const sectionResponse = await worker.fetch(new Request(
+    'https://test.local/api/v23.3/match-center?competition=serie_a&match_id=serie_a%3A77&section=overview',
+    { headers },
+  ), env, {});
+  const sectionPayload = await sectionResponse.json();
+  assert.equal(sectionResponse.status, 200);
+  assert.equal(sectionPayload.data.available, true);
+  assert.equal(sectionPayload.data.coverage.overview, true);
+  assert.equal(sectionPayload.data.data.venue.name, 'San Siro');
+  assert.deepEqual(calls.map(call => call.path), [
+    '/api/ciao-match-summary-fast-v2',
+    '/api/ciao-match-center-fast-v3',
+  ]);
 });
 
 test('Round 40 Match Center tabs are one premium segmented control themed by competition accent', () => {
