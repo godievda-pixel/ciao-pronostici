@@ -74,11 +74,14 @@ test('Round 27 keeps Matches covering legacy calendar until each destination tab
 test('Round 27 central navigation coordinator maps every destination to a visible-shell readiness check', async () => {
   const navigation = await readFile(new URL('../src/v23.3/navigation-ui.mjs', import.meta.url), 'utf8');
   assert.match(navigation, /dispatchNavigationReady/);
-  for (const tab of ['predict', 'mine', 'table', 'seriea', 'profile']) {
-    assert.match(navigation, new RegExp(`['"]${tab}['"]`), `navigation coordinator must cover ${tab}`);
+  for (const tab of ['predict', 'mine', 'table', 'profile']) {
+    assert.match(navigation, new RegExp(`\\b${tab}\\s*:`), `navigation coordinator must cover ${tab}`);
   }
+  assert.match(navigation, /tab\s*===\s*['"]seriea['"]/);
+  assert.match(navigation, /data-cw233-home/);
   assert.match(navigation, /cw233-prediction-page/);
   assert.match(navigation, /cw233-ranking-page/);
+  assert.match(navigation, /stats-grid/);
   assert.match(navigation, /ciao-v233-tables-overlay/);
 });
 
