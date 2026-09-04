@@ -174,6 +174,22 @@ const CSS = `
 #ciao-miniapp-root.match-center-open .mc-event {
   background:var(--cw233-mc-surface)!important;
 }
+#ciao-miniapp-root.match-center-open .cw14-info-item,
+#ciao-miniapp-root.match-center-open .cw14-form-card,
+#ciao-miniapp-root.match-center-open .cw20-stat-mini,
+#ciao-miniapp-root.match-center-open .cw20-player-row,
+#ciao-miniapp-root.match-center-open .cw20-event-card {
+  background:var(--cw233-mc-surface)!important;
+}
+#ciao-miniapp-root.match-center-open .mc-lineup-switch button {
+  border-color:var(--cw233-mc-border)!important;
+  background:var(--cw233-mc-surface)!important;
+}
+#ciao-miniapp-root.match-center-open .mc-lineup-switch button.active,
+#ciao-miniapp-root.match-center-open .mc-lineup-switch button[aria-selected="true"] {
+  color:#fff!important;
+  background:linear-gradient(135deg,var(--cw233-mc-accent),var(--cw233-mc-accent-2))!important;
+}
 #ciao-miniapp-root.match-center-open .mc-section-title,
 #ciao-miniapp-root.match-center-open .mc-key strong,
 #ciao-miniapp-root.match-center-open .mc-rating {
