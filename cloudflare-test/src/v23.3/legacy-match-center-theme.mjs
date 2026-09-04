@@ -176,8 +176,19 @@ const CSS = `
 #ciao-miniapp-root.match-center-open .mc-event {
   background:var(--cw233-mc-surface)!important;
 }
+/* Premium context cards: the old cw14 blocks now inherit the active competition rather than legacy blue. */
 #ciao-miniapp-root.match-center-open .cw14-info-item,
-#ciao-miniapp-root.match-center-open .cw14-form-card,
+#ciao-miniapp-root.match-center-open .cw14-form-card {
+  border:1px solid color-mix(in srgb,var(--cw233-mc-accent) 36%,transparent)!important;
+  border-radius:18px!important;
+  background:linear-gradient(145deg,
+    color-mix(in srgb,var(--cw233-mc-accent) 14%,var(--cw233-mc-bg)),
+    color-mix(in srgb,var(--cw233-mc-accent-2) 8%,var(--cw233-mc-bg)))!important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.025),
+    0 10px 28px color-mix(in srgb,var(--cw233-mc-accent) 9%,transparent)!important;
+  backdrop-filter:blur(14px)!important;
+}
 #ciao-miniapp-root.match-center-open .cw20-stat-mini,
 #ciao-miniapp-root.match-center-open .cw20-player-row,
 #ciao-miniapp-root.match-center-open .cw20-event-card {
