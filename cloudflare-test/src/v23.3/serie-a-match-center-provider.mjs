@@ -1,4 +1,5 @@
 import { adaptSerieALegacyMatchCenter } from './serie-a-match-center-adapter.mjs';
+import { normalizeSerieALegacyMatchCenter } from './serie-a-match-center-legacy-normalizer.mjs';
 
 export const SERIE_A_MATCH_SUMMARY_PATH = '/api/ciao-match-summary-fast-v2';
 export const SERIE_A_MATCH_CENTER_PATH = '/api/ciao-match-center-fast-v3';
@@ -76,6 +77,10 @@ async function postStable({ request, env, initData, path, body }) {
   return unwrapSerieAMatchCenterPayload(payload);
 }
 
+function adaptLegacy(raw) {
+  return adaptSerieALegacyMatchCenter(normalizeSerieALegacyMatchCenter(raw));
+}
+
 function richEnoughBase(adapted) {
   const home = String(adapted?.base?.homeTeam?.name || '').trim();
   const away = String(adapted?.base?.awayTeam?.name || '').trim();
@@ -91,6 +96,24 @@ function canonicalBaseFromAdapted(adapted) {
   };
 }
 
+function canonicalSectionPayload(adapted, section) {
+  if (section !== 'overview') {
+    return {
+      available:adapted.coverage?.[section] === true,
+      coverage:adapted.coverage,
+      data:adapted[section] ?? null,
+    };
+  }
+
+  const available = adapted.coverage?.overview === true || adapted.coverage?.stats === true;
+  const coverage = Object.freeze({ ...adapted.coverage, overview:available });
+  const data = Object.freeze({
+    ...adapted.overview,
+    summaryStats:adapted.coverage?.stats === true ? adapted.stats : null,
+  });
+  return { available, coverage, data };
+}
+
 export async function loadSerieAMatchCenterBase({ request, env, initData, matchId }) {
   const id = numericSerieAMatchId(matchId);
   const summaryRaw = await postStable({
@@ -100,7 +123,7 @@ export async function loadSerieAMatchCenterBase({ request, env, initData, matchI
     path:SERIE_A_MATCH_SUMMARY_PATH,
     body:{ match_id:id },
   });
-  let adapted = adaptSerieALegacyMatchCenter(summaryRaw);
+  let adapted = adaptLegacy(summaryRaw);
   if (!richEnoughBase(adapted)) {
     const fullRaw = await postStable({
       request,
@@ -109,7 +132,7 @@ export async function loadSerieAMatchCenterBase({ request, env, initData, matchI
       path:SERIE_A_MATCH_CENTER_PATH,
       body:{ match_id:id, sections:[], include_split:false },
     });
-    adapted = adaptSerieALegacyMatchCenter({ ...summaryRaw, ...fullRaw });
+    adapted = adaptLegacy({ ...summaryRaw, ...fullRaw });
   }
   if (!richEnoughBase(adapted)) throw providerError('match_not_found', 404);
   return { match:canonicalBaseFromAdapted(adapted) };
@@ -126,10 +149,5 @@ export async function loadSerieAMatchCenterSection({ request, env, initData, mat
     path:SERIE_A_MATCH_CENTER_PATH,
     body:{ match_id:id, sections:[...sections], include_split:false },
   });
-  const adapted = adaptSerieALegacyMatchCenter(raw);
-  return {
-    available:adapted.coverage?.[section] === true,
-    coverage:adapted.coverage,
-    data:adapted[section] ?? null,
-  };
+  return canonicalSectionPayload(adaptLegacy(raw), section);
 }
