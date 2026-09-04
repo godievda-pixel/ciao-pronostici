@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 
 import {
   captureMatchSource,
@@ -88,4 +89,11 @@ test('round37 no longer owns Match Center back or parent overlay lifecycle', asy
   const source = await import('../src/v23.3/round37-runtime.mjs?round38-lifecycle');
   assert.equal('dispatchMatchCenterBack' in source, false);
   assert.equal('restoreMatchSource' in source, false);
+});
+
+test('round31 no longer watches root class or owns parent Match Center viewport', async () => {
+  const source = await readFile(new URL('../src/v23.3/round31-match-center-stability.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /cw233-r31-match-center-owned/);
+  assert.doesNotMatch(source, /MutationObserver/);
+  assert.doesNotMatch(source, /closest\?\.\('\.mc-back'\)/);
 });
