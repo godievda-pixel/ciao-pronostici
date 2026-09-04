@@ -16,7 +16,9 @@ function fixtureFetch(overrides = {}) {
       #ciao-miniapp-root.match-center-open { --cw233-mc-accent:#0c5aa8; --cw233-mc-accent-2:#287fc7; }
       #ciao-miniapp-root.match-center-open:not([data-cw233-mc-competition]) .mc-back { display:none!important; }
       #ciao-miniapp-root.match-center-open .mc-toolbar { border-bottom:0!important; }
-      #ciao-miniapp-root.match-center-open .cw20-stat-mini { background:var(--cw233-mc-surface)!important; }
+      #ciao-miniapp-root.match-center-open .cw20-stat-mini,
+      #ciao-miniapp-root.match-center-open .cw20-player-row,
+      #ciao-miniapp-root.match-center-open .cw20-event-card { background:var(--cw233-mc-surface)!important; }
       #ciao-miniapp-root.match-center-open .mc-lineup-switch button { background:var(--cw233-mc-surface)!important; }
       #ciao-miniapp-root.match-center-open .mc-lineup-switch button.active { background:linear-gradient(135deg,var(--cw233-mc-accent),var(--cw233-mc-accent-2))!important; }
     `,
