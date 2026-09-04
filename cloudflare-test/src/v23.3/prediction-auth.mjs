@@ -49,13 +49,45 @@ function stableUserId(user = {}) {
 }
 
 export function normalizeFavoriteTeam(source = {}) {
-  const team = source?.favorite_team ?? source?.favoriteTeam;
-  if (!team || typeof team !== 'object') return null;
-  const rawId = Number(team.id ?? team.team_id ?? team.teamId);
+  const nested = source?.favorite_team ?? source?.favoriteTeam;
+  const team = nested && typeof nested === 'object' ? nested : {};
+  const rawId = Number(
+    team.id
+    ?? team.team_id
+    ?? team.teamId
+    ?? source?.favorite_team_id
+    ?? source?.favoriteTeamId,
+  );
   const id = Number.isFinite(rawId) && rawId > 0 ? rawId : null;
-  const name = text(team.name ?? team.team_name ?? team.teamName);
-  const crestUrl = text(team.logo_url ?? team.logoUrl ?? team.crest_url ?? team.crestUrl ?? team.logo ?? team.crest);
-  const customEmojiId = text(team.custom_emoji_id ?? team.customEmojiId);
+  const name = text(
+    team.name
+    ?? team.team_name
+    ?? team.teamName
+    ?? source?.favorite_team_name
+    ?? source?.favoriteTeamName,
+  );
+  const crestUrl = text(
+    team.logo_url
+    ?? team.logoUrl
+    ?? team.crest_url
+    ?? team.crestUrl
+    ?? team.logo
+    ?? team.crest
+    ?? source?.favorite_team_logo
+    ?? source?.favorite_team_logo_url
+    ?? source?.favorite_team_crest
+    ?? source?.favorite_team_crest_url
+    ?? source?.favoriteTeamLogo
+    ?? source?.favoriteTeamLogoUrl
+    ?? source?.favoriteTeamCrest
+    ?? source?.favoriteTeamCrestUrl,
+  );
+  const customEmojiId = text(
+    team.custom_emoji_id
+    ?? team.customEmojiId
+    ?? source?.favorite_team_custom_emoji_id
+    ?? source?.favoriteTeamCustomEmojiId,
+  );
   if (!id && !name && !crestUrl && !customEmojiId) return null;
   return Object.freeze({
     id,
