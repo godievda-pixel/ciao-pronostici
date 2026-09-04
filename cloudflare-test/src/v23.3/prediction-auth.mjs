@@ -48,6 +48,23 @@ function stableUserId(user = {}) {
   return stableId ? `telegram:${stableId}` : null;
 }
 
+export function normalizeFavoriteTeam(source = {}) {
+  const team = source?.favorite_team ?? source?.favoriteTeam;
+  if (!team || typeof team !== 'object') return null;
+  const rawId = Number(team.id ?? team.team_id ?? team.teamId);
+  const id = Number.isFinite(rawId) && rawId > 0 ? rawId : null;
+  const name = text(team.name ?? team.team_name ?? team.teamName);
+  const crestUrl = text(team.logo_url ?? team.logoUrl ?? team.crest_url ?? team.crestUrl ?? team.logo ?? team.crest);
+  const customEmojiId = text(team.custom_emoji_id ?? team.customEmojiId);
+  if (!id && !name && !crestUrl && !customEmojiId) return null;
+  return Object.freeze({
+    id,
+    name: name || 'Любимый клуб',
+    crestUrl: crestUrl || null,
+    customEmojiId: customEmojiId || null,
+  });
+}
+
 function participantRoster(payload = {}, currentUser = null) {
   const standings = extractStandings(payload);
   if (!standings.length) return Object.freeze([]);
@@ -64,6 +81,7 @@ function participantRoster(payload = {}, currentUser = null) {
       userId,
       displayName: displayName(source),
       username: text(source.username) || null,
+      favoriteTeam: normalizeFavoriteTeam(source),
     }));
   }
 
@@ -74,6 +92,7 @@ function participantRoster(payload = {}, currentUser = null) {
         userId,
         displayName: displayName(currentUser),
         username: text(currentUser.username) || null,
+        favoriteTeam: normalizeFavoriteTeam(currentUser),
       });
       byId.delete(userId);
       return Object.freeze([current, ...byId.values()]);
@@ -125,6 +144,7 @@ export async function resolveAuthenticatedUser({ request, env } = {}) {
     userId,
     displayName: displayName(user),
     username: text(user?.username) || null,
+    favoriteTeam: normalizeFavoriteTeam(user),
   };
   const participants = participantRoster(payload, user);
   if (participants.length) result.participants = participants;
