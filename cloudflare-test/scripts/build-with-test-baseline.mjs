@@ -1,12 +1,14 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from './build.mjs';
+import { applyRound34ExternalOverviewFormOnlySourcePatch } from './round34-external-overview-form-only-source-patch.mjs';
 import { loadBaseHtml } from './test-baseline.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const temporaryBasePath = resolve(root, '.round18-test-base.html');
 const baselineOutPath = resolve(root, 'dist/__baseline/v23-3-round18.html');
+const distIndexPath = resolve(root, 'dist/index.html');
 
 async function run() {
   const { html, sourceUrl } = await loadBaseHtml({ includeLegacyBase:false });
@@ -16,6 +18,9 @@ async function run() {
   process.env.BASE_FILE = temporaryBasePath;
   try {
     const result = await build();
+    const builtHtml = await readFile(distIndexPath, 'utf8');
+    const formOnlyHtml = applyRound34ExternalOverviewFormOnlySourcePatch(builtHtml);
+    await writeFile(distIndexPath, formOnlyHtml, 'utf8');
     await mkdir(dirname(baselineOutPath), { recursive:true });
     await writeFile(baselineOutPath, html, 'utf8');
     console.log(JSON.stringify({
