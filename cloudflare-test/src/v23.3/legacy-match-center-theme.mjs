@@ -88,8 +88,11 @@ const CSS = `
 }
 #ciao-miniapp-root.match-center-open .mc-toolbar {
   background:color-mix(in srgb, var(--cw233-mc-bg) 94%, black 6%)!important;
-  border-bottom:1px solid var(--cw233-mc-border)!important;
+  border-bottom:0!important;
   box-shadow:none!important;
+}
+#ciao-miniapp-root.match-center-open:not([data-cw233-mc-competition]) .mc-back {
+  display:none!important;
 }
 #ciao-miniapp-root.match-center-open .mc-back {
   border-color:var(--cw233-mc-border)!important;
