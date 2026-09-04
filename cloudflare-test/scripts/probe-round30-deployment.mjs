@@ -78,7 +78,7 @@ export async function probeRound30Deployment({ fetchImpl = fetch, writeArtifact 
     status:rankingResponse.status,
     responseOk:rankingResponse.ok,
     favoriteClubBadges:rankingText.includes('function favoriteClub(')
-      && rankingText.includes('favorite_team||row?.favoriteTeam')
+      && /favorite_team\s*\|\|\s*row\?\.favoriteTeam/.test(rankingText)
       && rankingText.includes('cw233-ranking-club-logo')
       && !rankingText.includes('function initials('),
   };
