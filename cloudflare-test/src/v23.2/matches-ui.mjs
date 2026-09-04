@@ -114,11 +114,15 @@ function coppaStageLabel(stage) { return COPPA_STAGE_LABELS[String(stage || '')]
 function coppaStageOrder(stage) { const index = COPPA_STAGE_ORDER.indexOf(String(stage || '')); return index < 0 ? Number.MAX_SAFE_INTEGER : index; }
 
 export function competitionNavigationGroups(matches = [], competition = '') {
-  if (!UEFA_COMPETITIONS.has(competition) && competition !== 'coppa_italia') return Object.freeze([]);
+  if (competition !== 'serie_a' && !UEFA_COMPETITIONS.has(competition) && competition !== 'coppa_italia') return Object.freeze([]);
   const groups = new Map();
   for (const match of sortChronologically(Array.isArray(matches) ? matches : [])) {
     let key; let label; let order;
-    if (UEFA_COMPETITIONS.has(competition)) {
+    if (competition === 'serie_a') {
+      const round = numericRound(match);
+      if (round) { key = `round:${round}`; label = String(round); order = round; }
+      else { const stage = String(match?.stage || 'Этап'); key = `stage:${stage}`; label = stage; order = Number.MAX_SAFE_INTEGER; }
+    } else if (UEFA_COMPETITIONS.has(competition)) {
       const round = numericRound(match);
       if (round) { key = `round:${round}`; label = `Тур ${round}`; order = round; }
       else { const stage = String(match?.stage || 'Этап'); key = `stage:${stage}`; label = stage; order = Number.MAX_SAFE_INTEGER; }
@@ -159,7 +163,7 @@ function renderCoppaTabs() { return `<div class="cw232-coppa-tabs" role="tablist
 export function renderCompetitionScreen(competition, data = {}, { now = new Date() } = {}) {
   const config = getCompetitionConfig(competition);
   const matches = sortChronologically(Array.isArray(data?.matches) ? data.matches : []);
-  const body = UEFA_COMPETITIONS.has(competition) || competition === 'coppa_italia'
+  const body = competition === 'serie_a' || UEFA_COMPETITIONS.has(competition) || competition === 'coppa_italia'
     ? renderNavigableGroups(matches, competition, now)
     : renderMatchGroups(matches, competition);
   return `<section class="cw232-competition" data-cw232-view="competition" data-cw232-competition="${esc(competition)}" data-cw232-theme="${esc(config.theme)}"><header class="cw232-competition__head"><button type="button" class="cw232-back" data-cw232-action="hub" aria-label="Назад к турнирам">←</button><div><span class="cw232-matches-kicker">Матчи</span><h2>${esc(config.title)}</h2><p>${competition === 'serie_a' || competition === 'coppa_italia' ? 'Италия' : 'Итальянские клубы'}</p></div></header>${body}</section>`;
