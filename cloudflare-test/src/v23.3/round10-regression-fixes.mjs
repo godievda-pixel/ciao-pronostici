@@ -32,7 +32,7 @@ const CSS = `
 /* Full-screen premium tournament ambience, not only the match cards. */
 #ciao-v232-matches-overlay{background:#07101f!important;transition:background .18s ease}
 #ciao-v232-matches-overlay[data-cw233-round10-theme='serie-a']{
-  background:radial-gradient(circle at 78% 6%,rgba(49,91,255,.28),transparent 36%),radial-gradient(circle at 8% 74%,rgba(17,66,158,.22),transparent 42%),linear-gradient(165deg,#081632 0%,#061027 46%,#050b1b 100%)!important
+  background:radial-gradient(circle at 78% 6%,rgba(12,90,168,.28),transparent 36%),radial-gradient(circle at 8% 74%,rgba(40,127,199,.22),transparent 42%),linear-gradient(165deg,#071626 0%,#061321 46%,#050f1a 100%)!important
 }
 #ciao-v232-matches-overlay[data-cw233-round10-theme='coppa']{
   background:radial-gradient(circle at 86% 7%,rgba(202,45,58,.21),transparent 34%),radial-gradient(circle at 4% 68%,rgba(0,143,72,.18),transparent 40%),linear-gradient(165deg,#171218 0%,#0d1215 48%,#07100d 100%)!important
@@ -47,7 +47,7 @@ const CSS = `
   background:radial-gradient(circle at 84% 7%,rgba(33,199,112,.24),transparent 35%),radial-gradient(circle at 5% 73%,rgba(8,103,57,.22),transparent 42%),linear-gradient(165deg,#081d14 0%,#07140f 48%,#050c09 100%)!important
 }
 html.cw233-serie-a-active #ciao-miniapp-root .content{
-  background:radial-gradient(circle at 86% 4%,rgba(49,91,255,.25),transparent 35%),radial-gradient(circle at 4% 72%,rgba(16,68,164,.20),transparent 42%),linear-gradient(165deg,#081632 0%,#061027 48%,#050b1b 100%)!important
+  background:radial-gradient(circle at 86% 4%,rgba(12,90,168,.25),transparent 35%),radial-gradient(circle at 4% 72%,rgba(40,127,199,.20),transparent 42%),linear-gradient(165deg,#071626 0%,#061321 48%,#050f1a 100%)!important
 }
 
 /* Favorite club next match: keep the compact useful card and make it feel intentional. */
