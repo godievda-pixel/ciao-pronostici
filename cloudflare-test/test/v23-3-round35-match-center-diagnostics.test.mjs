@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import {
   ROUND35_CSS,
+  installRound35MatchCenterOverviewFixes,
   isRound35ExternalCompetition,
   removeRound35ExternalOverviewForm,
 } from '../src/v23.3/round35-match-center-overview-fixes.mjs';
@@ -53,14 +54,65 @@ test('Round 35 never removes Form from Serie A Match Center', () => {
   assert.deepEqual(fixture.counts(), { sectionRemoved:0, markerRemoved:0 });
 });
 
-test('Round 35 Form guard is scoped to Overview and has a CSS fail-safe', () => {
+test('Round 35 Form guard is scoped to external Overview only, including the CSS fail-safe', () => {
   const fixture = externalFormFixture({ competition:'uel', tab:'stats' });
   assert.equal(removeRound35ExternalOverviewForm(fixture.root), 0);
   assert.deepEqual(fixture.counts(), { sectionRemoved:0, markerRemoved:0 });
+  for (const competition of ['coppa_italia', 'ucl', 'uel', 'uecl']) {
+    assert.match(ROUND35_CSS, new RegExp(`data-cw233-mc-competition=["']${competition}["']`));
+  }
+  assert.doesNotMatch(ROUND35_CSS, /data-cw233-mc-competition=["']serie_a["']/);
+  assert.doesNotMatch(ROUND35_CSS, /\[data-cw233-mc-competition\]\s/);
   assert.match(
     ROUND35_CSS,
-    /\[data-cw233-mc-competition\][\s\S]*?\[data-mc-tab-content=['"]overview['"]\][\s\S]*?\.mc-section:has\(\.cw14-form-card\)[\s\S]*?display:none!important/,
+    /\[data-mc-tab-content=['"]overview['"]\][\s\S]*?\.mc-section:has\(\.cw14-form-card\)[\s\S]*?display:none!important/,
   );
+});
+
+test('Round 35 observer removes Form again if a late legacy renderer reinserts it', () => {
+  let inserted = false;
+  let sectionRemoved = 0;
+  let observerCallback = null;
+  let observeOptions = null;
+  const section = { remove(){ sectionRemoved += 1; inserted = false; } };
+  const marker = { closest(selector){ return selector === '.mc-section' ? section : null; } };
+  const host = { querySelectorAll(selector){
+    assert.equal(selector, '.cw14-form-card');
+    return inserted ? [marker] : [];
+  } };
+  const root = {
+    dataset:{ cw233McCompetition:'uel' },
+    classList:{ contains(value){ return value === 'match-center-open'; } },
+    querySelector(selector){ return selector === '[data-mc-tab-content="overview"]' ? host : null; },
+  };
+  class FakeObserver {
+    constructor(callback){ observerCallback = callback; }
+    observe(_root, options){ observeOptions = options; }
+    disconnect(){}
+  }
+  const head = { appendChild(){} };
+  const documentRef = {
+    head,
+    getElementById(id){ return id === 'ciao-miniapp-root' ? root : null; },
+    createElement(){ return { id:'', textContent:'' }; },
+  };
+  const windowRef = {
+    MutationObserver:FakeObserver,
+    addEventListener(){},
+    removeEventListener(){},
+    queueMicrotask(callback){ callback(); },
+  };
+
+  const controller = installRound35MatchCenterOverviewFixes(documentRef, windowRef);
+  assert.ok(controller);
+  assert.deepEqual(observeOptions, { childList:true, subtree:true });
+  assert.equal(sectionRemoved, 0);
+
+  inserted = true;
+  observerCallback?.([]);
+  assert.equal(sectionRemoved, 1);
+  assert.equal(inserted, false);
+  controller.disconnect();
 });
 
 test('Round 35 pins Контекст Серии А to the Serie A blue palette in every tournament', () => {
