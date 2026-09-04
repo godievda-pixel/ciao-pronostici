@@ -54,7 +54,7 @@ test('Round 32 live probe now validates the Round 38 lifecycle owner instead of 
   assert.match(probe, /cw238-match-center-owner/);
   assert.match(probe, /cw238MatchCenterSuspended/);
   assert.match(probe, /restoreMatchSource/);
-  assert.doesNotMatch(probe, /syncViewportOwnership/);
+  assert.match(probe, /!compatText\.includes\(['"]syncViewportOwnership['"]\)/);
   assert.doesNotMatch(probe, /__cw233R21FinalClose/);
 });
 
