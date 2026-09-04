@@ -157,6 +157,20 @@ jobs:
             sleep 10
           done
 
+      - name: Probe deployed Round 39 canonical Match Center
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            if node scripts/probe-round39-match-center.mjs; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 6 ]; then
+              exit 1
+            fi
+            sleep 10
+          done
+
       - name: Upload v23.2 API contract observation
         if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
@@ -271,6 +285,15 @@ jobs:
         with:
           name: ciao-v23-3-round33-deployment
           path: cloudflare-test/artifacts/v23-3-round33-deployment.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload Round 39 Match Center deployment observation
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ciao-v23-3-round39-match-center
+          path: cloudflare-test/artifacts/v23-3-round39-match-center.json
           if-no-files-found: error
           retention-days: 7
 
