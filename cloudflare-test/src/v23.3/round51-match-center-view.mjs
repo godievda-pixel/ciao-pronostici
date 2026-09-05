@@ -96,12 +96,19 @@ function shotsView(html) {
   return output;
 }
 
+function round511FeedbackStyles() {
+  return `<style data-cw511-feedback-style>
+    .cw233-mc-form-run{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+    .cw233-mc-form-chip{min-width:0;width:100%;height:24px}
+  </style>`;
+}
+
 export function enhanceRound51MatchCenterView(html, state = {}, viewState = {}) {
   let output = String(html || '');
   if (!output) return output;
   const activeViewTab = canonicalRound51ViewTab(viewState?.activeViewTab || state?.activeTab);
   output = replaceProviderTabs(output, activeViewTab);
-  if (activeViewTab === 'statistics') return statisticsView(output);
-  if (activeViewTab === 'shots') return shotsView(output);
-  return output;
+  if (activeViewTab === 'statistics') output = statisticsView(output);
+  if (activeViewTab === 'shots') output = shotsView(output);
+  return `${output}${round511FeedbackStyles()}`;
 }
