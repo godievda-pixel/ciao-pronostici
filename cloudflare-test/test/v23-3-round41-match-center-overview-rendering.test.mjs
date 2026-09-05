@@ -58,7 +58,7 @@ test('Round 41 upcoming-match overview renders venue and referee instead of an e
   assert.doesNotMatch(full, /data-cw233-mc-overview-empty/);
 });
 
-test('Round 41 a genuinely empty rich overview renders an explicit empty state, never a blank rectangle', () => {
+test('Round 41 sparse rich overview keeps explicit unavailable hierarchy, never a blank rectangle', () => {
   const html = renderMatchCenterOverview({
     venue:{ name:'', city:'', capacity:null },
     referee:null,
@@ -70,6 +70,10 @@ test('Round 41 a genuinely empty rich overview renders an explicit empty state, 
     shotmap:null,
   }, { coverage:{ overview:true } });
 
-  assert.match(html, /data-cw233-mc-overview-empty/);
-  assert.match(html, /Подробности матча пока не опубликованы/);
+  assert.match(html, /data-cw233-mc-overview-region="form"/);
+  assert.match(html, /data-cw251-overview-form-unavailable/);
+  assert.match(html, /Форма команд пока не опубликована провайдером/);
+  assert.match(html, /data-cw233-mc-overview-region="context"/);
+  assert.match(html, /data-cw251-overview-context-unavailable/);
+  assert.match(html, /Стадион и судья пока не опубликованы провайдером/);
 });

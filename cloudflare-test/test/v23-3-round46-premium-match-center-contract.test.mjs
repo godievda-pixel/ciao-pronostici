@@ -83,6 +83,7 @@ test('Premium Match Center Stats keeps rich shots and invalid coordinates off th
   assert.equal(stats.shots.length, 2);
   assert.deepEqual(stats.shots[0], {
     side:'home',
+    playerId:null,
     x:77.5,
     y:42.2,
     minute:34,

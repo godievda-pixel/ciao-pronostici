@@ -25,9 +25,9 @@ test('Round 50 Events redraw uses one centered home/away chronology with narrow-
   const html = renderMatchCenterEvents(events, context);
 
   assert.match(html, /data-cw250-mc-events-timeline/);
-  assert.match(html, /\.cw250-mc-events-timeline::before\{[^}]*left:50%/s);
-  assert.match(html, /\.cw250-mc-event\{[^}]*grid-template-columns:minmax\(0,1fr\) 34px minmax\(0,1fr\)/s);
-  assert.match(html, /@media\(max-width:359px\)/);
+  assert.match(html, /\.cw250-mc-events-timeline::before,\.cw233-mc-events-timeline::before\{[^}]*left:50%/s);
+  assert.match(html, /\.cw250-mc-event\{[^}]*grid-template-columns:minmax\(0,1fr\) 38px minmax\(0,1fr\)/s);
+  assert.match(html, /@media\(max-width:520px\)/);
   assert.match(html, /data-cw250-mc-side="home"/);
   assert.match(html, /data-cw250-mc-side="away"/);
 });

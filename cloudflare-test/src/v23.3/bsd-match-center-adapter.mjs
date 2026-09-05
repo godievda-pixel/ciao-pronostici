@@ -46,7 +46,9 @@ function firstPresent(source, keys) {
 
 function nestedName(value) {
   const source = object(value);
-  return source ? text(source.name ?? source.short_name ?? source.shortName) : text(value);
+  return source
+    ? text(source.name ?? source.full_name ?? source.fullName ?? source.player_name ?? source.short_name ?? source.shortName)
+    : text(value);
 }
 
 function numericStat(source, aliases) {
@@ -180,18 +182,30 @@ function shotSide(shot = {}) {
   return shot.home === false || shot.is_home === false ? 'away' : 'home';
 }
 
+function normalizeShotOutcome(value) {
+  const key = text(value).toLowerCase().replaceAll(' ', '_').replaceAll('-', '_');
+  if (['goal','scored'].includes(key)) return 'goal';
+  if (['save','saved','on_target','ontarget','shot_on_target'].includes(key)) return 'saved';
+  if (['miss','missed','off_target','offtarget','wide'].includes(key)) return 'off_target';
+  if (['block','blocked'].includes(key)) return 'blocked';
+  if (['post','woodwork','crossbar'].includes(key)) return 'post';
+  return 'unknown';
+}
+
 function normalizeDetailedShot(shot = {}) {
   const position = firstObject(shot.position, shot.pos) || {};
+  const playerObject = object(shot.player);
   return {
     side:shotSide(shot),
+    playerId:shot.playerId ?? shot.player_id ?? playerObject?.id,
     x:shot.x ?? position.x,
     y:shot.y ?? position.y,
     minute:shot.minute ?? shot.min,
     addedTime:shot.addedTime ?? shot.added_time,
-    player:nestedName(shot.player ?? shot.player_name),
-    assist:nestedName(shot.assist ?? shot.assist_name),
+    player:nestedName(shot.player_name ?? shot.playerName ?? playerObject),
+    assist:nestedName(shot.assist ?? shot.assist_name ?? shot.assistName),
     xg:shot.xg ?? shot.expected_goals,
-    outcome:shot.outcome ?? shot.result ?? shot.type,
+    outcome:normalizeShotOutcome(shot.outcome ?? shot.result ?? shot.type),
     situation:shot.situation ?? shot.playPattern ?? shot.play_pattern,
     bodyPart:shot.bodyPart ?? shot.body_part,
     goalKind:normalizeGoalKind(shot),
@@ -223,9 +237,12 @@ function canonicalEventInput(event = {}) {
     minute:event.minute,
     addedTime:event.addedTime ?? event.added_time,
     side:event.side || (event.is_home === true ? 'home' : event.is_home === false ? 'away' : ''),
+    playerId:event.playerId ?? event.player_id ?? event.player?.id,
     player:nestedName(event.player ?? event.player_name),
     assist:nestedName(event.assist ?? event.assist_name),
     reason:event.reason,
+    playerInId:event.playerInId ?? event.player_in_id ?? event.player_in?.id,
+    playerOutId:event.playerOutId ?? event.player_out_id ?? event.player_out?.id,
     playerIn:nestedName(event.playerIn ?? event.player_in),
     playerOut:nestedName(event.playerOut ?? event.player_out),
     homeScore:event.homeScore ?? event.home_score,
@@ -240,13 +257,19 @@ function canonicalEventInput(event = {}) {
 function lineupPlayerInput(player = {}) {
   return {
     playerId:player.playerId ?? player.player_id ?? player.id,
-    name:nestedName(player.name || player.short_name || player.shortName),
+    name:nestedName(player.name ?? player.full_name ?? player.fullName ?? player.player_name ?? player.player),
+    shortName:nestedName(player.short_name ?? player.shortName),
     position:player.position || player.pos,
-    shirtNumber:player.shirtNumber ?? player.shirt_number ?? player.number,
+    shirtNumber:player.shirtNumber ?? player.shirt_number ?? player.number ?? player.jerseyNumber ?? player.jersey_number ?? player.jersey ?? player.shirt_no ?? player.squad_number ?? player.kit_number,
     x:player.x ?? player.position_x ?? player.coordinates?.x,
     y:player.y ?? player.position_y ?? player.coordinates?.y,
     grid:player.grid ?? player.grid_position ?? player.formation_position,
     starter:typeof player.starter === 'boolean' ? player.starter : undefined,
+    rating:player.rating,
+    goals:player.goals,
+    assists:player.assists,
+    yellowCards:player.yellowCards ?? player.yellow_cards,
+    redCards:player.redCards ?? player.red_cards,
   };
 }
 
@@ -261,10 +284,10 @@ function lineupSideInput(side = {}) {
 
 function playerInput(player = {}) {
   return {
-    playerId:player.playerId ?? player.player_id ?? player.id,
-    name:player.name || player.short_name || player.shortName,
-    teamId:player.teamId ?? player.team_id,
-    teamName:player.teamName ?? player.team_name,
+    playerId:player.playerId ?? player.player_id ?? player.id ?? player.player?.id,
+    name:nestedName(player.name ?? player.full_name ?? player.fullName ?? player.player_name ?? player.player),
+    teamId:player.teamId ?? player.team_id ?? player.team?.id,
+    teamName:nestedName(player.teamName ?? player.team_name ?? player.team),
     rating:player.rating,
     goals:player.goals,
     assists:player.assists ?? player.goal_assist,

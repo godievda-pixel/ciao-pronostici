@@ -51,7 +51,7 @@ function predictionPercentages(distribution = {}) {
 }
 
 function overviewStyles() {
-  return `<style data-cw233-mc-overview-parity-style data-cw250-overview-redraw-style>
+  return `<style data-cw233-mc-overview-parity-style data-cw250-overview-redraw-style data-cw251-overview-polish-style>
     .cw233-mc-overview{display:grid;gap:12px}
     .cw233-mc-overview-card{position:relative;overflow:hidden;padding:14px;border:1px solid var(--mc-border);border-radius:20px;background:linear-gradient(155deg,var(--mc-surface),color-mix(in srgb,var(--mc-surface-2) 78%,transparent));box-shadow:inset 0 1px 0 rgba(255,255,255,.045),0 12px 28px rgba(0,0,0,.13)}
     .cw233-mc-overview-card::after{content:'';pointer-events:none;position:absolute;inset:0;background:radial-gradient(circle at 94% -22%,var(--mc-accent-soft),transparent 38%);opacity:.5}
@@ -65,6 +65,7 @@ function overviewStyles() {
     .cw233-mc-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.cw233-mc-form-side{min-width:0;padding:12px;border:1px solid var(--mc-border);border-radius:14px;background:linear-gradient(145deg,var(--mc-surface-raised),rgba(255,255,255,.018))}.cw233-mc-form-side>strong{display:block;margin-bottom:10px;color:var(--mc-text);font-size:11px;font-weight:900;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cw233-mc-form-run{display:flex;gap:6px;flex-wrap:wrap}.cw233-mc-form-chip{width:24px;height:24px;display:grid;place-items:center;border-radius:8px;border:1px solid rgba(255,255,255,.035);background:rgba(255,255,255,.065);color:var(--mc-muted);font-size:9px;font-weight:950}.cw233-mc-form-chip.is-win{background:rgba(24,186,139,.19);border-color:rgba(57,218,170,.22);color:#8ff0c8}.cw233-mc-form-chip.is-draw{background:rgba(111,132,166,.17);color:#dce6f7}.cw233-mc-form-chip.is-loss{background:rgba(225,75,96,.17);border-color:rgba(248,113,113,.18);color:#ffafb9}
 
     .cw250-match-info-main{padding:13px;border:1px solid var(--mc-border);border-radius:15px;background:linear-gradient(145deg,var(--mc-surface-raised),rgba(255,255,255,.018))}.cw250-match-info-main small,.cw250-match-info-card small{display:block;margin-bottom:6px;color:var(--mc-muted);font-size:8px}.cw250-match-info-main strong,.cw250-match-info-card strong{display:block;color:var(--mc-text);font-size:11px;line-height:1.3;font-weight:950}.cw250-match-info-main span{display:block;margin-top:4px;color:var(--mc-muted);font-size:9px}.cw250-match-info-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px}.cw250-match-info-card{min-width:0;padding:12px;border:1px solid var(--mc-border);border-radius:14px;background:rgba(255,255,255,.025)}
+    .cw251-overview-unavailable{display:grid;place-items:center;min-height:54px;padding:12px;border:1px dashed color-mix(in srgb,var(--mc-border) 88%,transparent);border-radius:14px;background:rgba(255,255,255,.018);text-align:center;color:var(--mc-muted);font-size:9px;line-height:1.35}
 
     .cw250-user-prediction{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;padding:12px 13px;border:1px solid color-mix(in srgb,var(--mc-accent) 24%,var(--mc-border));border-radius:15px;background:linear-gradient(145deg,color-mix(in srgb,var(--mc-accent-soft) 28%,var(--mc-surface-raised)),var(--mc-surface))}.cw250-user-prediction small{display:block;margin-bottom:4px;color:var(--mc-accent-2);font-size:8px;font-weight:850;text-transform:uppercase}.cw250-user-prediction strong{display:block;color:var(--mc-text);font-size:11px;font-weight:950}.cw250-user-prediction span{display:block;margin-top:4px;color:var(--mc-muted);font-size:8px}.cw250-user-prediction b{min-width:64px;padding:12px 10px;border:1px solid color-mix(in srgb,var(--mc-accent) 55%,transparent);border-radius:14px;background:linear-gradient(145deg,var(--mc-accent-soft),color-mix(in srgb,var(--mc-accent) 26%,var(--mc-surface)));color:#fff;font-size:20px;line-height:1;font-weight:950;text-align:center}
     .cw250-prediction-community{margin-top:9px;padding:12px;border:1px solid var(--mc-border);border-radius:15px;background:rgba(255,255,255,.022)}.cw250-prediction-community-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}.cw250-prediction-community-head strong{font-size:10px;color:var(--mc-text)}.cw250-prediction-community-head span{font-size:8px;color:var(--mc-muted)}.cw250-prediction-bar{display:flex;height:7px;margin:10px 0 9px;border-radius:999px;overflow:hidden;background:rgba(255,255,255,.055)}.cw250-prediction-bar i{display:block;height:100%}.cw250-prediction-bar .home{background:var(--mc-accent)}.cw250-prediction-bar .draw{background:color-mix(in srgb,var(--mc-muted) 72%,transparent)}.cw250-prediction-bar .away{background:var(--mc-accent-2)}.cw250-prediction-labels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.cw250-prediction-label{display:flex;align-items:center;justify-content:center;gap:5px;color:var(--mc-muted);font-size:8px}.cw250-prediction-label i{width:7px;height:7px;border-radius:50%;background:var(--mc-accent)}.cw250-prediction-label:nth-child(2) i{background:color-mix(in srgb,var(--mc-muted) 72%,transparent)}.cw250-prediction-label:nth-child(3) i{background:var(--mc-accent-2)}.cw250-prediction-label b{color:var(--mc-text);font-size:12px}.cw250-prediction-extras{display:grid;gap:8px;margin-top:9px}.cw250-exact-score{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 11px;border:1px solid var(--mc-border);border-radius:13px;background:rgba(255,255,255,.02);color:var(--mc-muted);font-size:8px}.cw250-exact-score strong{color:var(--mc-text);font-size:10px}.cw250-popular-scores{padding:10px 11px;border:1px solid var(--mc-border);border-radius:13px;background:rgba(255,255,255,.02)}.cw250-popular-scores>span{display:block;margin-bottom:8px;color:var(--mc-muted);font-size:8px}.cw250-popular-score-list{display:flex;gap:6px;flex-wrap:wrap}.cw250-popular-score{padding:6px 8px;border:1px solid color-mix(in srgb,var(--mc-accent) 30%,var(--mc-border));border-radius:999px;background:var(--mc-accent-soft);color:var(--mc-text);font-size:8px;font-weight:850}
@@ -121,7 +122,8 @@ function keyIndicatorsHtml(source = {}) {
 
   const metricHtml = metrics.length ? `<div class="cw250-key-metrics">${metrics.map(([key,label,pct]) => `<div class="cw250-key-metric"><span>${esc(label)}</span><div class="cw250-key-values"><strong>${esc(metricValue(home[key], pct))}</strong><i></i><strong>${esc(metricValue(away[key], pct))}</strong></div></div>`).join('')}</div>` : '';
   const rating = finite(best?.rating);
-  const bestHtml = best && (text(best.name) || rating !== null) ? `<div class="cw250-best-player" data-cw250-best-player><div><small>Лучший игрок</small><strong>${esc(text(best.name) || 'Игрок')}</strong>${text(best.teamName) ? `<span>${esc(best.teamName)}</span>` : ''}</div><b>${rating === null ? '—' : esc(rating.toFixed(1))}</b></div>` : '';
+  const bestName = text(best?.name);
+  const bestHtml = best && bestName ? `<div class="cw250-best-player" data-cw250-best-player><div><small>Лучший игрок</small><strong>${esc(bestName)}</strong>${text(best.teamName) ? `<span>${esc(best.teamName)}</span>` : ''}</div><b>${rating === null ? '—' : esc(rating.toFixed(1))}</b></div>` : '';
   const recentHtml = recent.length ? `<div class="cw250-recent-events" data-cw250-recent-events>${recent.map(eventChip).join('')}</div>` : '';
 
   return `<section class="cw233-mc-overview-card" data-cw250-key-indicators>${sectionTitle('Ключевые показатели','Матч в цифрах')}${metricHtml}${bestHtml}${recentHtml}</section>`;
@@ -150,10 +152,12 @@ function formHtml(value, match = {}) {
   const source = value && typeof value === 'object' ? value : {};
   const home = list(source.home).map(formChip).filter(Boolean);
   const away = list(source.away).map(formChip).filter(Boolean);
-  if (!home.length && !away.length) return '';
   const homeName = text(match?.homeTeam?.name) || 'Хозяева';
   const awayName = text(match?.awayTeam?.name) || 'Гости';
-  return `<section class="cw233-mc-overview-card" data-cw233-mc-overview-region="form">${sectionTitle('Форма','Последние 5 матчей')}<div class="cw233-mc-form-grid"><div class="cw233-mc-form-side"><strong>${esc(homeName)}</strong><div class="cw233-mc-form-run">${home.join('')}</div></div><div class="cw233-mc-form-side"><strong>${esc(awayName)}</strong><div class="cw233-mc-form-run">${away.join('')}</div></div></div></section>`;
+  const body = home.length || away.length
+    ? `<div class="cw233-mc-form-grid"><div class="cw233-mc-form-side"><strong>${esc(homeName)}</strong><div class="cw233-mc-form-run">${home.join('')}</div></div><div class="cw233-mc-form-side"><strong>${esc(awayName)}</strong><div class="cw233-mc-form-run">${away.join('')}</div></div></div>`
+    : `<div class="cw251-overview-unavailable" data-cw251-overview-form-unavailable>Форма команд пока не опубликована провайдером</div>`;
+  return `<section class="cw233-mc-overview-card" data-cw233-mc-overview-region="form">${sectionTitle('Форма','Последние 5 матчей')}${body}</section>`;
 }
 
 function contextHtml(source = {}) {
@@ -162,7 +166,10 @@ function contextHtml(source = {}) {
   const venueCity = text(venue.city);
   const capacity = finite(venue.capacity);
   const referee = text(source?.referee?.name);
-  if (!venueName && !venueCity && capacity === null && !referee) return '';
+  const hasContext = venueName || venueCity || capacity !== null || referee;
+  if (!hasContext) {
+    return `<section class="cw233-mc-overview-card" data-cw233-mc-overview-region="context">${sectionTitle('Информация о матче','Основная информация')}<div class="cw251-overview-unavailable" data-cw251-overview-context-unavailable>Стадион и судья пока не опубликованы провайдером</div></section>`;
+  }
 
   const venueHtml = venueName || venueCity ? `<div class="cw250-match-info-main"><small>Стадион${venueCity ? ' · город' : ''}</small><strong>${esc(venueName || venueCity)}</strong>${venueName && venueCity ? `<span>${esc(venueCity)}</span>` : ''}</div>` : '';
   const secondary = [];

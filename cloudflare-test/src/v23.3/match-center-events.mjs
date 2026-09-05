@@ -1,9 +1,10 @@
-const EVENT_STYLE = `<style data-cw233-mc-events-parity-style data-cw250-mc-events-redraw-style>
+const EVENT_STYLE = `<style data-cw233-mc-events-parity-style data-cw250-mc-events-redraw-style data-cw251-mc-events-polish-style>
 .cw233-mc-events,.cw250-mc-events{display:grid;gap:10px}.cw233-mc-events-head,.cw250-mc-events-head{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;padding:3px 4px 7px}.cw233-mc-events-head span,.cw250-mc-events-head span{font-size:9px;font-weight:850;color:var(--mc-muted)}.cw233-mc-events-head span:last-child,.cw250-mc-events-head span:last-child{text-align:right}.cw233-mc-events-head b,.cw250-mc-events-head b{font-size:10px;font-weight:950;letter-spacing:.04em;color:var(--mc-text)}
-.cw233-mc-events-timeline,.cw250-mc-events-timeline{position:relative;display:grid;gap:7px;padding:10px 8px;border:1px solid var(--mc-border);border-radius:19px;background:linear-gradient(160deg,var(--mc-surface-2,rgba(255,255,255,.035)),rgba(255,255,255,.016));box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}.cw250-mc-events-timeline::before{content:'';position:absolute;top:16px;bottom:16px;left:50%;width:1px;transform:translateX(-50%);background:linear-gradient(180deg,transparent,var(--mc-border-strong,var(--mc-border)) 8%,var(--mc-border-strong,var(--mc-border)) 92%,transparent);opacity:.72}.cw233-mc-events-timeline::before{content:'';position:absolute;top:16px;bottom:16px;left:50%;width:1px;transform:translateX(-50%);background:linear-gradient(180deg,transparent,var(--mc-border-strong,var(--mc-border)) 8%,var(--mc-border-strong,var(--mc-border)) 92%,transparent);opacity:.72}
-.cw250-mc-event{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1fr) 34px minmax(0,1fr);align-items:center;gap:7px;min-height:58px}.cw233-mc-event{position:relative}.cw250-mc-event-card{min-width:0;padding:9px 10px;border:1px solid var(--mc-border);border-radius:14px;background:linear-gradient(145deg,var(--mc-surface-raised,rgba(255,255,255,.065)),rgba(255,255,255,.018));box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 8px 22px rgba(0,0,0,.10)}.cw250-mc-event.is-home .cw250-mc-event-card{grid-column:1;border-right:2px solid color-mix(in srgb,var(--mc-home-marker,var(--mc-accent)) 58%,transparent);text-align:right}.cw250-mc-event.is-away .cw250-mc-event-card{grid-column:3;border-left:2px solid color-mix(in srgb,var(--mc-away-marker,var(--mc-accent-2)) 58%,transparent);text-align:left}.cw250-mc-event.is-neutral .cw250-mc-event-card{grid-column:1 / 4;justify-self:center;width:min(100%,220px);text-align:center}.cw250-mc-event-node,.cw233-mc-event-icon{position:relative;z-index:2;grid-column:2;grid-row:1;place-self:center;display:grid;place-items:center;width:28px;height:28px;border:1px solid var(--mc-border);border-radius:10px;background:var(--mc-surface-raised,var(--mc-bg));font-size:8px;font-weight:950;color:var(--mc-text);box-shadow:0 5px 14px rgba(0,0,0,.28)}.cw250-mc-event.is-home .cw250-mc-event-node{border-color:color-mix(in srgb,var(--mc-home-marker,var(--mc-accent)) 62%,var(--mc-border));color:var(--mc-home-marker,var(--mc-accent))}.cw250-mc-event.is-away .cw250-mc-event-node{border-color:color-mix(in srgb,var(--mc-away-marker,var(--mc-accent-2)) 62%,var(--mc-border));color:var(--mc-away-marker,var(--mc-accent-2))}.cw250-mc-event.kind-goal .cw250-mc-event-node,.cw250-mc-event.kind-penalty .cw250-mc-event-node,.cw250-mc-event.kind-own_goal .cw250-mc-event-node{background:linear-gradient(145deg,var(--mc-accent),var(--mc-accent-2));border-color:rgba(255,255,255,.3);color:#fff;box-shadow:0 0 18px var(--mc-accent-soft,rgba(255,255,255,.09))}.cw250-mc-event.kind-yellow_card .cw250-mc-event-node{color:#ffd44f}.cw250-mc-event.kind-red_card .cw250-mc-event-node{color:#ff6673}.cw250-mc-event.kind-var .cw250-mc-event-node{font-size:6.5px;letter-spacing:-.02em}.cw250-mc-event-spacer{display:block;min-width:0}.cw250-mc-event.is-home .cw250-mc-event-spacer{grid-column:3}.cw250-mc-event.is-away .cw250-mc-event-spacer{grid-column:1;grid-row:1}.cw250-mc-event-meta{display:flex;align-items:center;gap:6px;margin-bottom:3px}.cw250-mc-event.is-home .cw250-mc-event-meta{justify-content:flex-end}.cw250-mc-event.is-away .cw250-mc-event-meta{justify-content:flex-start}.cw233-mc-event-minute,.cw250-mc-event-minute{font-size:8.5px;font-weight:950;color:var(--mc-muted)}.cw250-mc-event-score{padding:2px 5px;border:1px solid var(--mc-border);border-radius:7px;background:rgba(255,255,255,.04);font-size:8px;font-weight:950;color:var(--mc-text)}.cw250-mc-event-card small{display:block;margin-bottom:2px;font-size:7px;font-weight:900;letter-spacing:.045em;text-transform:uppercase;color:var(--mc-muted)}.cw250-mc-event-card strong{display:block;overflow:hidden;text-overflow:ellipsis;font-size:10px;font-weight:950;line-height:1.25;color:var(--mc-text)}.cw250-mc-event-card span{display:block;margin-top:2px;font-size:8px;line-height:1.3;color:var(--mc-muted)}.cw250-mc-event-card .cw250-mc-event-detail{color:var(--mc-text)}.cw233-mc-goal-qualifier{display:inline!important;margin:0!important;color:var(--mc-muted)!important;font-size:8px!important;font-weight:900!important}
+.cw233-mc-events-timeline,.cw250-mc-events-timeline{position:relative;display:grid;gap:8px;padding:11px 9px;border:1px solid var(--mc-border);border-radius:19px;background:linear-gradient(160deg,var(--mc-surface-2,rgba(255,255,255,.035)),rgba(255,255,255,.016));box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}.cw250-mc-events-timeline::before,.cw233-mc-events-timeline::before{content:'';position:absolute;top:16px;bottom:16px;left:50%;width:1px;transform:translateX(-50%);background:linear-gradient(180deg,transparent,var(--mc-border-strong,var(--mc-border)) 8%,var(--mc-border-strong,var(--mc-border)) 92%,transparent);opacity:.72}
+.cw250-mc-event{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1fr) 38px minmax(0,1fr);align-items:center;gap:8px;min-height:62px}.cw233-mc-event{position:relative}.cw250-mc-event-card{min-width:0;padding:10px 11px;border:1px solid var(--mc-border);border-radius:14px;background:linear-gradient(145deg,var(--mc-surface-raised,rgba(255,255,255,.065)),rgba(255,255,255,.018));box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 8px 22px rgba(0,0,0,.10)}.cw250-mc-event.is-home .cw250-mc-event-card{grid-column:1;border-right:2px solid color-mix(in srgb,var(--mc-home-marker,var(--mc-accent)) 58%,transparent);text-align:right}.cw250-mc-event.is-away .cw250-mc-event-card{grid-column:3;border-left:2px solid color-mix(in srgb,var(--mc-away-marker,var(--mc-accent-2)) 58%,transparent);text-align:left}.cw250-mc-event.is-neutral .cw250-mc-event-card{grid-column:1 / 4;justify-self:center;width:min(100%,240px);text-align:center}.cw250-mc-event-node,.cw233-mc-event-icon{position:relative;z-index:2;grid-column:2;grid-row:1;place-self:center;display:grid;place-items:center;width:30px;height:30px;border:1px solid var(--mc-border);border-radius:10px;background:var(--mc-surface-raised,var(--mc-bg));font-size:8.5px;font-weight:950;color:var(--mc-text);box-shadow:0 5px 14px rgba(0,0,0,.28)}.cw250-mc-event.is-home .cw250-mc-event-node{border-color:color-mix(in srgb,var(--mc-home-marker,var(--mc-accent)) 62%,var(--mc-border));color:var(--mc-home-marker,var(--mc-accent))}.cw250-mc-event.is-away .cw250-mc-event-node{border-color:color-mix(in srgb,var(--mc-away-marker,var(--mc-accent-2)) 62%,var(--mc-border));color:var(--mc-away-marker,var(--mc-accent-2))}.cw250-mc-event.kind-goal .cw250-mc-event-node,.cw250-mc-event.kind-penalty .cw250-mc-event-node,.cw250-mc-event.kind-own_goal .cw250-mc-event-node{background:linear-gradient(145deg,var(--mc-accent),var(--mc-accent-2));border-color:rgba(255,255,255,.3);color:#fff;box-shadow:0 0 18px var(--mc-accent-soft,rgba(255,255,255,.09))}.cw250-mc-event.kind-yellow_card .cw250-mc-event-node{color:#ffd44f}.cw250-mc-event.kind-red_card .cw250-mc-event-node{color:#ff6673}.cw250-mc-event.kind-var .cw250-mc-event-node{font-size:6.5px;letter-spacing:-.02em}.cw250-mc-event-spacer{display:block;min-width:0}.cw250-mc-event.is-home .cw250-mc-event-spacer{grid-column:3}.cw250-mc-event.is-away .cw250-mc-event-spacer{grid-column:1;grid-row:1}.cw250-mc-event-meta{display:flex;align-items:center;gap:6px;margin-bottom:3px}.cw250-mc-event.is-home .cw250-mc-event-meta{justify-content:flex-end}.cw250-mc-event.is-away .cw250-mc-event-meta{justify-content:flex-start}.cw233-mc-event-minute,.cw250-mc-event-minute{font-size:9px;font-weight:950;color:var(--mc-muted)}.cw250-mc-event-score{padding:2px 5px;border:1px solid var(--mc-border);border-radius:7px;background:rgba(255,255,255,.04);font-size:8px;font-weight:950;color:var(--mc-text)}.cw250-mc-event-card small{display:block;margin-bottom:3px;font-size:7.5px;font-weight:900;letter-spacing:.045em;text-transform:uppercase;color:var(--mc-muted)}.cw250-mc-event-card strong{display:block;overflow:hidden;text-overflow:ellipsis;font-size:10.5px;font-weight:950;line-height:1.25;color:var(--mc-text)}.cw250-mc-event-card span{display:block;margin-top:2px;font-size:8px;line-height:1.3;color:var(--mc-muted)}.cw250-mc-event-card .cw250-mc-event-detail{color:var(--mc-text)}.cw233-mc-goal-qualifier{display:inline!important;margin:0!important;color:var(--mc-muted)!important;font-size:8px!important;font-weight:900!important}
 .cw233-mc-event-period,.cw250-mc-event-period{position:relative;z-index:3;display:grid;grid-template-columns:auto auto;align-items:center;justify-content:center;gap:6px;padding:7px 0}.cw250-mc-event-period time{padding:4px 7px;border:1px solid var(--mc-border);border-radius:99px;background:var(--mc-bg);font-size:8px;font-weight:950;color:var(--mc-text)}.cw250-mc-event-period span{padding:4px 8px;border:1px solid var(--mc-border);border-radius:99px;background:var(--mc-surface-raised,var(--mc-bg));font-size:8px;font-weight:900;color:var(--mc-muted)}.cw233-mc-events-empty{padding:28px 12px;text-align:center;font-size:10px;color:var(--mc-muted)}
-@media(max-width:359px){.cw233-mc-events-timeline,.cw250-mc-events-timeline{padding-left:7px;padding-right:7px}.cw250-mc-events-timeline::before,.cw233-mc-events-timeline::before{left:42px;transform:none}.cw250-mc-event{grid-template-columns:30px 24px minmax(0,1fr);gap:6px;align-items:start}.cw250-mc-event.is-home .cw250-mc-event-card,.cw250-mc-event.is-away .cw250-mc-event-card{grid-column:3;grid-row:1;text-align:left;border-right:0;border-left:2px solid color-mix(in srgb,var(--mc-accent) 48%,transparent)}.cw250-mc-event.is-away .cw250-mc-event-card{border-left-color:color-mix(in srgb,var(--mc-away-marker,var(--mc-accent-2)) 58%,transparent)}.cw250-mc-event-node,.cw233-mc-event-icon{grid-column:2;width:24px;height:24px;margin-top:4px}.cw250-mc-event-spacer{grid-column:1!important;grid-row:1!important}.cw250-mc-event-spacer::before{content:attr(data-clock);display:block;padding-top:10px;text-align:right;font-size:8px;font-weight:950;color:var(--mc-muted)}.cw250-mc-event-card .cw250-mc-event-meta time{display:none}.cw250-mc-event.is-home .cw250-mc-event-meta,.cw250-mc-event.is-away .cw250-mc-event-meta{justify-content:flex-start}.cw233-mc-event-period,.cw250-mc-event-period{grid-template-columns:auto minmax(0,1fr);justify-content:stretch;padding-left:4px}.cw250-mc-event-period time{justify-self:start}.cw250-mc-event-period span{justify-self:start}}
+@media(max-width:520px){.cw233-mc-events-timeline,.cw250-mc-events-timeline{padding:10px 8px}.cw250-mc-events-timeline::before,.cw233-mc-events-timeline::before{left:45px;transform:none}.cw250-mc-event{grid-template-columns:31px 28px minmax(0,1fr);gap:7px;align-items:start;min-height:56px}.cw250-mc-event.is-home .cw250-mc-event-card,.cw250-mc-event.is-away .cw250-mc-event-card,.cw250-mc-event.is-neutral .cw250-mc-event-card{grid-column:3;grid-row:1;width:auto;justify-self:stretch;text-align:left;border-right:0;border-left:2px solid color-mix(in srgb,var(--mc-home-marker,var(--mc-accent)) 58%,transparent)}.cw250-mc-event.is-away .cw250-mc-event-card{border-left-color:color-mix(in srgb,var(--mc-away-marker,var(--mc-accent-2)) 58%,transparent)}.cw250-mc-event-node,.cw233-mc-event-icon{grid-column:2;width:26px;height:26px;margin-top:4px}.cw250-mc-event-spacer{grid-column:1!important;grid-row:1!important}.cw250-mc-event-spacer::before{content:attr(data-clock);display:block;padding-top:10px;text-align:right;font-size:8px;font-weight:950;color:var(--mc-muted)}.cw250-mc-event-card .cw250-mc-event-meta time{display:none}.cw250-mc-event.is-home .cw250-mc-event-meta,.cw250-mc-event.is-away .cw250-mc-event-meta{justify-content:flex-start}.cw233-mc-event-period,.cw250-mc-event-period{grid-template-columns:31px minmax(0,1fr);justify-content:stretch;gap:35px;padding-left:0}.cw250-mc-event-period time{justify-self:end}.cw250-mc-event-period span{justify-self:start}}
+@media(max-width:339px){.cw250-mc-events-timeline::before,.cw233-mc-events-timeline::before{left:39px}.cw250-mc-event{grid-template-columns:26px 24px minmax(0,1fr);gap:5px}.cw233-mc-event-period,.cw250-mc-event-period{grid-template-columns:26px minmax(0,1fr);gap:29px}}
 </style>`;
 
 function esc(value) {
@@ -28,8 +29,22 @@ function eventClock(event = {}) {
   return `${minute}${added !== null && added > 0 ? `+${added}` : ''}′`;
 }
 
+function eventKind(event = {}) {
+  const type = String(event?.type || '').trim().toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
+  const rawText = String(event?.text || '').trim().toLowerCase();
+  const goalKind = String(event?.goalKind ?? event?.goal_kind ?? '').trim().toLowerCase();
+  if (type === 'goal' && goalKind === 'penalty') return 'penalty';
+  if (type === 'goal' && goalKind === 'own_goal') return 'own_goal';
+  if (type === 'yellow') return 'yellow_card';
+  if (type === 'red') return 'red_card';
+  if (type === 'sub') return 'substitution';
+  if (['half','ht','half_time','halftime','break','ft','full_time','fulltime'].includes(type)) return 'period';
+  if (type === 'event' && ['ht','half time','half-time','halftime','ft','full time','full-time','fulltime'].includes(rawText)) return 'period';
+  return type || 'event';
+}
+
 function sortEvents(events) {
-  return (Array.isArray(events) ? events : [])
+  const sorted = (Array.isArray(events) ? events : [])
     .map((event, index) => ({ event:event && typeof event === 'object' ? event : {}, index }))
     .sort((a, b) => {
       const minuteA = finite(a.event.minute) ?? Number.MAX_SAFE_INTEGER;
@@ -41,18 +56,15 @@ function sortEvents(events) {
       return a.index - b.index;
     })
     .map(item => item.event);
-}
 
-function eventKind(event = {}) {
-  const type = String(event?.type || '').trim().toLowerCase();
-  const goalKind = String(event?.goalKind ?? event?.goal_kind ?? '').trim().toLowerCase();
-  if (type === 'goal' && goalKind === 'penalty') return 'penalty';
-  if (type === 'goal' && goalKind === 'own_goal') return 'own_goal';
-  if (type === 'yellow') return 'yellow_card';
-  if (type === 'red') return 'red_card';
-  if (type === 'sub') return 'substitution';
-  if (type === 'half') return 'period';
-  return type || 'event';
+  const periodClocks = new Set();
+  return sorted.filter(event => {
+    if (eventKind(event) !== 'period') return true;
+    const key = `${finite(event.minute) ?? ''}:${finite(event.addedTime ?? event.added_time) ?? 0}`;
+    if (periodClocks.has(key)) return false;
+    periodClocks.add(key);
+    return true;
+  });
 }
 
 function typeLabel(value) {
@@ -71,16 +83,7 @@ function typeLabel(value) {
 
 function eventIcon(value) {
   const kind = typeof value === 'object' ? eventKind(value) : String(value || '').trim().toLowerCase();
-  return ({
-    goal:'●',
-    penalty:'P',
-    own_goal:'АГ',
-    yellow_card:'▰',
-    red_card:'▰',
-    substitution:'⇄',
-    var:'VAR',
-    period:'•',
-  })[kind] || '•';
+  return ({ goal:'●', penalty:'P', own_goal:'АГ', yellow_card:'▰', red_card:'▰', substitution:'⇄', var:'VAR', period:'•' })[kind] || '•';
 }
 
 function goalQualifier(kind) {
@@ -99,13 +102,7 @@ function score(event) {
 
 function varDecisionLabel(value) {
   const key = String(value || '').trim().toLowerCase();
-  return ({
-    goal_confirmed:'Гол подтверждён',
-    goal_disallowed:'Гол отменён',
-    penalty_awarded:'Пенальти назначен',
-    penalty_cancelled:'Пенальти отменён',
-    red_card:'Красная карточка',
-  })[key] || '';
+  return ({ goal_confirmed:'Гол подтверждён', goal_disallowed:'Гол отменён', penalty_awarded:'Пенальти назначен', penalty_cancelled:'Пенальти отменён', red_card:'Красная карточка' })[key] || '';
 }
 
 function eventDetails(event, kind) {
@@ -122,24 +119,28 @@ function eventDetails(event, kind) {
     if (reason) details.push(reason);
     return { title:playerIn || player || typeLabel(kind), details };
   }
-
   if (kind === 'var') {
     const decision = varDecisionLabel(event?.varDecision ?? event?.var_decision) || rawText || reason;
     if (decision) details.push(decision);
     return { title:player || 'VAR', details };
   }
-
   if (assist) details.push(`Ассист: ${assist}`);
   if (reason) details.push(reason);
   if (rawText && rawText !== player && rawText !== reason) details.push(rawText);
   return { title:player || rawText || typeLabel(kind), details };
 }
 
+function periodLabel(event = {}) {
+  const raw = String(event?.text || event?.type || '').trim().toLowerCase().replaceAll('-', ' ').replaceAll('_', ' ');
+  if (['ht','half','half time','halftime','break'].includes(raw)) return 'Перерыв';
+  if (['ft','full time','fulltime'].includes(raw)) return 'Матч окончен';
+  return String(event?.text || '').trim() || typeLabel('period');
+}
+
 function renderPeriod(event) {
   const clock = eventClock(event);
-  const label = String(event?.text || '').trim() || typeLabel('period');
   return `<div class="cw233-mc-event-period cw250-mc-event-period" data-cw233-mc-event="period" data-cw250-mc-period>
-    <time>${esc(clock || '—')}</time><span>${esc(label)}</span>
+    <time>${esc(clock || '—')}</time><span>${esc(periodLabel(event))}</span>
   </div>`;
 }
 
