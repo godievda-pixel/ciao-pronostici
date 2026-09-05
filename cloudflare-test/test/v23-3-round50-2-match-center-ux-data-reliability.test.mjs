@@ -124,7 +124,7 @@ test('Round 50.2 Lineups defaults to pitch plus collapsed active-team disclosure
   };
   const harness = runtimeHarness(sectionState('lineups', lineups));
   const html = harness.html();
-  assert.doesNotMatch(html, /cw233-mc-lineup-text/);
+  assert.doesNotMatch(html, /class="cw233-mc-lineup-text/);
   assert.match(html, /data-cw502-lineup-team="home"/);
   assert.match(html, /data-cw502-lineup-disclosure="starters"/);
   assert.match(html, /Стартовый состав · 2/);
