@@ -183,11 +183,17 @@ export function createMatchCenterStore({
     if (!force && state.sectionState[key]?.status === 'ready') return getState();
     if (!force && state.sectionState[key]?.status === 'unavailable') return getState();
 
-    state = {
-      ...state,
-      sectionState:{ ...state.sectionState, [key]:{ status:'loading', error:'' } },
-    };
-    emit();
+    const staleReady = force === true
+      && state.sectionState[key]?.status === 'ready'
+      && state.sections[key] !== null;
+
+    if (!staleReady) {
+      state = {
+        ...state,
+        sectionState:{ ...state.sectionState, [key]:{ status:'loading', error:'' } },
+      };
+      emit();
+    }
 
     try {
       const payload = await repository.section(competition, matchId, key, {
@@ -212,6 +218,7 @@ export function createMatchCenterStore({
       emit();
     } catch (error) {
       if (!isCurrent(token, competition, matchId)) return getState();
+      if (staleReady) return getState();
       state = {
         ...state,
         sectionState:{
