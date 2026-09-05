@@ -103,7 +103,7 @@ test('Round 18 events follow premium chronological top-to-bottom order', () => {
   assert.ok(html.indexOf('12′') < html.indexOf('44′'));
   assert.ok(html.indexOf('44′') < html.indexOf('70′'));
   assert.match(html, /cw233-mc-event-minute/);
-  assert.match(html, /cw233-mc-event-text/);
+  assert.match(html, /cw250-mc-event-card/);
 });
 
 test('Round 18 lineups keep authoritative lists alongside the premium pitch diagram', () => {
