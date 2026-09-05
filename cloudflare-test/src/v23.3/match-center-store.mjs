@@ -179,15 +179,23 @@ export function createMatchCenterStore({
     const competition = state.competition;
     const matchId = state.matchId;
     const status = String(state?.match?.status || '') || null;
+    const previousData = state.sections[key];
+    const previousState = state.sectionState[key] || { status:'idle', error:'' };
+    const keepStaleVisible = force === true
+      && previousState.status === 'ready'
+      && previousData !== null
+      && previousData !== undefined;
 
-    if (!force && state.sectionState[key]?.status === 'ready') return getState();
-    if (!force && state.sectionState[key]?.status === 'unavailable') return getState();
+    if (!force && previousState.status === 'ready') return getState();
+    if (!force && previousState.status === 'unavailable') return getState();
 
-    state = {
-      ...state,
-      sectionState:{ ...state.sectionState, [key]:{ status:'loading', error:'' } },
-    };
-    emit();
+    if (!keepStaleVisible) {
+      state = {
+        ...state,
+        sectionState:{ ...state.sectionState, [key]:{ status:'loading', error:'' } },
+      };
+      emit();
+    }
 
     try {
       const payload = await repository.section(competition, matchId, key, {
@@ -216,7 +224,9 @@ export function createMatchCenterStore({
         ...state,
         sectionState:{
           ...state.sectionState,
-          [key]:{ status:'error', error:message(error, 'match_center_section_failed') },
+          [key]:keepStaleVisible
+            ? { status:'ready', error:message(error, 'match_center_section_failed') }
+            : { status:'error', error:message(error, 'match_center_section_failed') },
         },
       };
       emit();
