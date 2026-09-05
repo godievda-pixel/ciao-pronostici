@@ -39,8 +39,32 @@ function finite(value) {
   return Number.isFinite(number) ? number : null;
 }
 
-function frozenTextList(value) {
-  return Object.freeze(list(value).map(text).filter(Boolean));
+function canonicalFormToken(value) {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const token = canonicalFormToken(item);
+      if (token) return token;
+    }
+    return '';
+  }
+  if (value && typeof value === 'object') {
+    const candidates = [value.result, value.outcome, value.code, value.value, value.status, value.form];
+    for (const candidate of candidates) {
+      const token = canonicalFormToken(candidate);
+      if (token) return token;
+    }
+    return '';
+  }
+  const raw = text(value).toUpperCase();
+  if (!raw || raw === '[OBJECT OBJECT]') return '';
+  if (['W','WIN','WON','В','ПОБЕДА'].includes(raw)) return 'W';
+  if (['D','DRAW','Н','НИЧЬЯ'].includes(raw)) return 'D';
+  if (['L','LOSS','LOST','П','ПОРАЖЕНИЕ'].includes(raw)) return 'L';
+  return '';
+}
+
+function frozenFormList(value) {
+  return Object.freeze(list(value).map(canonicalFormToken).filter(Boolean));
 }
 
 function canonicalVenue(value) {
@@ -163,8 +187,8 @@ export function canonicalOverviewSection(input = {}) {
     venue:canonicalVenue(source.venue),
     referee:canonicalReferee(source.referee),
     form:Object.freeze({
-      home:frozenTextList(form.home),
-      away:frozenTextList(form.away),
+      home:frozenFormList(form.home),
+      away:frozenFormList(form.away),
     }),
     prediction:source.prediction || null,
     predictionSplit:source.predictionSplit ?? source.prediction_split ?? null,
