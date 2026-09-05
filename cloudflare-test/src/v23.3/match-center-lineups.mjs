@@ -1,6 +1,7 @@
 const LINEUP_STYLE = `<style data-cw233-mc-lineups-parity-style>
-.cw233-mc-lineups{display:grid;gap:10px}.cw233-mc-lineup-side{overflow:hidden;border:1px solid var(--mc-border);border-radius:17px;background:rgba(255,255,255,.025)}.cw233-mc-lineup-side>header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 13px;border-bottom:1px solid rgba(255,255,255,.06)}.cw233-mc-lineup-side>header span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:900;color:var(--mc-text)}.cw233-mc-lineup-side>header strong{flex:0 0 auto;font-size:9px;font-weight:850;color:var(--mc-muted)}.cw233-mc-lineup-list{display:grid;padding:2px 13px}.cw233-mc-lineup-player{display:grid;grid-template-columns:28px minmax(0,1fr);align-items:center;gap:9px;min-height:38px;border-bottom:1px solid rgba(255,255,255,.055)}.cw233-mc-lineup-player:last-child{border-bottom:0}.cw233-mc-lineup-number{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.055);font-size:9px;font-weight:900;color:var(--mc-muted)}.cw233-mc-lineup-player span:last-child{min-width:0}.cw233-mc-lineup-player b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;font-weight:850;color:var(--mc-text)}.cw233-mc-lineup-player small{display:block;margin-top:2px;font-size:8px;color:var(--mc-muted)}.cw233-mc-lineup-subs{padding:8px 13px 10px;border-top:1px solid rgba(255,255,255,.06)}.cw233-mc-lineup-subs>strong{display:block;margin-bottom:3px;font-size:8px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:var(--mc-muted)}.cw233-mc-lineup-subs.is-empty>span{display:block;padding:7px 0;font-size:9px;color:var(--mc-muted)}
-@media(min-width:540px){.cw233-mc-lineups{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}}
+.cw233-mc-lineups{display:grid;gap:11px}.cw233-mc-lineup-stage{display:grid;gap:8px;padding:10px;border:1px solid var(--mc-border);border-radius:19px;background:linear-gradient(160deg,var(--mc-surface-2,rgba(255,255,255,.035)),rgba(255,255,255,.016));box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}.cw233-mc-lineup-switch{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:3px;border:1px solid var(--mc-border);border-radius:13px;background:rgba(0,0,0,.12)}.cw233-mc-lineup-switch input{position:absolute;opacity:0;pointer-events:none}.cw233-mc-lineup-switch label{min-width:0;padding:8px 7px;border-radius:9px;text-align:center;font-size:9px;font-weight:900;color:var(--mc-muted);cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cw233-mc-lineup-stage:has(#cw233-lineup-home:checked) label[for="cw233-lineup-home"],.cw233-mc-lineup-stage:has(#cw233-lineup-away:checked) label[for="cw233-lineup-away"]{background:linear-gradient(135deg,var(--mc-accent),var(--mc-accent-2));color:#fff;box-shadow:0 5px 16px var(--mc-accent-soft,rgba(0,0,0,.16))}.cw233-mc-pitch-panels{display:grid}.cw233-mc-lineup-pitch{display:none;position:relative;aspect-ratio:68/100;width:min(100%,270px);margin:0 auto;border:1px solid var(--mc-pitch-line,rgba(255,255,255,.2));border-radius:16px;background:linear-gradient(180deg,color-mix(in srgb,var(--mc-pitch,#0b3550) 94%,#fff 6%),var(--mc-pitch,#0b3550));overflow:hidden;box-shadow:inset 0 0 42px rgba(0,0,0,.17),0 12px 26px rgba(0,0,0,.16)}.cw233-mc-lineup-stage:has(#cw233-lineup-home:checked) [data-cw233-mc-pitch-team="home"],.cw233-mc-lineup-stage:has(#cw233-lineup-away:checked) [data-cw233-mc-pitch-team="away"]{display:block}.cw233-mc-lineup-pitch::before{content:'';position:absolute;inset:4%;border:1px solid var(--mc-pitch-line,rgba(255,255,255,.18));border-radius:3px}.cw233-mc-lineup-pitch::after{content:'';position:absolute;left:4%;right:4%;top:50%;height:1px;background:var(--mc-pitch-line,rgba(255,255,255,.18))}.cw233-mc-pitch-circle{position:absolute;left:50%;top:50%;width:24%;aspect-ratio:1;border:1px solid var(--mc-pitch-line,rgba(255,255,255,.18));border-radius:50%;transform:translate(-50%,-50%)}.cw233-mc-pitch-box{position:absolute;left:27%;width:46%;height:14%;border:1px solid var(--mc-pitch-line,rgba(255,255,255,.18))}.cw233-mc-pitch-box.top{top:4%;border-top:0}.cw233-mc-pitch-box.bottom{bottom:4%;border-bottom:0}.cw233-mc-pitch-player{position:absolute;left:var(--player-x);bottom:var(--player-y);width:48px;transform:translate(-50%,50%);display:grid;justify-items:center;gap:2px;z-index:2}.cw233-mc-pitch-player b{display:grid;place-items:center;width:25px;height:25px;border:1px solid rgba(255,255,255,.35);border-radius:50%;background:linear-gradient(145deg,var(--mc-accent),var(--mc-accent-2));box-shadow:0 4px 12px rgba(0,0,0,.3);font-size:8px;font-weight:950;color:#fff}.cw233-mc-pitch-player span{max-width:48px;padding:2px 3px;border-radius:5px;background:rgba(2,8,16,.72);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:7px;font-weight:850;color:#fff;box-shadow:0 2px 7px rgba(0,0,0,.22)}.cw233-mc-pitch-unavailable{display:grid;place-items:center;align-content:center;gap:5px;aspect-ratio:68/70;width:min(100%,270px);margin:0 auto;border:1px dashed var(--mc-border);border-radius:16px;background:rgba(255,255,255,.018);text-align:center;color:var(--mc-muted);font-size:9px}.cw233-mc-pitch-unavailable b{font-size:11px;color:var(--mc-text)}.cw233-mc-lineup-stage-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:8px;color:var(--mc-muted)}.cw233-mc-lineup-stage-meta strong{font-size:9px;color:var(--mc-text)}
+.cw233-mc-lineup-text{display:grid;gap:10px}.cw233-mc-lineup-side{overflow:hidden;border:1px solid var(--mc-border);border-radius:17px;background:linear-gradient(160deg,var(--mc-surface,rgba(255,255,255,.025)),rgba(255,255,255,.014))}.cw233-mc-lineup-side>header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 13px;border-bottom:1px solid rgba(255,255,255,.06)}.cw233-mc-lineup-side>header span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:900;color:var(--mc-text)}.cw233-mc-lineup-side>header strong{flex:0 0 auto;font-size:9px;font-weight:850;color:var(--mc-muted)}.cw233-mc-lineup-coach{padding:8px 13px;border-bottom:1px solid rgba(255,255,255,.055);font-size:8px;color:var(--mc-muted)}.cw233-mc-lineup-coach b{margin-left:4px;color:var(--mc-text);font-weight:850}.cw233-mc-lineup-list{display:grid;padding:2px 13px}.cw233-mc-lineup-player{display:grid;grid-template-columns:28px minmax(0,1fr);align-items:center;gap:9px;min-height:38px;border-bottom:1px solid rgba(255,255,255,.055)}.cw233-mc-lineup-player:last-child{border-bottom:0}.cw233-mc-lineup-number{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.055);font-size:9px;font-weight:900;color:var(--mc-muted)}.cw233-mc-lineup-player span:last-child{min-width:0}.cw233-mc-lineup-player b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;font-weight:850;color:var(--mc-text)}.cw233-mc-lineup-player small{display:block;margin-top:2px;font-size:8px;color:var(--mc-muted)}.cw233-mc-lineup-subs{padding:8px 13px 10px;border-top:1px solid rgba(255,255,255,.06)}.cw233-mc-lineup-subs>strong{display:block;margin-bottom:3px;font-size:8px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:var(--mc-muted)}.cw233-mc-lineup-subs.is-empty>span{display:block;padding:7px 0;font-size:9px;color:var(--mc-muted)}
+@media(min-width:540px){.cw233-mc-lineup-text{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}.cw233-mc-lineup-pitch{width:min(100%,300px)}}@media(max-width:339px){.cw233-mc-lineup-stage{padding:8px}.cw233-mc-lineup-pitch{width:min(100%,230px)}.cw233-mc-pitch-player{width:42px}.cw233-mc-pitch-player span{max-width:42px;font-size:6.5px}}
 </style>`;
 
 function esc(value) {
@@ -20,6 +21,12 @@ function text(value) {
   return String(value ?? '').trim();
 }
 
+function finite(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
 function positionKey(value) {
   const normalized = text(value).toUpperCase();
   if (['GK', 'G', 'GOALKEEPER', 'ВР'].includes(normalized)) return 'GK';
@@ -33,7 +40,51 @@ function parseFormation(value) {
   const formation = text(value);
   if (!/^\d(?:-\d){1,4}$/.test(formation)) return null;
   const rows = formation.split('-').map(Number);
-  return rows.every(count => Number.isInteger(count) && count > 0 && count <= 6) ? rows : null;
+  if (!rows.every(count => Number.isInteger(count) && count > 0 && count <= 6)) return null;
+  return rows.reduce((sum, count) => sum + count, 0) === 10 ? rows : null;
+}
+
+function gridPosition(value) {
+  const match = text(value).match(/^(\d+):(\d+)$/);
+  if (!match) return null;
+  const row = Number(match[1]);
+  const column = Number(match[2]);
+  if (!Number.isInteger(row) || !Number.isInteger(column) || row < 1 || row > 5 || column < 1 || column > 5) return null;
+  return Object.freeze({
+    x:Math.max(10, Math.min(90, column * 20)),
+    y:Math.max(8, Math.min(88, 8 + (row - 1) * 20)),
+  });
+}
+
+function linePositions(count, y) {
+  if (!Number.isInteger(count) || count < 1) return [];
+  const step = 100 / (count + 1);
+  return Array.from({ length:count }, (_, index) => Object.freeze({ x:Number((step * (index + 1)).toFixed(2)), y }));
+}
+
+function formationPositions(formation, starters = []) {
+  const rows = parseFormation(formation);
+  const players = list(starters);
+  if (!rows || players.length < 11) return null;
+  const out = [Object.freeze({ x:50, y:8 })];
+  const ySlots = rows.length === 2 ? [38,72] : rows.length === 3 ? [28,52,76] : rows.length === 4 ? [24,43,62,81] : [28,52,76];
+  rows.forEach((count, index) => out.push(...linePositions(count, ySlots[index] ?? (28 + index * 18))));
+  return out.length === 11 ? Object.freeze(out) : null;
+}
+
+function explicitPosition(player) {
+  const x = finite(player?.x);
+  const y = finite(player?.y);
+  if (x === null || y === null || x < 0 || x > 100 || y < 0 || y > 100) return null;
+  return Object.freeze({ x, y });
+}
+
+function resolvePitchPositions(side = {}) {
+  const starters = list(side.starters);
+  if (starters.length < 11) return null;
+  const fallback = formationPositions(side.formation, starters);
+  const resolved = starters.slice(0, 11).map((player, index) => explicitPosition(player) || gridPosition(player?.grid) || fallback?.[index] || null);
+  return resolved.every(Boolean) ? resolved : null;
 }
 
 function playerRow(player = {}) {
@@ -49,13 +100,13 @@ function playerRow(player = {}) {
 
 function playerList(players = []) {
   const rows = list(players);
-  return `<div class="cw233-mc-lineup-list">${rows.length ? rows.map(playerRow).join('') : '<div class="cw233-mc-lineup-player"><span class="cw233-mc-lineup-number">—</span><span><b>Нет данных</b></span></div>'}</div>`;
+  return `<div class="cw233-mc-lineup-list" data-cw233-mc-lineup-list>${rows.length ? rows.map(playerRow).join('') : '<div class="cw233-mc-lineup-player"><span class="cw233-mc-lineup-number">—</span><span><b>Нет данных</b></span></div>'}</div>`;
 }
 
 function renderSubstitutes(side = {}) {
   const substitutes = list(side.substitutes);
   if (!substitutes.length) return '<div class="cw233-mc-lineup-subs is-empty"><strong>Запасные</strong><span>Нет данных</span></div>';
-  return `<div class="cw233-mc-lineup-subs" data-cw233-mc-subs><strong>Запасные</strong><div class="cw233-mc-lineup-list">${substitutes.map(playerRow).join('')}</div></div>`;
+  return `<div class="cw233-mc-lineup-subs" data-cw233-mc-subs><strong>Запасные</strong><div class="cw233-mc-lineup-list" data-cw233-mc-lineup-list>${substitutes.map(playerRow).join('')}</div></div>`;
 }
 
 function sideName(sideKey, context = {}) {
@@ -63,10 +114,46 @@ function sideName(sideKey, context = {}) {
   return text(team?.name) || (sideKey === 'home' ? 'Хозяева' : 'Гости');
 }
 
+function pitchPlayer(player, position, index) {
+  const number = finite(player?.shirtNumber ?? player?.number);
+  const playerId = finite(player?.playerId ?? player?.id) ?? index;
+  const name = text(player?.name) || 'Игрок';
+  return `<span class="cw233-mc-pitch-player" data-cw233-mc-pitch-player="${esc(playerId)}" style="--player-x:${position.x}%;--player-y:${position.y}%"><b>${esc(number ?? '—')}</b><span>${esc(name)}</span></span>`;
+}
+
+function pitchPanel(sideKey, side = {}, context = {}) {
+  const starters = list(side.starters);
+  const positions = resolvePitchPositions(side);
+  const team = sideName(sideKey, context);
+  const formation = text(side.formation);
+  if (!positions) {
+    return `<div class="cw233-mc-pitch-unavailable" data-cw233-mc-pitch-team="${sideKey}" data-cw233-mc-lineup-pitch><b>Схема недоступна</b><span>${esc(team)}</span></div>`;
+  }
+  return `<div class="cw233-mc-lineup-pitch" data-cw233-mc-pitch-team="${sideKey}" data-cw233-mc-lineup-pitch aria-label="Схема ${esc(team)} ${esc(formation)}">
+    <i class="cw233-mc-pitch-circle" aria-hidden="true"></i><i class="cw233-mc-pitch-box top" aria-hidden="true"></i><i class="cw233-mc-pitch-box bottom" aria-hidden="true"></i>
+    ${starters.slice(0,11).map((player,index) => pitchPlayer(player, positions[index], index)).join('')}
+  </div>`;
+}
+
+function renderStage(source, context) {
+  const homeName = sideName('home', context);
+  const awayName = sideName('away', context);
+  return `<section class="cw233-mc-lineup-stage" data-cw233-mc-lineup-stage>
+    <div class="cw233-mc-lineup-switch" data-cw233-mc-lineup-switch>
+      <input id="cw233-lineup-home" type="radio" name="cw233-lineup-team" checked><label for="cw233-lineup-home">${esc(homeName)}</label>
+      <input id="cw233-lineup-away" type="radio" name="cw233-lineup-team"><label for="cw233-lineup-away">${esc(awayName)}</label>
+    </div>
+    <div class="cw233-mc-pitch-panels">${pitchPanel('home', source.home || {}, context)}${pitchPanel('away', source.away || {}, context)}</div>
+    <div class="cw233-mc-lineup-stage-meta"><strong>${esc(text(source.home?.formation) || 'Схема —')}</strong><span>Выберите команду</span><strong>${esc(text(source.away?.formation) || 'Схема —')}</strong></div>
+  </section>`;
+}
+
 function renderSide(sideKey, side = {}, context = {}) {
   const formation = text(side?.formation);
+  const coach = text(side?.coach);
   return `<section class="cw233-mc-lineup-side" data-cw233-mc-lineup-side="${sideKey}">
     <header><span>${esc(sideName(sideKey, context))}</span><strong>${esc(formation || 'Состав')}</strong></header>
+    ${coach ? `<div class="cw233-mc-lineup-coach">Тренер:<b>${esc(coach)}</b></div>` : ''}
     ${playerList(side.starters)}
     ${renderSubstitutes(side)}
   </section>`;
@@ -75,9 +162,9 @@ function renderSide(sideKey, side = {}, context = {}) {
 export function renderMatchCenterLineups(section = {}, context = {}) {
   const source = section && typeof section === 'object' ? section : {};
   return `${LINEUP_STYLE}<section class="cw233-mc-lineups" data-cw233-mc-lineups>
-    ${renderSide('home', source.home || {}, context)}
-    ${renderSide('away', source.away || {}, context)}
+    ${renderStage(source, context)}
+    <div class="cw233-mc-lineup-text">${renderSide('home', source.home || {}, context)}${renderSide('away', source.away || {}, context)}</div>
   </section>`;
 }
 
-export { parseFormation, positionKey };
+export { parseFormation, positionKey, gridPosition, formationPositions, resolvePitchPositions };
