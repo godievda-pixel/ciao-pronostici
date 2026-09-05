@@ -94,7 +94,7 @@ test('Round 50.1 Overview keeps the reference hierarchy visible and enriches unn
 
   assert.equal(requests.some(value => value.endsWith('/events/901/lineups/')), true);
   assert.equal(result.data.bestPlayer.name, 'Adrian Bernabe');
-  assert.equal(result.data.bestPlayer.teamName, 'Parma');
+  assert.equal(result.data.bestPlayer.teamName, 'Парма');
   assert.equal(result.data.bestPlayer.rating, 8.4);
 
   const html = renderMatchCenterOverview(result.data, { match });
