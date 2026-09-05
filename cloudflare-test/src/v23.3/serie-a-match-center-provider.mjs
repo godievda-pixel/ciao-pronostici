@@ -148,7 +148,7 @@ function needsHeroGoalEnrichment(adapted) {
   const homeScore = Number(adapted?.base?.homeScore);
   const awayScore = Number(adapted?.base?.awayScore);
   const scored = (Number.isFinite(homeScore) ? homeScore : 0) + (Number.isFinite(awayScore) ? awayScore : 0);
-  return scored > 0 && scorerCount(adapted) === 0;
+  return scored > 0 && scorerCount(adapted) < scored;
 }
 
 function canonicalBaseFromAdapted(adapted) {
