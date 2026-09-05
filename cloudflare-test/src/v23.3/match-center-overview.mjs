@@ -35,6 +35,21 @@ function percentage(value) {
   return Math.max(0, Math.min(100, normalized));
 }
 
+function predictionPercentages(distribution = {}) {
+  const raw = [
+    finite(distribution.home ?? distribution.prob_home ?? distribution.probHome),
+    finite(distribution.draw ?? distribution.prob_draw ?? distribution.probDraw),
+    finite(distribution.away ?? distribution.prob_away ?? distribution.probAway),
+  ];
+  const present = raw.filter(value => value !== null);
+  const fractional = present.length > 0 && present.every(value => Math.abs(value) <= 1);
+  return raw.map(value => {
+    if (value === null) return null;
+    const normalized = fractional ? value * 100 : value;
+    return Math.max(0, Math.min(100, normalized));
+  });
+}
+
 function overviewStyles() {
   return `<style data-cw233-mc-overview-parity-style data-cw250-overview-redraw-style>
     .cw233-mc-overview{display:grid;gap:12px}
@@ -170,9 +185,7 @@ function predictionHtml(prediction, split, match = {}) {
   const homeScore = finite(model.homeScore ?? model.home_score ?? model.pred_home_score);
   const awayScore = finite(model.awayScore ?? model.away_score ?? model.pred_away_score);
   const points = finite(model.points);
-  const home = percentage(distribution.home ?? distribution.prob_home ?? distribution.probHome);
-  const draw = percentage(distribution.draw ?? distribution.prob_draw ?? distribution.probDraw);
-  const away = percentage(distribution.away ?? distribution.prob_away ?? distribution.probAway);
+  const [home, draw, away] = predictionPercentages(distribution);
   const total = finite(distribution.total);
   const exact = percentage(distribution.exactScoreProbability ?? distribution.exact_score_probability ?? distribution.scoreProbability);
   const popular = list(distribution.popularScores ?? distribution.popular_scores).map(item => {
