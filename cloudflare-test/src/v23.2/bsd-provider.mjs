@@ -393,7 +393,7 @@ function predictionPayload(payload) {
   return null;
 }
 
-function composeOverviewEvent(event, statsPayload, modelPayload) {
+function composeOverviewEvent(event, statsPayload, modelPayload, incidentsPayload, playerStatsPayload) {
   const combined = { ...event };
   const stats = object(statsPayload);
   if (stats) {
@@ -405,6 +405,13 @@ function composeOverviewEvent(event, statsPayload, modelPayload) {
   }
   const prediction = predictionPayload(modelPayload);
   if (prediction) combined.prediction = prediction;
+
+  if (Array.isArray(incidentsPayload)) combined.incidents = incidentsPayload;
+  else if (object(incidentsPayload)) combined.incidents = incidentsPayload;
+
+  if (Array.isArray(playerStatsPayload)) combined.player_stats = playerStatsPayload;
+  else if (object(playerStatsPayload)) combined.player_stats = playerStatsPayload;
+
   return combined;
 }
 
@@ -466,7 +473,7 @@ export async function fetchBsdMatchCenterSection(args) {
   const baseCoverage = baseMatchCenterCoverage(event);
 
   if (section === 'overview') {
-    const [statsPayload, modelPayload] = await Promise.all([
+    const [statsPayload, modelPayload, incidentsPayload, playerStatsPayload] = await Promise.all([
       fetchOptionalEventResource({
         sourceId,
         resource:'stats',
@@ -479,8 +486,20 @@ export async function fetchBsdMatchCenterSection(args) {
         apiKey:args.apiKey,
         fetchImpl:args.fetchImpl,
       }),
+      fetchOptionalEventResource({
+        sourceId,
+        resource:'incidents',
+        apiKey:args.apiKey,
+        fetchImpl:args.fetchImpl,
+      }),
+      fetchOptionalEventResource({
+        sourceId,
+        resource:'player-stats',
+        apiKey:args.apiKey,
+        fetchImpl:args.fetchImpl,
+      }),
     ]);
-    const combined = composeOverviewEvent(event, statsPayload, modelPayload);
+    const combined = composeOverviewEvent(event, statsPayload, modelPayload, incidentsPayload, playerStatsPayload);
     const sections = adaptBsdMatchCenterSections(combined);
     const available = sections.coverage.overview === true;
     return Object.freeze({
