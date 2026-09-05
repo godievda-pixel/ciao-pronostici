@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { resolveCanonicalMatchTarget } from '../src/v23.3/match-center-links.mjs';
 import { normalizeSerieALegacyMatchCenter } from '../src/v23.3/serie-a-match-center-legacy-normalizer.mjs';
 import { adaptSerieALegacyMatchCenter } from '../src/v23.3/serie-a-match-center-adapter.mjs';
+import { normalizeRound512SerieARaw } from '../src/v23.3/round51-2-serie-a-recovery.mjs';
 import {
   loadSerieAMatchCenterBase,
   loadSerieAMatchCenterSection,
@@ -55,8 +56,8 @@ test('Round 51.2 schedule-card click carries team crests directly into initialMa
   assert.equal(payload.initialMatch.kickoffAt, '2026-09-05T18:45:00Z');
 });
 
-test('Round 51.2 legacy shot normalizer preserves short_name/name and player id aliases', () => {
-  const normalized = normalizeSerieALegacyMatchCenter({
+test('Round 51.2 legacy recovery preserves short_name/name and player id aliases on shots', () => {
+  const normalized = normalizeSerieALegacyMatchCenter(normalizeRound512SerieARaw({
     match:{ id:77, home:{ id:1, name:'Рома' }, away:{ id:2, name:'Аталанта' } },
     stats:{
       stats:{ home:{ total_shots:1 }, away:{ total_shots:1 } },
@@ -65,7 +66,7 @@ test('Round 51.2 legacy shot normalizer preserves short_name/name and player id 
         { pos:{ x:76, y:55 }, is_home:false, min:61, xg:.12, name:'Éderson', pid:15 },
       ],
     },
-  });
+  }));
   const adapted = adaptSerieALegacyMatchCenter(normalized);
   assert.equal(adapted.stats.shots[0].player, 'D. Malen');
   assert.equal(adapted.stats.shots[0].playerId, 14);
