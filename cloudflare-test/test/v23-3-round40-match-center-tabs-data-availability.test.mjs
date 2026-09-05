@@ -122,7 +122,10 @@ test('Round 40 Serie A worker can resolve rich overview after a summary-only bas
   assert.deepEqual(calls.map(call => call.path), [
     '/api/ciao-match-summary-fast-v2',
     '/api/ciao-match-center-fast-v3',
+    '/api/ciao-match-summary-fast-v2',
   ]);
+  assert.deepEqual(calls[1].body.sections, ['detail','stats','lineups','overview_meta','player_stats']);
+  assert.equal(calls[2].body.match_id, 77);
 });
 
 test('Round 40 base coverage hints never disable idle tabs before the rich API is checked', () => {
