@@ -1,0 +1,1 @@
+Expected first CI state: unit test fails because round50-3-match-center-view.mjs is intentionally absent. This confirms the rebuild starts from clean Round 50.2.
