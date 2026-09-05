@@ -5,6 +5,8 @@ import { enhanceRound502MatchCenterView } from './round50-2-match-center-view.mj
 import {
   canonicalRound503ViewTab,
   providerTabForRound503View,
+  round503SnapHeights,
+  resolveRound503Snap,
   enhanceRound503MatchCenterView,
 } from './round50-3-match-center-view.mjs';
 import {
@@ -17,6 +19,9 @@ export const MATCH_CENTER_RUNTIME_BUILD = 'round50-3-bottom-drawer-seamless-refr
 export const MATCH_CENTER_RUNTIME_ID = 'ciao-v239-match-center-overlay';
 export const MATCH_CENTER_HOST_SCROLLBAR_STYLE_ID = 'ciao-v239-match-center-scrollbar-style';
 export const MATCH_CENTER_HOST_SCROLLBAR_CSS = `#${MATCH_CENTER_RUNTIME_ID}{scrollbar-width:none;-ms-overflow-style:none}#${MATCH_CENTER_RUNTIME_ID}::-webkit-scrollbar{display:none;width:0;height:0}`;
+
+const DRAWER_SNAPS = Object.freeze(['compact', 'standard', 'expanded']);
+const DRAWER_HANDLE_HTML = '<div class="cw503-mc-drawer-handle" data-cw503-drawer-handle role="button" aria-label="Изменить высоту панели" style="position:sticky;top:0;z-index:6;display:flex;justify-content:center;align-items:center;height:28px;touch-action:none;cursor:grab;background:linear-gradient(180deg,#071626 68%,rgba(7,22,38,0))"><span aria-hidden="true" style="display:block;width:42px;height:4px;border-radius:999px;background:rgba(255,255,255,.32)"></span></div>';
 
 let installedRuntime = null;
 
@@ -51,6 +56,14 @@ function rootFor(documentRef) {
   return documentRef?.getElementById?.('ciao-miniapp-root') || documentRef?.body || null;
 }
 
+function viewportHeightFor(documentRef) {
+  const local = Number(documentRef?.defaultView?.innerHeight);
+  const globalHeight = Number(globalThis?.innerHeight);
+  if (Number.isFinite(local) && local > 0) return local;
+  if (Number.isFinite(globalHeight) && globalHeight > 0) return globalHeight;
+  return 800;
+}
+
 function ensureHostScrollbarStyle(documentRef) {
   if (!documentRef?.createElement || documentRef.getElementById?.(MATCH_CENTER_HOST_SCROLLBAR_STYLE_ID)) return null;
   const style = documentRef.createElement('style');
@@ -74,26 +87,61 @@ export function createBrowserMatchCenterHost(documentRef = globalThis.document) 
     node = documentRef.createElement('div');
     node.id = MATCH_CENTER_RUNTIME_ID;
     node.dataset.cw239Runtime = MATCH_CENTER_RUNTIME_BUILD;
+    node.dataset.cw503Drawer = '1';
     node.hidden = true;
     node.setAttribute?.('aria-hidden', 'true');
     Object.assign(node.style || {}, {
       position:'fixed',
-      inset:'0',
+      left:'0',
+      right:'0',
+      bottom:'0',
+      top:'auto',
+      width:'100%',
       zIndex:'58',
       overflowY:'auto',
       overflowX:'hidden',
       overscrollBehavior:'contain',
       background:'#071626',
+      borderRadius:'24px 24px 0 0',
+      boxShadow:'0 -18px 56px rgba(0,0,0,.36)',
       scrollbarWidth:'none',
       msOverflowStyle:'none',
+      willChange:'height',
     });
     rootFor(documentRef)?.appendChild?.(node);
   } else {
-    node.style.scrollbarWidth = 'none';
-    node.style.msOverflowStyle = 'none';
+    node.dataset.cw239Runtime = MATCH_CENTER_RUNTIME_BUILD;
+    node.dataset.cw503Drawer = '1';
+    Object.assign(node.style || {}, {
+      position:'fixed',
+      left:'0',
+      right:'0',
+      bottom:'0',
+      top:'auto',
+      width:'100%',
+      borderRadius:'24px 24px 0 0',
+      overflowY:'auto',
+      overflowX:'hidden',
+      scrollbarWidth:'none',
+      msOverflowStyle:'none',
+    });
+    if (node.style?.inset === '0') node.style.inset = '';
   }
 
   let boundRuntime = null;
+  let drag = null;
+
+  const snapTo = (requested = 'standard', animate = true) => {
+    const snap = DRAWER_SNAPS.includes(requested) ? requested : 'standard';
+    const height = round503SnapHeights(viewportHeightFor(documentRef))[snap];
+    node.dataset.matchCenterSnap = snap;
+    node.style.transition = animate ? 'height 180ms ease' : 'none';
+    node.style.height = `${height}px`;
+    return height;
+  };
+
+  snapTo('standard', false);
+
   const clickHandler = event => {
     if (!boundRuntime) return;
 
@@ -145,21 +193,93 @@ export function createBrowserMatchCenterHost(documentRef = globalThis.document) 
     image.replaceWith?.(fallback);
   };
 
+  const pointerDownHandler = event => {
+    const handle = event?.target?.closest?.('[data-cw503-drawer-handle]');
+    if (!handle || !node.contains?.(handle)) return;
+    const startY = Number(event?.clientY);
+    if (!Number.isFinite(startY)) return;
+    const currentHeight = Number.parseFloat(node.style.height) || round503SnapHeights(viewportHeightFor(documentRef)).standard;
+    drag = { pointerId:event?.pointerId, startY, startHeight:currentHeight };
+    node.style.transition = 'none';
+    node.style.cursor = 'grabbing';
+    node.setPointerCapture?.(event?.pointerId);
+    event?.preventDefault?.();
+  };
+
+  const pointerMoveHandler = event => {
+    if (!drag || (drag.pointerId != null && event?.pointerId != null && drag.pointerId !== event.pointerId)) return;
+    const y = Number(event?.clientY);
+    if (!Number.isFinite(y)) return;
+    const viewport = viewportHeightFor(documentRef);
+    const snaps = round503SnapHeights(viewport);
+    const deltaY = y - drag.startY;
+    const minimum = Math.max(96, Math.round(snaps.compact * 0.62));
+    const height = Math.max(minimum, Math.min(snaps.expanded, Math.round(drag.startHeight - deltaY)));
+    node.dataset.matchCenterSnap = 'dragging';
+    node.style.height = `${height}px`;
+    event?.preventDefault?.();
+  };
+
+  const finishDrag = event => {
+    if (!drag || (drag.pointerId != null && event?.pointerId != null && drag.pointerId !== event.pointerId)) return;
+    const y = Number(event?.clientY);
+    const deltaY = Number.isFinite(y) ? y - drag.startY : 0;
+    const result = resolveRound503Snap({
+      viewportHeight:viewportHeightFor(documentRef),
+      currentHeight:drag.startHeight,
+      deltaY,
+    });
+    const pointerId = drag.pointerId;
+    drag = null;
+    node.style.cursor = '';
+    node.releasePointerCapture?.(pointerId);
+    event?.preventDefault?.();
+    if (result.action === 'dismiss') {
+      boundRuntime?.back?.();
+      return;
+    }
+    snapTo(result.snap || 'standard');
+  };
+
+  const cancelDrag = event => {
+    if (!drag) return;
+    const current = Number.parseFloat(node.style.height) || round503SnapHeights(viewportHeightFor(documentRef)).standard;
+    const result = resolveRound503Snap({ viewportHeight:viewportHeightFor(documentRef), currentHeight:current, deltaY:0 });
+    drag = null;
+    node.style.cursor = '';
+    snapTo(result.snap || 'standard');
+    event?.preventDefault?.();
+  };
+
+  const resizeHandler = () => {
+    const snap = DRAWER_SNAPS.includes(node.dataset.matchCenterSnap) ? node.dataset.matchCenterSnap : 'standard';
+    snapTo(snap, false);
+  };
+
   node.addEventListener?.('click', clickHandler);
   node.addEventListener?.('error', imageErrorHandler, true);
+  node.addEventListener?.('pointerdown', pointerDownHandler);
+  node.addEventListener?.('pointermove', pointerMoveHandler);
+  node.addEventListener?.('pointerup', finishDrag);
+  node.addEventListener?.('pointercancel', cancelDrag);
+  documentRef?.defaultView?.addEventListener?.('resize', resizeHandler);
 
   return Object.freeze({
     node,
     bind(runtime) { boundRuntime = runtime; },
+    snapTo,
     render(html) {
       const scrollTop = Number(node.scrollTop) || 0;
-      node.innerHTML = String(html || '');
+      const reopening = node.hidden || node.style.display === 'none';
+      if (reopening) snapTo('standard', false);
+      node.innerHTML = `${DRAWER_HANDLE_HTML}${String(html || '')}`;
       node.hidden = false;
       node.removeAttribute?.('aria-hidden');
       node.style.display = 'block';
       node.scrollTop = scrollTop;
     },
     hide() {
+      drag = null;
       node.hidden = true;
       node.setAttribute?.('aria-hidden', 'true');
       node.style.display = 'none';
@@ -167,8 +287,14 @@ export function createBrowserMatchCenterHost(documentRef = globalThis.document) 
     scrollToTop() { node.scrollTop = 0; },
     destroy() {
       boundRuntime = null;
+      drag = null;
       node.removeEventListener?.('click', clickHandler);
       node.removeEventListener?.('error', imageErrorHandler, true);
+      node.removeEventListener?.('pointerdown', pointerDownHandler);
+      node.removeEventListener?.('pointermove', pointerMoveHandler);
+      node.removeEventListener?.('pointerup', finishDrag);
+      node.removeEventListener?.('pointercancel', cancelDrag);
+      documentRef?.defaultView?.removeEventListener?.('resize', resizeHandler);
       node.remove?.();
     },
   });
@@ -181,8 +307,8 @@ export function createCanonicalMatchCenterRuntime({
   enhanceView = enhanceRound503Pipeline,
   suspendSource = () => {},
   restoreSource = () => {},
-  currentSource = () => defaultSource(),
-  legacySourceLifecycle = false,
+  currentSource = null,
+  legacySourceLifecycle = null,
 } = {}) {
   if (!store || typeof store.open !== 'function' || typeof store.close !== 'function') {
     throw new Error('match_center_store_required');
@@ -193,6 +319,8 @@ export function createCanonicalMatchCenterRuntime({
   if (typeof renderView !== 'function') throw new Error('match_center_view_required');
   if (typeof enhanceView !== 'function') throw new Error('match_center_enhancer_required');
 
+  const hasCurrentSourceReader = typeof currentSource === 'function';
+  const sourceReader = hasCurrentSourceReader ? currentSource : () => defaultSource();
   let source = null;
   let restoreLegacySource = false;
   let destroyed = false;
@@ -229,8 +357,11 @@ export function createCanonicalMatchCenterRuntime({
     if (!competition || !matchId) throw new Error('match_center_target_required');
 
     viewState = defaultViewState();
-    source = sourceOrDefault(payload.source || currentSource?.());
-    restoreLegacySource = legacySourceLifecycle === true || payload.legacySourceLifecycle === true;
+    const explicitSource = payload.source && typeof payload.source === 'object';
+    source = sourceOrDefault(explicitSource ? payload.source : sourceReader?.());
+    const legacyRequested = legacySourceLifecycle === true || payload.legacySourceLifecycle === true;
+    const historicalDirectCall = legacySourceLifecycle == null && !hasCurrentSourceReader && explicitSource;
+    restoreLegacySource = legacyRequested || historicalDirectCall;
     if (restoreLegacySource) suspendSource(source);
     host.scrollToTop?.();
     return store.open({
@@ -363,6 +494,7 @@ export function installCanonicalMatchCenterRuntime(documentRef = globalThis.docu
     suspendSource:() => suspendMatchSource(documentRef),
     restoreSource:source => restoreMatchSource(documentRef, source),
     currentSource:() => currentMatchSource(),
+    legacySourceLifecycle:false,
   });
 
   installedRuntime = runtime;
