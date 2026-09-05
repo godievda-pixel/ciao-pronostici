@@ -38,7 +38,7 @@ function fakeHost() {
   };
 }
 
-test('hard cutover sends Serie A and UEFA through the exact same canonical Store path', async () => {
+test('hard cutover sends Serie A and UEFA through the exact same canonical Store path without suspending the source page', async () => {
   const store = fakeStore();
   const host = fakeHost();
   const suspended = [];
@@ -61,13 +61,12 @@ test('hard cutover sends Serie A and UEFA through the exact same canonical Store
     ['open','serie_a','serie_a:10'],
     ['open','ucl','ucl:20'],
   ]);
-  assert.equal(suspended.length, 2);
-  assert.equal(restored.length, 2);
-  assert.deepEqual(restored[0], { surface:'home', navTab:'predict', scrollTop:17 });
+  assert.equal(suspended.length, 0);
+  assert.equal(restored.length, 0);
   assert.equal(host.hidden, true);
 });
 
-test('Back restores the exact captured source and tabs/retries stay inside the canonical Store', async () => {
+test('explicit legacy source lifecycle remains available as opt-in and tabs/retries stay inside the canonical Store', async () => {
   const store = fakeStore();
   const host = fakeHost();
   const restored = [];
@@ -79,6 +78,7 @@ test('Back restores the exact captured source and tabs/retries stay inside the c
     suspendSource:() => {},
     restoreSource:value => restored.push(value),
     currentSource:() => ({ surface:'home' }),
+    legacySourceLifecycle:true,
   });
 
   await runtime.open({ competition:'uel', matchId:'uel:7', source });

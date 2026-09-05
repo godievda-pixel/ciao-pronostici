@@ -157,7 +157,7 @@ test('Serie A and BSD adapters both expose the same canonical Match Center secti
   }
 });
 
-test('Canonical runtime restores the exact source context on Back', async () => {
+test('Legacy runtime source handoff remains available as an explicit opt-in', async () => {
   const snapshots = [];
   let closed = 0;
   let hidden = 0;
@@ -184,6 +184,7 @@ test('Canonical runtime restores the exact source context on Back', async () => 
     renderView:() => '',
     suspendSource:value => suspended.push(value),
     restoreSource:value => restored.push(value),
+    legacySourceLifecycle:true,
   });
 
   await runtime.open({ competition:'uel', matchId:'uel:77', source });
