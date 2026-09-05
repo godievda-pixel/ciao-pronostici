@@ -215,7 +215,6 @@ function normalizeDetailedShot(shot) {
   const goalKind = normalizeGoalKind(source);
   return {
     side:shotSide(source),
-    playerId:source.playerId ?? source.player_id ?? source.pid ?? source.player?.id ?? source.shooter?.id,
     x:source.x ?? position.x,
     y:source.y ?? position.y,
     minute:source.minute ?? source.min,
