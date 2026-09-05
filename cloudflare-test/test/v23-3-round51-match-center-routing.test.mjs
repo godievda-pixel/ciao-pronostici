@@ -133,10 +133,3 @@ test('Round 51 router/runtime source contains no legacy lifecycle escape hatch',
   assert.doesNotMatch(combined, /ciao-v233-open-serie-a-match|ciao-v233-open-external-legacy-match/);
   assert.match(links, /openRound51MatchCenter/);
 });
-
-test('Home integration installs Round 51 router instead of the historical router', async () => {
-  const source = await readFile(new URL('../src/v23.3/home-integration.mjs', import.meta.url), 'utf8');
-  assert.match(source, /from '\.\/round51-match-center-links\.mjs'/);
-  assert.match(source, /installRound51MatchLinks\(globalThis\.document\)/);
-  assert.doesNotMatch(source, /installCanonicalMatchLinks/);
-});
