@@ -31,8 +31,8 @@ function overviewSection() {
     prediction:{ homeScore:2, awayScore:1 },
     predictionSplit:{ home:48, draw:27, away:25 },
     summaryStats:{
-      home:{ xg:1.83, shots:14 },
-      away:{ xg:0.91, shots:9 },
+      home:{ xg:1.83, possession:55, shots:14, shotsOnTarget:6 },
+      away:{ xg:0.91, possession:45, shots:9, shotsOnTarget:3 },
     },
     momentum:[
       { minute:15, home:62, away:38 },
@@ -45,25 +45,29 @@ function overviewSection() {
   };
 }
 
-test('Round 18 overview follows the approved compact Serie A regions when data is covered', () => {
+test('Round 18 legacy coverage remains compatible with the Round 50 Overview product hierarchy', () => {
   const html = renderMatchCenterOverview(overviewSection(), {
     match:baseMatch(),
     coverage:baseMatch().coverage,
   });
 
   assert.match(html, /data-cw233-mc-overview/);
-  assert.match(html, /data-cw233-mc-overview-region="main"/);
-  assert.match(html, /data-cw233-mc-overview-region="momentum"/);
-  assert.match(html, /data-cw233-mc-overview-region="shotmap"/);
-  assert.match(html, /Главное/);
-  assert.match(html, /xG хозяев/);
-  assert.match(html, /23<\/strong><span>ударов/);
+  assert.match(html, /data-cw250-key-indicators/);
+  assert.match(html, /Ключевые показатели/);
+  assert.match(html, />xG</);
+  assert.match(html, />Владение</);
+  assert.match(html, />Удары</);
+  assert.match(html, />В створ</);
   assert.match(html, /data-cw233-mc-overview-region="form"/);
+  assert.match(html, /data-cw233-mc-overview-region="context"/);
   assert.match(html, /data-cw233-mc-overview-region="prediction"/);
-  assert.doesNotMatch(html, /data-cw233-mc-overview-region="match-info"/);
+
+  // Round 50 deliberately owns these analytics in the Stats tab, not Overview.
+  assert.doesNotMatch(html, /data-cw233-mc-overview-region="momentum"/);
+  assert.doesNotMatch(html, /data-cw233-mc-overview-region="shotmap"/);
 });
 
-test('Round 18 overview does not fabricate momentum or shot map when provider data is absent', () => {
+test('Round 18 overview still avoids fabricating analytics and keeps real match context', () => {
   const html = renderMatchCenterOverview({
     ...overviewSection(),
     momentum:null,
@@ -73,7 +77,9 @@ test('Round 18 overview does not fabricate momentum or shot map when provider da
     coverage:{ ...baseMatch().coverage, momentum:false, shotmap:false },
   });
 
-  assert.match(html, /data-cw233-mc-overview-region="main"/);
+  assert.match(html, /data-cw250-key-indicators/);
+  assert.match(html, /San Siro/);
+  assert.match(html, /Daniele Orsato/);
   assert.doesNotMatch(html, /data-cw233-mc-overview-region="momentum"/);
   assert.doesNotMatch(html, /data-cw233-mc-overview-region="shotmap"/);
 });
