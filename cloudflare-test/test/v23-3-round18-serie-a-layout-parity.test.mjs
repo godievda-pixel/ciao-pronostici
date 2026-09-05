@@ -123,20 +123,22 @@ test('Round 18 lineups keep authoritative lists alongside the premium pitch diag
   assert.match(html, /cw233-mc-pitch-player/);
 });
 
-test('Round 18 players use compact Serie A rating rows and legacy metric set', () => {
+test('Round 18 players preserve canonical hooks inside premium cards and expose the full provider metric set', () => {
   const html = renderMatchCenterPlayers([
     { playerId:10, name:'Lautaro', teamName:'Интер', rating:8.4, minutes:90, goals:1, assists:1, xg:0.82, xa:0.34, shots:4, keyPasses:3 },
     { playerId:27, name:'Rice', teamName:'Арсенал', rating:7.2, minutes:90, shots:1, keyPasses:2 },
   ], { match:match() });
 
+  assert.match(html, /cw233-mc-player-card/);
+  assert.match(html, /data-cw233-mc-player-rank="1"/);
   assert.match(html, /cw233-mc-rating-row/);
   assert.match(html, /cw233-mc-rating-name/);
   assert.match(html, /cw233-mc-rating-meta/);
   assert.match(html, /cw233-mc-rating/);
-  assert.doesNotMatch(html, /cw233-mc-player-card/);
+  assert.match(html, /Интер/);
   assert.match(html, /90 мин/);
   assert.match(html, /xG 0\.82/);
   assert.match(html, /xA 0\.34/);
-  assert.doesNotMatch(html, /4 удара/);
-  assert.doesNotMatch(html, /ключ\. перед/);
+  assert.match(html, /4 удара/);
+  assert.match(html, /3 ключ\. передачи/);
 });
