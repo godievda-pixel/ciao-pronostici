@@ -29,11 +29,14 @@ function fmt(value, digits = 2) {
 
 function overviewStyles() {
   return `<style data-cw233-mc-overview-parity-style>
+    .cw233-mc-overview-title{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:0 0 10px}.cw233-mc-overview-title span{color:var(--mc-text);font-size:13px;font-weight:900}.cw233-mc-overview-title b{color:var(--mc-muted);font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;text-align:right}
     .cw233-mc-context-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
     .cw233-mc-context-card{min-width:0;padding:13px 12px;border:1px solid var(--mc-border);border-radius:13px;background:linear-gradient(145deg,var(--mc-surface),rgba(255,255,255,.025))}
     .cw233-mc-context-card span{display:block;margin-bottom:6px;color:var(--mc-muted);font-size:9px;font-weight:800;letter-spacing:.07em;text-transform:uppercase}
     .cw233-mc-context-card strong{display:block;color:var(--mc-text);font-size:12px;line-height:1.3;font-weight:900;overflow-wrap:anywhere}
     .cw233-mc-context-card small{display:block;margin-top:5px;color:var(--mc-muted);font-size:10px;line-height:1.3}
+    .cw233-mc-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.cw233-mc-form-side{min-width:0;padding:12px;border:1px solid var(--mc-border);border-radius:13px;background:rgba(255,255,255,.025)}.cw233-mc-form-side>strong{display:block;margin-bottom:9px;color:var(--mc-text);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cw233-mc-form-run{display:flex;gap:5px;flex-wrap:wrap}.cw233-mc-form-chip{width:22px;height:22px;display:grid;place-items:center;border-radius:7px;background:rgba(255,255,255,.065);color:var(--mc-muted);font-size:9px;font-weight:950}.cw233-mc-form-chip.is-win{background:rgba(52,211,153,.16);color:#8ff0c8}.cw233-mc-form-chip.is-draw{background:rgba(255,255,255,.09);color:var(--mc-text)}.cw233-mc-form-chip.is-loss{background:rgba(248,113,113,.15);color:#ffb0b0}
+    .cw233-mc-prediction-score{display:grid;place-items:center;gap:4px;padding:12px 8px 14px}.cw233-mc-prediction-score strong{font-size:27px;line-height:1;font-weight:950;letter-spacing:-.04em;color:var(--mc-text)}.cw233-mc-prediction-score span{font-size:9px;color:var(--mc-muted);font-weight:800;text-transform:uppercase;letter-spacing:.05em}.cw233-mc-prediction-split{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.cw233-mc-prediction-outcome{padding:9px 5px;border-radius:10px;background:rgba(255,255,255,.045);text-align:center}.cw233-mc-prediction-outcome strong{display:block;color:var(--mc-text);font-size:13px}.cw233-mc-prediction-outcome span{display:block;margin-top:4px;color:var(--mc-muted);font-size:8px;font-weight:800;text-transform:uppercase}
     .cw233-mc-overview-empty{min-height:100px;display:grid;place-items:center;align-content:center;gap:7px;text-align:center;color:var(--mc-muted);font-size:11px;line-height:1.35}
     .cw233-mc-overview-empty b{color:var(--mc-text);font-size:13px}
     .cw233-mc-key-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
@@ -47,7 +50,7 @@ function overviewStyles() {
     .cw233-mc-momentum-bar i{position:absolute;left:0;right:0;height:var(--mc-momentum-height);max-height:45%;min-height:2px;border-radius:2px;opacity:.88;background:var(--mc-accent)}
     .cw233-mc-momentum-bar.is-home i{bottom:50%}
     .cw233-mc-momentum-bar.is-away i{top:50%;background:var(--mc-accent-2);opacity:.68}
-    @media (max-width:380px){.cw233-mc-context-grid{grid-template-columns:1fr}}
+    @media (max-width:380px){.cw233-mc-context-grid,.cw233-mc-form-grid{grid-template-columns:1fr}}
   </style>`;
 }
 
@@ -76,6 +79,85 @@ function contextHtml(source = {}) {
   return `<section class="cw233-mc-overview-card" data-cw233-mc-overview-region="context">
     <div class="cw233-mc-overview-title"><span>О матче</span><b>Основная информация</b></div>
     <div class="cw233-mc-context-grid">${cards.join('')}</div>
+  </section>`;
+}
+
+function formChip(value) {
+  const raw = text(value).toUpperCase();
+  if (!raw) return '';
+  const kind = ['W','WIN','В'].includes(raw) ? 'is-win' : ['D','DRAW','Н'].includes(raw) ? 'is-draw' : ['L','LOSS','П'].includes(raw) ? 'is-loss' : '';
+  const label = kind === 'is-win' ? 'В' : kind === 'is-draw' ? 'Н' : kind === 'is-loss' ? 'П' : raw.slice(0, 1);
+  return `<span class="cw233-mc-form-chip ${kind}" title="${esc(raw)}">${esc(label)}</span>`;
+}
+
+function formHtml(value, match = {}) {
+  const source = value && typeof value === 'object' ? value : {};
+  const home = list(source.home).map(formChip).filter(Boolean);
+  const away = list(source.away).map(formChip).filter(Boolean);
+  if (!home.length && !away.length) return '';
+  const homeName = text(match?.homeTeam?.name) || 'Хозяева';
+  const awayName = text(match?.awayTeam?.name) || 'Гости';
+  return `<section class="cw233-mc-overview-card" data-cw233-mc-overview-region="form">
+    <div class="cw233-mc-overview-title"><span>Форма</span><b>Последние матчи</b></div>
+    <div class="cw233-mc-form-grid">
+      <div class="cw233-mc-form-side"><strong>${esc(homeName)}</strong><div class="cw233-mc-form-run">${home.join('')}</div></div>
+      <div class="cw233-mc-form-side"><strong>${esc(awayName)}</strong><div class="cw233-mc-form-run">${away.join('')}</div></div>
+    </div>
+  </section>`;
+}
+
+function percent(value) {
+  const number = finite(value);
+  if (number === null) return null;
+  const normalized = Math.abs(number) <= 1 ? number * 100 : number;
+  return Math.max(0, Math.min(100, normalized));
+}
+
+function predictionCountLabel(value) {
+  const number = Math.max(0, Math.trunc(finite(value) ?? 0));
+  const lastTwo = number % 100;
+  const last = number % 10;
+  const word = lastTwo >= 11 && lastTwo <= 14
+    ? 'прогнозов'
+    : last === 1
+      ? 'прогноз'
+      : last >= 2 && last <= 4
+        ? 'прогноза'
+        : 'прогнозов';
+  return `${number} ${word}`;
+}
+
+function predictionHtml(prediction, split) {
+  const model = prediction && typeof prediction === 'object' ? prediction : {};
+  const result = split && typeof split === 'object' ? split : {};
+  const homeScore = finite(model.homeScore ?? model.home_score ?? model.pred_home_score);
+  const awayScore = finite(model.awayScore ?? model.away_score ?? model.pred_away_score);
+  const home = percent(result.home ?? result.prob_home ?? result.probHome);
+  const draw = percent(result.draw ?? result.prob_draw ?? result.probDraw);
+  const away = percent(result.away ?? result.prob_away ?? result.probAway);
+  const total = finite(result.total);
+  const points = finite(model.points);
+  const userPrediction = text(model.kind).toLowerCase() === 'user' || total !== null;
+  const hasScore = homeScore !== null || awayScore !== null;
+  const hasSplit = [home, draw, away].some(item => item !== null);
+  if (!hasScore && !hasSplit) return '';
+  const score = `${homeScore === null ? '—' : Math.round(homeScore)}:${awayScore === null ? '—' : Math.round(awayScore)}`;
+  const outcomes = [
+    ['П1', home],
+    ['Х', draw],
+    ['П2', away],
+  ];
+  const heading = userPrediction ? 'Прогнозы пользователей' : 'Прогноз';
+  const headingMeta = userPrediction
+    ? (total === null ? 'Распределение' : predictionCountLabel(total))
+    : 'Модель матча';
+  const scoreLabel = userPrediction
+    ? `Твой прогноз${points === null ? '' : ` · ${Math.round(points)} оч.`}`
+    : 'ожидаемый счёт';
+  return `<section class="cw233-mc-overview-card" data-cw233-mc-overview-region="prediction">
+    <div class="cw233-mc-overview-title"><span>${heading}</span><b>${esc(headingMeta)}</b></div>
+    ${hasScore ? `<div class="cw233-mc-prediction-score"><strong>${esc(score)}</strong><span>${esc(scoreLabel)}</span></div>` : ''}
+    ${hasSplit ? `<div class="cw233-mc-prediction-split">${outcomes.map(([label, value]) => `<div class="cw233-mc-prediction-outcome"><strong>${value === null ? '—' : `${Math.round(value)}%`}</strong><span>${label}</span></div>`).join('')}</div>` : ''}
   </section>`;
 }
 
@@ -165,6 +247,8 @@ export function renderMatchCenterOverview(section = {}, context = {}) {
   const coverage = context?.coverage && typeof context.coverage === 'object' ? context.coverage : {};
   const blocks = [
     contextHtml(source),
+    formHtml(source.form, context?.match),
+    predictionHtml(source.prediction, source.predictionSplit),
     summaryStatsHtml(source.summaryStats),
     momentumHtml(source.momentum, coverage.momentum === true),
     shotmapHtml(source.shotmap, coverage.shotmap === true),

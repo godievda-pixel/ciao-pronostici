@@ -58,9 +58,9 @@ test('Round 18 overview follows the approved compact Serie A regions when data i
   assert.match(html, /Главное/);
   assert.match(html, /xG хозяев/);
   assert.match(html, /23<\/strong><span>ударов/);
-  assert.doesNotMatch(html, /data-cw233-mc-overview-region="form"/);
+  assert.match(html, /data-cw233-mc-overview-region="form"/);
+  assert.match(html, /data-cw233-mc-overview-region="prediction"/);
   assert.doesNotMatch(html, /data-cw233-mc-overview-region="match-info"/);
-  assert.doesNotMatch(html, /data-cw233-mc-overview-region="predictions"/);
 });
 
 test('Round 18 overview does not fabricate momentum or shot map when provider data is absent', () => {
