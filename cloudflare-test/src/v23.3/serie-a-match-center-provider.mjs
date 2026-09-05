@@ -1,3 +1,4 @@
+import { createPredictionService } from './prediction-service.mjs';
 import { adaptSerieALegacyMatchCenter } from './serie-a-match-center-adapter.mjs';
 import { normalizeSerieALegacyMatchCenter } from './serie-a-match-center-legacy-normalizer.mjs';
 
@@ -29,6 +30,32 @@ function numericSerieAMatchId(matchId) {
 
 function object(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+}
+
+function integerOrNull(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  return Number.isInteger(number) && number >= 0 ? number : null;
+}
+
+function savedPredictionForMatch(rows, matchId) {
+  const row = (Array.isArray(rows) ? rows : []).find(item => String(item?.match_id || '') === matchId);
+  if (!row) return null;
+  const homeScore = integerOrNull(row.predicted_home ?? row.home_score);
+  const awayScore = integerOrNull(row.predicted_away ?? row.away_score);
+  if (homeScore === null || awayScore === null) return null;
+  return Object.freeze({ homeScore, awayScore, kind:'user' });
+}
+
+async function authoritativeUserPrediction({ request, env, matchId }) {
+  if (!env?.PREDICTION_LEAGUE) return null;
+  try {
+    const service = createPredictionService({ request, env, now:new Date() });
+    const rows = await service.list('serie_a');
+    return savedPredictionForMatch(rows, matchId);
+  } catch {
+    return null;
+  }
 }
 
 export function unwrapSerieAMatchCenterPayload(payload) {
@@ -188,5 +215,15 @@ export async function loadSerieAMatchCenterSection({ request, env, initData, mat
     raw = await richPromise;
   }
 
-  return canonicalSectionPayload(adaptLegacy(raw), section);
+  const payload = canonicalSectionPayload(adaptLegacy(raw), section);
+  if (section !== 'overview') return payload;
+
+  const prediction = await authoritativeUserPrediction({ request, env, matchId });
+  return {
+    ...payload,
+    data:Object.freeze({
+      ...payload.data,
+      prediction,
+    }),
+  };
 }
