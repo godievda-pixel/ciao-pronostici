@@ -1,11 +1,6 @@
 import { createPredictionService } from './prediction-service.mjs';
 import { adaptSerieALegacyMatchCenter } from './serie-a-match-center-adapter.mjs';
 import { normalizeSerieALegacyMatchCenter } from './serie-a-match-center-legacy-normalizer.mjs';
-import {
-  enrichRound512ShotPlayers,
-  normalizeRound512SerieARaw,
-  round512NeedsSectionRecovery,
-} from './round51-2-serie-a-recovery.mjs';
 
 export const SERIE_A_MATCH_SUMMARY_PATH = '/api/ciao-match-summary-fast-v2';
 export const SERIE_A_MATCH_CENTER_PATH = '/api/ciao-match-center-fast-v3';
@@ -192,8 +187,7 @@ function normalizeLineupAliases(raw) {
 }
 
 function adaptLegacy(raw) {
-  const recovered = normalizeRound512SerieARaw(normalizeLineupAliases(raw));
-  return adaptSerieALegacyMatchCenter(normalizeSerieALegacyMatchCenter(recovered));
+  return adaptSerieALegacyMatchCenter(normalizeSerieALegacyMatchCenter(normalizeLineupAliases(raw)));
 }
 
 function richEnoughBase(adapted) {
@@ -304,9 +298,7 @@ function canonicalSectionPayload(adapted, section) {
       coverage:adapted.coverage,
       data:section === 'lineups'
         ? enrichLineupRatings(adapted.lineups, adapted.players)
-        : section === 'stats'
-          ? enrichRound512ShotPlayers(adapted.stats, adapted.players, adapted.lineups)
-          : adapted[section] ?? null,
+        : adapted[section] ?? null,
     };
   }
 
@@ -321,16 +313,6 @@ function canonicalSectionPayload(adapted, section) {
   return { available, coverage, data };
 }
 
-async function fullMatchCenterRaw({ request, env, initData, id }) {
-  return postStable({
-    request,
-    env,
-    initData,
-    path:SERIE_A_MATCH_CENTER_PATH,
-    body:{ match_id:id, sections:[], include_split:false },
-  });
-}
-
 export async function loadSerieAMatchCenterBase({ request, env, initData, matchId }) {
   const id = numericSerieAMatchId(matchId);
   const summaryRaw = await postStable({
@@ -343,7 +325,13 @@ export async function loadSerieAMatchCenterBase({ request, env, initData, matchI
   let mergedRaw = summaryRaw;
   let adapted = adaptLegacy(mergedRaw);
   if (!richEnoughBase(adapted)) {
-    const fullRaw = await fullMatchCenterRaw({ request, env, initData, id });
+    const fullRaw = await postStable({
+      request,
+      env,
+      initData,
+      path:SERIE_A_MATCH_CENTER_PATH,
+      body:{ match_id:id, sections:[], include_split:false },
+    });
     mergedRaw = mergeSerieALegacyPayload(mergedRaw, fullRaw);
     adapted = adaptLegacy(mergedRaw);
   }
@@ -358,12 +346,6 @@ export async function loadSerieAMatchCenterBase({ request, env, initData, matchI
       body:{ match_id:id, sections:['incidents'], include_split:false },
     });
     mergedRaw = mergeSerieALegacyPayload(mergedRaw, incidentRaw);
-    adapted = adaptLegacy(mergedRaw);
-  }
-
-  if (needsHeroGoalEnrichment(adapted)) {
-    const fullRaw = await fullMatchCenterRaw({ request, env, initData, id });
-    mergedRaw = mergeSerieALegacyPayload(mergedRaw, fullRaw);
     adapted = adaptLegacy(mergedRaw);
   }
 
@@ -398,14 +380,7 @@ export async function loadSerieAMatchCenterSection({ request, env, initData, mat
     raw = await richPromise;
   }
 
-  let adapted = adaptLegacy(raw);
-  if (round512NeedsSectionRecovery(adapted, section)) {
-    const fullRaw = await fullMatchCenterRaw({ request, env, initData, id });
-    raw = mergeSerieALegacyPayload(raw, fullRaw);
-    adapted = adaptLegacy(raw);
-  }
-
-  const payload = canonicalSectionPayload(adapted, section);
+  const payload = canonicalSectionPayload(adaptLegacy(raw), section);
   if (section !== 'overview' || !env?.PREDICTION_LEAGUE) return payload;
 
   const prediction = await authoritativeUserPrediction({ request, env, matchId });
