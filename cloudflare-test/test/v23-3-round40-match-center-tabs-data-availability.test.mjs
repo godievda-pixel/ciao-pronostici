@@ -124,7 +124,7 @@ test('Round 40 Serie A worker can resolve rich overview after a summary-only bas
     '/api/ciao-match-center-fast-v3',
     '/api/ciao-match-summary-fast-v2',
   ]);
-  assert.deepEqual(calls[1].body.sections, ['detail','stats','lineups','overview_meta','player_stats']);
+  assert.deepEqual(calls[1].body.sections, ['detail','stats','lineups','overview_meta','player_stats','incidents']);
   assert.equal(calls[2].body.match_id, 77);
 });
 
