@@ -6,12 +6,21 @@ export const SERIE_A_MATCH_SUMMARY_PATH = '/api/ciao-match-summary-fast-v2';
 export const SERIE_A_MATCH_CENTER_PATH = '/api/ciao-match-center-fast-v3';
 
 export const SERIE_A_SECTION_REQUESTS = Object.freeze({
-  overview:Object.freeze(['detail','stats','lineups','overview_meta','player_stats']),
+  overview:Object.freeze(['detail','stats','lineups','overview_meta','player_stats','incidents']),
   stats:Object.freeze(['stats']),
   events:Object.freeze(['incidents','lineups']),
   lineups:Object.freeze(['lineups']),
   players:Object.freeze(['player_stats']),
 });
+
+const OVERVIEW_EVENT_TYPES = new Set([
+  'goal',
+  'yellow_card',
+  'red_card',
+  'card',
+  'substitution',
+  'var',
+]);
 
 function providerError(code, status = 502) {
   const error = new Error(code);
@@ -160,6 +169,40 @@ function canonicalBaseFromAdapted(adapted) {
   };
 }
 
+function numericRating(player) {
+  if (player?.rating === null || player?.rating === undefined || player?.rating === '') return null;
+  const rating = Number(player.rating);
+  return Number.isFinite(rating) ? rating : null;
+}
+
+function bestRatedPlayer(players) {
+  let best = null;
+  let bestRating = null;
+  for (const player of Array.isArray(players) ? players : []) {
+    const rating = numericRating(player);
+    if (rating === null || (bestRating !== null && rating <= bestRating)) continue;
+    best = player;
+    bestRating = rating;
+  }
+  return best;
+}
+
+function eventClockValue(event = {}) {
+  const minute = Number(event?.minute);
+  const addedTime = Number(event?.addedTime);
+  const safeMinute = Number.isFinite(minute) ? minute : -1;
+  const safeAddedTime = Number.isFinite(addedTime) ? addedTime : 0;
+  return safeMinute * 100 + safeAddedTime;
+}
+
+function latestOverviewEvents(events) {
+  return (Array.isArray(events) ? events : [])
+    .filter(event => OVERVIEW_EVENT_TYPES.has(String(event?.type || '').trim().toLowerCase()))
+    .slice()
+    .sort((left, right) => eventClockValue(left) - eventClockValue(right))
+    .slice(-4);
+}
+
 function canonicalSectionPayload(adapted, section) {
   if (section !== 'overview') {
     return {
@@ -174,6 +217,8 @@ function canonicalSectionPayload(adapted, section) {
   const data = Object.freeze({
     ...adapted.overview,
     summaryStats:adapted.coverage?.stats === true ? adapted.stats : null,
+    bestPlayer:bestRatedPlayer(adapted.players),
+    recentEvents:Object.freeze(latestOverviewEvents(adapted.events)),
   });
   return { available, coverage, data };
 }
