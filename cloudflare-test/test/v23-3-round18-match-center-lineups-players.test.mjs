@@ -57,7 +57,7 @@ function lineups() {
   };
 }
 
-test('Round 18 lineups renderer keeps all starters and substitutes in compact Serie A lists', () => {
+test('Round 18 lineups renderer keeps all players and now includes premium pitch view', () => {
   const html = renderMatchCenterLineups(lineups(), { match:match() });
 
   assert.match(html, /data-cw233-mc-lineups/);
@@ -67,7 +67,8 @@ test('Round 18 lineups renderer keeps all starters and substitutes in compact Se
   assert.match(html, />4-3-3</);
   assert.match(html, /cw233-mc-lineup-list/);
   assert.match(html, /data-cw233-mc-lineup-player/);
-  assert.doesNotMatch(html, /data-cw233-mc-pitch/);
+  assert.match(html, /data-cw233-mc-lineup-pitch/);
+  assert.match(html, /data-cw233-mc-lineup-switch/);
   for (const name of ['Sommer', 'Pavard', 'Barella', 'Lautaro', 'Raya', 'Saliba', 'Odegaard', 'Saka']) {
     assert.match(html, new RegExp(name));
   }
@@ -93,6 +94,7 @@ test('Round 18 lineups renderer keeps starters even when formation is unavailabl
   }, { match:match() });
 
   assert.match(html, /cw233-mc-lineup-list/);
+  assert.match(html, /Схема недоступна/);
   for (const name of ['Keeper', 'Defender', 'Midfielder', 'Forward']) {
     assert.match(html, new RegExp(name));
   }
