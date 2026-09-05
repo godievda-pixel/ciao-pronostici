@@ -182,6 +182,7 @@ export function createCanonicalMatchCenterRuntime({
   suspendSource = () => {},
   restoreSource = () => {},
   currentSource = () => defaultSource(),
+  legacySourceLifecycle = false,
 } = {}) {
   if (!store || typeof store.open !== 'function' || typeof store.close !== 'function') {
     throw new Error('match_center_store_required');
@@ -193,7 +194,7 @@ export function createCanonicalMatchCenterRuntime({
   if (typeof enhanceView !== 'function') throw new Error('match_center_enhancer_required');
 
   let source = null;
-  let restoreExplicitSource = false;
+  let restoreLegacySource = false;
   let destroyed = false;
   let lastState = null;
   let viewState = defaultViewState();
@@ -228,10 +229,9 @@ export function createCanonicalMatchCenterRuntime({
     if (!competition || !matchId) throw new Error('match_center_target_required');
 
     viewState = defaultViewState();
-    const explicitSource = payload.source && typeof payload.source === 'object';
-    source = sourceOrDefault(explicitSource ? payload.source : currentSource?.());
-    restoreExplicitSource = Boolean(explicitSource);
-    if (restoreExplicitSource) suspendSource(source);
+    source = sourceOrDefault(payload.source || currentSource?.());
+    restoreLegacySource = legacySourceLifecycle === true || payload.legacySourceLifecycle === true;
+    if (restoreLegacySource) suspendSource(source);
     host.scrollToTop?.();
     return store.open({
       competition,
@@ -242,9 +242,9 @@ export function createCanonicalMatchCenterRuntime({
 
   function back() {
     if (destroyed) return null;
-    const sourceToRestore = restoreExplicitSource ? source : null;
+    const sourceToRestore = restoreLegacySource ? source : null;
     source = null;
-    restoreExplicitSource = false;
+    restoreLegacySource = false;
     viewState = defaultViewState();
     const result = store.close();
     host.hide();
@@ -323,7 +323,7 @@ export function createCanonicalMatchCenterRuntime({
     if (destroyed) return;
     destroyed = true;
     source = null;
-    restoreExplicitSource = false;
+    restoreLegacySource = false;
     lastState = null;
     viewState = defaultViewState();
     unsubscribe?.();
