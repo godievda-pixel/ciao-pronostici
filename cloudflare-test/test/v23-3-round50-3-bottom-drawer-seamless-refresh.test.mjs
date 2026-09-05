@@ -157,7 +157,8 @@ test('Round 50.3 failed background refresh preserves stale ready content instead
 });
 
 test('Round 50.3 user navigation is Overview, Lineups, Events, Statistics, Shots and hides Players', () => {
-  const html = renderMatchCenterView(readyState());
+  const state = readyState();
+  const html = enhanceRound503MatchCenterView(renderMatchCenterView(state), state, { activeViewTab:'overview' });
   const labels = ['Обзор','Составы','События','Статистика','Удары'];
   let cursor = -1;
   for (const label of labels) {
