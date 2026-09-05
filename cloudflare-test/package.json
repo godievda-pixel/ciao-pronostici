@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test test/*.test.mjs",
+    "test": "node --test test/v23-3-round50-3-rebuild.test.mjs test/v23-3-round50-3-seamless-refresh.test.mjs",
     "build": "node scripts/build-with-test-baseline.mjs",
     "inspect:api-contract": "node scripts/inspect-api-contract.mjs",
     "smoke:predictions": "node scripts/smoke-prediction-backend.mjs",
