@@ -3,12 +3,17 @@ import { createMatchCenterStore } from './match-center-store.mjs';
 import { renderMatchCenterView } from './match-center-view.mjs';
 import { enhanceRound502MatchCenterView } from './round50-2-match-center-view.mjs';
 import {
+  canonicalRound503ViewTab,
+  providerTabForRound503View,
+  enhanceRound503MatchCenterView,
+} from './round50-3-match-center-view.mjs';
+import {
   currentMatchSource,
   suspendMatchSource,
   restoreMatchSource,
 } from './match-center-lifecycle.mjs';
 
-export const MATCH_CENTER_RUNTIME_BUILD = 'round43-canonical-match-center';
+export const MATCH_CENTER_RUNTIME_BUILD = 'round50-3-bottom-drawer-seamless-refresh';
 export const MATCH_CENTER_RUNTIME_ID = 'ciao-v239-match-center-overlay';
 export const MATCH_CENTER_HOST_SCROLLBAR_STYLE_ID = 'ciao-v239-match-center-scrollbar-style';
 export const MATCH_CENTER_HOST_SCROLLBAR_CSS = `#${MATCH_CENTER_RUNTIME_ID}{scrollbar-width:none;-ms-overflow-style:none}#${MATCH_CENTER_RUNTIME_ID}::-webkit-scrollbar{display:none;width:0;height:0}`;
@@ -31,6 +36,7 @@ function defaultSource() {
 
 function defaultViewState() {
   return {
+    activeViewTab:'overview',
     selectedLineupTeam:'home',
     expandedLineupDisclosure:null,
     selectedShotIndex:null,
@@ -52,6 +58,11 @@ function ensureHostScrollbarStyle(documentRef) {
   style.textContent = MATCH_CENTER_HOST_SCROLLBAR_CSS;
   (documentRef.head || rootFor(documentRef))?.appendChild?.(style);
   return style;
+}
+
+function enhanceRound503Pipeline(html, state, viewState) {
+  const round502 = enhanceRound502MatchCenterView(html, state, viewState);
+  return enhanceRound503MatchCenterView(round502, state, viewState);
 }
 
 export function createBrowserMatchCenterHost(documentRef = globalThis.document) {
@@ -167,7 +178,7 @@ export function createCanonicalMatchCenterRuntime({
   store,
   host,
   renderView = renderMatchCenterView,
-  enhanceView = enhanceRound502MatchCenterView,
+  enhanceView = enhanceRound503Pipeline,
   suspendSource = () => {},
   restoreSource = () => {},
   currentSource = () => defaultSource(),
@@ -187,7 +198,7 @@ export function createCanonicalMatchCenterRuntime({
   let viewState = defaultViewState();
 
   function rendered(state) {
-    return enhanceView(renderView(state), state, viewState);
+    return enhanceView(renderView(state, viewState), state, viewState);
   }
 
   function renderCurrent() {
@@ -217,7 +228,6 @@ export function createCanonicalMatchCenterRuntime({
 
     viewState = defaultViewState();
     source = sourceOrDefault(payload.source || currentSource?.());
-    suspendSource?.(source);
     host.scrollToTop?.();
     return store.open({
       competition,
@@ -228,24 +238,33 @@ export function createCanonicalMatchCenterRuntime({
 
   function back() {
     if (destroyed) return null;
-    const restore = sourceOrDefault(source || currentSource?.());
     source = null;
     viewState = defaultViewState();
     const result = store.close();
     host.hide();
-    restoreSource?.(restore);
     return result;
   }
 
   function selectTab(tab) {
-    const next = text(tab);
-    const current = text((store.getState?.() || lastState)?.activeTab);
-    if (current === 'lineups' && next !== 'lineups') {
-      viewState.selectedLineupTeam = 'home';
-      viewState.expandedLineupDisclosure = null;
+    if (destroyed) return null;
+    const activeViewTab = canonicalRound503ViewTab(tab);
+    const providerTab = providerTabForRound503View(activeViewTab);
+    const currentState = store.getState?.() || lastState;
+    const previousViewTab = viewState.activeViewTab;
+
+    viewState = {
+      ...viewState,
+      activeViewTab,
+      selectedShotIndex:activeViewTab === 'shots' ? viewState.selectedShotIndex : null,
+      selectedLineupTeam:activeViewTab === 'lineups' ? viewState.selectedLineupTeam : 'home',
+      expandedLineupDisclosure:activeViewTab === 'lineups' ? viewState.expandedLineupDisclosure : null,
+    };
+
+    if (currentState?.activeTab === providerTab) {
+      if (previousViewTab !== activeViewTab) renderCurrent();
+      return currentState;
     }
-    if (current === 'stats' && next !== 'stats') viewState.selectedShotIndex = null;
-    return store.setActiveTab?.(next);
+    return store.setActiveTab?.(providerTab);
   }
 
   function uiAction(action, value) {
@@ -254,7 +273,7 @@ export function createCanonicalMatchCenterRuntime({
     if (!state?.open) return null;
     const key = text(action);
 
-    if (key === 'lineup-team' && state.activeTab === 'lineups') {
+    if (key === 'lineup-team' && state.activeTab === 'lineups' && viewState.activeViewTab === 'lineups') {
       const side = value === 'away' ? 'away' : value === 'home' ? 'home' : null;
       if (!side) return null;
       viewState.selectedLineupTeam = side;
@@ -262,7 +281,7 @@ export function createCanonicalMatchCenterRuntime({
       return renderCurrent();
     }
 
-    if (key === 'lineup-disclosure' && state.activeTab === 'lineups') {
+    if (key === 'lineup-disclosure' && state.activeTab === 'lineups' && viewState.activeViewTab === 'lineups') {
       const disclosure = value === 'starters' || value === 'substitutes' ? value : null;
       if (!disclosure) return null;
       const selected = viewState.selectedLineupTeam === 'away' ? 'away' : 'home';
@@ -273,7 +292,7 @@ export function createCanonicalMatchCenterRuntime({
       return renderCurrent();
     }
 
-    if (key === 'shot' && state.activeTab === 'stats') {
+    if (key === 'shot' && state.activeTab === 'stats' && viewState.activeViewTab === 'shots') {
       const index = Number(value);
       const shots = Array.isArray(state?.sections?.stats?.shots) ? state.sections.stats.shots : [];
       if (!Number.isInteger(index) || index < 0 || index >= shots.length) return null;
@@ -288,7 +307,9 @@ export function createCanonicalMatchCenterRuntime({
   }
 
   function retrySection(tab) {
-    return store.retrySection?.(text(tab) || undefined);
+    const viewTab = text(tab);
+    const providerTab = viewTab ? providerTabForRound503View(viewTab) : undefined;
+    return store.retrySection?.(providerTab);
   }
 
   function destroy() {
