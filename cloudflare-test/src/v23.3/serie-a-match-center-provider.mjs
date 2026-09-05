@@ -216,7 +216,7 @@ export async function loadSerieAMatchCenterSection({ request, env, initData, mat
   }
 
   const payload = canonicalSectionPayload(adaptLegacy(raw), section);
-  if (section !== 'overview') return payload;
+  if (section !== 'overview' || !env?.PREDICTION_LEAGUE) return payload;
 
   const prediction = await authoritativeUserPrediction({ request, env, matchId });
   return {
