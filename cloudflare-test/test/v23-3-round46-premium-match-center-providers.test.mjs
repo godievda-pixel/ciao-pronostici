@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { adaptBsdMatchCenterSections } from '../src/v23.3/bsd-match-center-adapter.mjs';
 import { normalizeSerieALegacyMatchCenter } from '../src/v23.3/serie-a-match-center-legacy-normalizer.mjs';
 import { adaptSerieALegacyMatchCenter } from '../src/v23.3/serie-a-match-center-adapter.mjs';
-import { loadSerieAMatchCenterBase } from '../src/v23.3/serie-a-match-center-provider.mjs';
+import { loadSerieAMatchCenterBase, needsHeroGoalEnrichment } from '../src/v23.3/serie-a-match-center-provider.mjs';
 
 const richGoal = {
   type:'goal',
@@ -192,4 +192,36 @@ test('finished Serie A base enriches hero scorers while scheduled base stays sum
   });
   assert.deepEqual(scheduled.match.goals, { home:[], away:[] });
   assert.equal(scheduledCalls.length, 1);
+});
+
+test('Serie A hero enrichment treats partial scorer lists as incomplete', () => {
+  assert.equal(needsHeroGoalEnrichment({
+    base:{
+      status:'finished',
+      homeScore:3,
+      awayScore:1,
+      goals:{ home:[{ player:'Known scorer', minute:12 }], away:[] },
+    },
+  }), true);
+
+  assert.equal(needsHeroGoalEnrichment({
+    base:{
+      status:'finished',
+      homeScore:2,
+      awayScore:1,
+      goals:{
+        home:[{ player:'One' }, { player:'Two' }],
+        away:[{ player:'Three' }],
+      },
+    },
+  }), false);
+
+  assert.equal(needsHeroGoalEnrichment({
+    base:{
+      status:'scheduled',
+      homeScore:0,
+      awayScore:0,
+      goals:{ home:[], away:[] },
+    },
+  }), false);
 });
