@@ -107,7 +107,7 @@ export async function probeRound49PremiumMatchCenter({ fetchImpl = fetch, writeA
     'var(--mc-accent-soft)',
     'player.shots',
     'player.keyPasses',
-    '@media(max-width:360px)',
+    '@media(max-width:420px)',
   ]);
 
   const report = {
