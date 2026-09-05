@@ -104,6 +104,18 @@ function canonicalStatSide(value) {
   ));
 }
 
+function canonicalMomentumPoint(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const home = finite(value.home);
+  const away = finite(value.away);
+  if (home === null || away === null) return null;
+  return Object.freeze({
+    minute:finite(value.minute ?? value.m),
+    home,
+    away,
+  });
+}
+
 function canonicalScoreAfter(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const home = finite(value.home ?? value.homeScore ?? value.home_score);
@@ -292,6 +304,7 @@ export function canonicalStatsSection(input = {}) {
     home:canonicalStatSide(source.home),
     away:canonicalStatSide(source.away),
     shots:Object.freeze(list(source.shots).map(canonicalShot).filter(Boolean)),
+    momentum:Object.freeze(list(source.momentum).map(canonicalMomentumPoint).filter(Boolean)),
   });
 }
 
