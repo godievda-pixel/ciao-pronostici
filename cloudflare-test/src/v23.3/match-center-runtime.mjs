@@ -1,6 +1,7 @@
 import { createMatchCenterRepository } from './match-center-repository.mjs';
 import { createMatchCenterStore } from './match-center-store.mjs';
 import { renderMatchCenterView } from './match-center-view.mjs';
+import { enhanceRound502MatchCenterView } from './round50-2-match-center-view.mjs';
 import {
   currentMatchSource,
   suspendMatchSource,
@@ -26,6 +27,14 @@ function defaultSource() {
     scrollTop:0,
     matchesOverlayScrollTop:0,
   });
+}
+
+function defaultViewState() {
+  return {
+    selectedLineupTeam:'home',
+    expandedLineupDisclosure:null,
+    selectedShotIndex:null,
+  };
 }
 
 function sourceOrDefault(source) {
@@ -77,6 +86,22 @@ export function createBrowserMatchCenterHost(documentRef = globalThis.document) 
   const clickHandler = event => {
     if (!boundRuntime) return;
 
+    const uiNode = event?.target?.closest?.('[data-cw502-action]');
+    if (uiNode && node.contains?.(uiNode)) {
+      const action = text(uiNode.dataset?.cw502Action);
+      const value = action === 'lineup-team'
+        ? text(uiNode.dataset?.cw502LineupTeam)
+        : action === 'lineup-disclosure'
+          ? text(uiNode.dataset?.cw502LineupDisclosure)
+          : action === 'shot'
+            ? text(uiNode.dataset?.cw502ShotAction)
+            : '';
+      event.preventDefault?.();
+      event.stopPropagation?.();
+      boundRuntime.uiAction?.(action, value);
+      return;
+    }
+
     const actionNode = event?.target?.closest?.('[data-cw239-action]');
     if (actionNode && node.contains?.(actionNode)) {
       const action = text(actionNode.dataset?.cw239Action);
@@ -96,7 +121,21 @@ export function createBrowserMatchCenterHost(documentRef = globalThis.document) 
     event.stopPropagation?.();
     void boundRuntime.selectTab(text(tabNode.dataset?.cw239Tab));
   };
+
+  const imageErrorHandler = event => {
+    const image = event?.target;
+    if (!image?.matches?.('img[data-cw502-crest-fallback]')) return;
+    const fallback = documentRef.createElement('span');
+    fallback.className = 'cw239-mc-crest cw502-mc-crest-fallback';
+    fallback.dataset.cw502CrestSide = text(image.dataset?.cw502CrestSide);
+    fallback.dataset.cw502CrestFallback = text(image.dataset?.cw502CrestFallback);
+    fallback.setAttribute?.('aria-hidden', 'true');
+    fallback.textContent = text(image.dataset?.cw502CrestFallback) || '—';
+    image.replaceWith?.(fallback);
+  };
+
   node.addEventListener?.('click', clickHandler);
+  node.addEventListener?.('error', imageErrorHandler, true);
 
   return Object.freeze({
     node,
@@ -118,6 +157,7 @@ export function createBrowserMatchCenterHost(documentRef = globalThis.document) 
     destroy() {
       boundRuntime = null;
       node.removeEventListener?.('click', clickHandler);
+      node.removeEventListener?.('error', imageErrorHandler, true);
       node.remove?.();
     },
   });
@@ -127,6 +167,7 @@ export function createCanonicalMatchCenterRuntime({
   store,
   host,
   renderView = renderMatchCenterView,
+  enhanceView = enhanceRound502MatchCenterView,
   suspendSource = () => {},
   restoreSource = () => {},
   currentSource = () => defaultSource(),
@@ -138,17 +179,34 @@ export function createCanonicalMatchCenterRuntime({
     throw new Error('match_center_host_required');
   }
   if (typeof renderView !== 'function') throw new Error('match_center_view_required');
+  if (typeof enhanceView !== 'function') throw new Error('match_center_enhancer_required');
 
   let source = null;
   let destroyed = false;
+  let lastState = null;
+  let viewState = defaultViewState();
+
+  function rendered(state) {
+    return enhanceView(renderView(state), state, viewState);
+  }
+
+  function renderCurrent() {
+    if (destroyed) return null;
+    const state = store.getState?.() || lastState;
+    if (!state?.open || state?.phase === 'closed') return null;
+    lastState = state;
+    host.render(rendered(state));
+    return state;
+  }
 
   const unsubscribe = store.subscribe?.(state => {
     if (destroyed) return;
+    lastState = state;
     if (!state?.open || state?.phase === 'closed') {
       host.hide();
       return;
     }
-    host.render(renderView(state));
+    host.render(rendered(state));
   }) || (() => {});
 
   async function open(payload = {}) {
@@ -157,6 +215,7 @@ export function createCanonicalMatchCenterRuntime({
     const matchId = text(payload.matchId);
     if (!competition || !matchId) throw new Error('match_center_target_required');
 
+    viewState = defaultViewState();
     source = sourceOrDefault(payload.source || currentSource?.());
     suspendSource?.(source);
     host.scrollToTop?.();
@@ -171,6 +230,7 @@ export function createCanonicalMatchCenterRuntime({
     if (destroyed) return null;
     const restore = sourceOrDefault(source || currentSource?.());
     source = null;
+    viewState = defaultViewState();
     const result = store.close();
     host.hide();
     restoreSource?.(restore);
@@ -178,7 +238,49 @@ export function createCanonicalMatchCenterRuntime({
   }
 
   function selectTab(tab) {
-    return store.setActiveTab?.(tab);
+    const next = text(tab);
+    const current = text((store.getState?.() || lastState)?.activeTab);
+    if (current === 'lineups' && next !== 'lineups') {
+      viewState.selectedLineupTeam = 'home';
+      viewState.expandedLineupDisclosure = null;
+    }
+    if (current === 'stats' && next !== 'stats') viewState.selectedShotIndex = null;
+    return store.setActiveTab?.(next);
+  }
+
+  function uiAction(action, value) {
+    if (destroyed) return null;
+    const state = store.getState?.() || lastState;
+    if (!state?.open) return null;
+    const key = text(action);
+
+    if (key === 'lineup-team' && state.activeTab === 'lineups') {
+      const side = value === 'away' ? 'away' : value === 'home' ? 'home' : null;
+      if (!side) return null;
+      viewState.selectedLineupTeam = side;
+      viewState.expandedLineupDisclosure = null;
+      return renderCurrent();
+    }
+
+    if (key === 'lineup-disclosure' && state.activeTab === 'lineups') {
+      const disclosure = value === 'starters' || value === 'substitutes' ? value : null;
+      if (!disclosure) return null;
+      const selected = viewState.selectedLineupTeam === 'away' ? 'away' : 'home';
+      const side = state?.sections?.lineups?.[selected];
+      const rows = Array.isArray(side?.[disclosure]) ? side[disclosure] : [];
+      if (!rows.length) return null;
+      viewState.expandedLineupDisclosure = viewState.expandedLineupDisclosure === disclosure ? null : disclosure;
+      return renderCurrent();
+    }
+
+    if (key === 'shot' && state.activeTab === 'stats') {
+      const index = Number(value);
+      const shots = Array.isArray(state?.sections?.stats?.shots) ? state.sections.stats.shots : [];
+      if (!Number.isInteger(index) || index < 0 || index >= shots.length) return null;
+      viewState.selectedShotIndex = viewState.selectedShotIndex === index ? null : index;
+      return renderCurrent();
+    }
+    return null;
   }
 
   function retryBase() {
@@ -193,6 +295,8 @@ export function createCanonicalMatchCenterRuntime({
     if (destroyed) return;
     destroyed = true;
     source = null;
+    lastState = null;
+    viewState = defaultViewState();
     unsubscribe?.();
     store.close?.();
     host.hide?.();
@@ -205,10 +309,12 @@ export function createCanonicalMatchCenterRuntime({
     open,
     back,
     selectTab,
+    uiAction,
     retryBase,
     retrySection,
     destroy,
     currentSource:() => source,
+    currentViewState:() => Object.freeze({ ...viewState }),
   });
   host.bind?.(runtime);
   return runtime;
@@ -236,6 +342,7 @@ export function installCanonicalMatchCenterRuntime(documentRef = globalThis.docu
     open:runtime.open,
     back:runtime.back,
     selectTab:runtime.selectTab,
+    uiAction:runtime.uiAction,
     retryBase:runtime.retryBase,
     retrySection:runtime.retrySection,
   });
