@@ -43,7 +43,8 @@ test('Round 39 has a dedicated deployed artifact probe for the complete canonica
     assert.match(probe, new RegExp(moduleName.replaceAll('.', '\\.')));
   }
 
-  assert.match(probe, /round\d\+-canonical-match-center/);
+  assert.match(probe, /runtimeBuild/);
+  assert.doesNotMatch(probe, /MATCH_CENTER_RUNTIME_BUILD = 'round39-canonical-match-center'/);
   assert.match(probe, /canonicalRouterOnly/);
   assert.match(probe, /canonicalView/);
   assert.match(probe, /singleStore/);
