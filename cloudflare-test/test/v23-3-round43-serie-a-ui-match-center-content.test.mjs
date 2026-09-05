@@ -17,11 +17,13 @@ test('Round 43 canonical Serie A Match Center uses the same palette as Predictio
 });
 
 test('Round 43 Serie A match cards reuse the premium Predictions card surface', async () => {
-  const source = await read('../src/v23.2/matches-ui.mjs');
+  const source = await read('../src/v23.3/round43-serie-a-ui.mjs');
   assert.match(
     source,
     /\.cw232-competition\[data-cw232-competition=['"]serie_a['"]\][\s\S]*?\.cw232-match-card[\s\S]*?radial-gradient\(circle at 92% 8%,rgba\(12,90,168,\.15\),transparent 48%\)[\s\S]*?linear-gradient\(145deg,rgba\(24,42,91,\.90\),rgba\(12,24,55,\.94\)\)/,
   );
+  const index = await read('../src/v23.3/index.mjs');
+  assert.match(index, /import ['"]\.\/round43-serie-a-ui\.mjs['"]/);
 });
 
 test('Round 43 Overview renders structured form results instead of [object Object]', () => {
