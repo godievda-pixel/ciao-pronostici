@@ -60,6 +60,10 @@ test('Round 50 Overview redraw restores the old product hierarchy without copyin
   assert.ok(infoIndex < predictionIndex, 'match information must come before predictions');
 
   assert.match(html, /data-cw250-prediction-distribution/);
+  assert.match(html, />1%<\/b>/);
+  assert.match(html, />11%<\/b>/);
+  assert.match(html, />88%<\/b>/);
+  assert.doesNotMatch(html, />100%<\/b>/);
   assert.match(html, /data-cw250-exact-score/);
   assert.match(html, /17%/);
   assert.match(html, /data-cw250-popular-scores/);
@@ -69,6 +73,16 @@ test('Round 50 Overview redraw restores the old product hierarchy without copyin
   assert.doesNotMatch(html, /data-cw233-mc-overview-region="momentum"/);
   assert.doesNotMatch(html, /data-cw233-mc-overview-region="shotmap"/);
   assert.match(html, /data-cw250-overview-redraw-style/);
+});
+
+test('Round 50 Overview scales fractional prediction vectors consistently', () => {
+  const html = renderMatchCenterOverview({
+    predictionSplit:{ home:0.42, draw:0.43, away:0.15, total:100 },
+  }, { match, coverage:{} });
+
+  assert.match(html, />42%<\/b>/);
+  assert.match(html, />43%<\/b>/);
+  assert.match(html, />15%<\/b>/);
 });
 
 test('Round 50 Overview remains additive when optional analytics are unavailable', () => {
