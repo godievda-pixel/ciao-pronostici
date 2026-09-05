@@ -132,5 +132,5 @@ test('premium Players uses tournament surfaces and shows every provider-supplied
   }
   assert.match(html, /var\(--mc-surface-raised\)/);
   assert.match(html, /var\(--mc-accent-soft\)/);
-  assert.match(html, /@media\(max-width:360px\)/);
+  assert.match(html, /@media\(max-width:420px\)/);
 });
