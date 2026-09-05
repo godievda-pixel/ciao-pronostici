@@ -3,6 +3,7 @@ import {
   normalizeCanonicalBase,
   normalizeCanonicalSection,
 } from './match-center-contract.mjs';
+import { createPredictionService } from './prediction-service.mjs';
 
 const SUPPORTED_COMPETITIONS = new Set([
   'serie_a',
@@ -60,11 +61,43 @@ function requireLoader(loader, code) {
   return loader;
 }
 
+function integerOrNull(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  return Number.isInteger(number) && number >= 0 ? number : null;
+}
+
+function savedPredictionForMatch(rows, matchId) {
+  const row = (Array.isArray(rows) ? rows : []).find(item => String(item?.match_id || '') === matchId);
+  if (!row) return null;
+  const homeScore = integerOrNull(row.predicted_home ?? row.home_score);
+  const awayScore = integerOrNull(row.predicted_away ?? row.away_score);
+  if (homeScore === null || awayScore === null) return null;
+  const prediction = { homeScore, awayScore, kind:'user' };
+  if (row.points !== null && row.points !== undefined && row.points !== '') {
+    const points = Number(row.points);
+    if (Number.isFinite(points)) prediction.points = points;
+  }
+  return Object.freeze(prediction);
+}
+
+export async function loadAuthoritativeUserPrediction({ request, env, competition, matchId } = {}) {
+  if (!env?.PREDICTION_LEAGUE) return null;
+  try {
+    const service = createPredictionService({ request, env, now:new Date() });
+    const rows = await service.list(competition);
+    return savedPredictionForMatch(rows, matchId);
+  } catch {
+    return null;
+  }
+}
+
 export function createMatchCenterProviders({
   loadSerieABase,
   loadSerieASection,
   loadExternalBase,
   loadExternalSection,
+  loadUserPrediction = loadAuthoritativeUserPrediction,
 } = {}) {
   async function loadBase({ competition, matchId, ...context } = {}) {
     const target = assertTarget(competition, matchId);
@@ -82,7 +115,19 @@ export function createMatchCenterProviders({
       ? requireLoader(loadSerieASection, 'serie_a_provider_unavailable')
       : requireLoader(loadExternalSection, 'external_provider_unavailable');
     const payload = await loader({ ...context, ...target, section:canonicalSection });
-    return normalizeCanonicalSection(canonicalSection, unwrapSection(payload));
+    const normalized = normalizeCanonicalSection(canonicalSection, unwrapSection(payload));
+    if (canonicalSection !== 'overview' || normalized?.available === false || !normalized?.data) return normalized;
+
+    let prediction = null;
+    try {
+      prediction = await loadUserPrediction({ ...context, ...target });
+    } catch {}
+    if (!prediction) return normalized;
+
+    return Object.freeze({
+      ...normalized,
+      data:Object.freeze({ ...normalized.data, prediction }),
+    });
   }
 
   return Object.freeze({ loadBase, loadSection });
