@@ -9,7 +9,7 @@ export const SERIE_A_SECTION_REQUESTS = Object.freeze({
   overview:Object.freeze(['detail','stats','lineups','overview_meta','player_stats','incidents']),
   stats:Object.freeze(['stats','overview_meta']),
   events:Object.freeze(['incidents','lineups']),
-  lineups:Object.freeze(['lineups']),
+  lineups:Object.freeze(['lineups','player_stats']),
   players:Object.freeze(['player_stats']),
 });
 
@@ -39,6 +39,11 @@ function numericSerieAMatchId(matchId) {
 
 function object(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+}
+
+function arrayCandidate(...values) {
+  const arrays = values.filter(Array.isArray);
+  return arrays.find(value => value.length > 0) || arrays[0] || null;
 }
 
 function integerOrNull(value) {
@@ -135,8 +140,54 @@ function mergeSerieALegacyPayload(summaryRaw, richRaw) {
   };
 }
 
+function normalizeLineupSideAliases(value) {
+  const side = object(value);
+  if (!side) return value;
+  const combined = arrayCandidate(side.players);
+  const explicitStarters = arrayCandidate(side.starters);
+  let starters = explicitStarters?.length ? explicitStarters : combined || [];
+  let substitutes = arrayCandidate(
+    side.substitutes,
+    side.bench,
+    side.subs,
+    side.reserves,
+    side.reserve_players,
+    side.reservePlayers,
+    side.substitute_players,
+    side.substitutePlayers,
+    side.bench_players,
+    side.benchPlayers,
+  );
+  if ((!substitutes || substitutes.length === 0) && combined?.some(player => player?.starter === false || player?.is_starter === false)) {
+    substitutes = combined.filter(player => player?.starter === false || player?.is_starter === false);
+    if (!explicitStarters?.length) starters = combined.filter(player => player?.starter !== false && player?.is_starter !== false);
+  }
+  return {
+    ...side,
+    starters,
+    substitutes:substitutes || [],
+  };
+}
+
+function normalizeLineupAliases(raw) {
+  const source = object(raw);
+  const envelope = object(source?.lineups);
+  if (!source || !envelope) return raw;
+  const nested = object(envelope.lineups);
+  const lineups = nested || envelope;
+  const normalized = {
+    ...lineups,
+    home:normalizeLineupSideAliases(lineups.home),
+    away:normalizeLineupSideAliases(lineups.away),
+  };
+  return {
+    ...source,
+    lineups:nested ? { ...envelope, lineups:normalized } : normalized,
+  };
+}
+
 function adaptLegacy(raw) {
-  return adaptSerieALegacyMatchCenter(normalizeSerieALegacyMatchCenter(raw));
+  return adaptSerieALegacyMatchCenter(normalizeSerieALegacyMatchCenter(normalizeLineupAliases(raw)));
 }
 
 function richEnoughBase(adapted) {
@@ -187,6 +238,43 @@ function bestRatedPlayer(players) {
   return best;
 }
 
+function playerRatingIndex(players) {
+  const byId = new Map();
+  const byName = new Map();
+  for (const player of Array.isArray(players) ? players : []) {
+    const rating = numericRating(player);
+    if (rating === null) continue;
+    const id = String(player?.playerId ?? '').trim();
+    const name = String(player?.name || '').trim().toLocaleLowerCase('ru-RU');
+    if (id) byId.set(id, rating);
+    if (name) byName.set(name, rating);
+  }
+  return { byId, byName };
+}
+
+function enrichLineupPlayerRating(player, index) {
+  const current = numericRating(player);
+  if (current !== null) return player;
+  const id = String(player?.playerId ?? '').trim();
+  const name = String(player?.name || '').trim().toLocaleLowerCase('ru-RU');
+  const rating = (id && index.byId.get(id)) ?? (name && index.byName.get(name)) ?? null;
+  return rating === null || rating === undefined ? player : Object.freeze({ ...player, rating });
+}
+
+function enrichLineupRatings(lineups, players) {
+  const source = lineups && typeof lineups === 'object' ? lineups : {};
+  const index = playerRatingIndex(players);
+  const side = value => {
+    const item = value && typeof value === 'object' ? value : {};
+    return Object.freeze({
+      ...item,
+      starters:Object.freeze((Array.isArray(item.starters) ? item.starters : []).map(player => enrichLineupPlayerRating(player, index))),
+      substitutes:Object.freeze((Array.isArray(item.substitutes) ? item.substitutes : []).map(player => enrichLineupPlayerRating(player, index))),
+    });
+  };
+  return Object.freeze({ home:side(source.home), away:side(source.away) });
+}
+
 function eventClockValue(event = {}) {
   const minute = Number(event?.minute);
   const addedTime = Number(event?.addedTime);
@@ -208,7 +296,9 @@ function canonicalSectionPayload(adapted, section) {
     return {
       available:adapted.coverage?.[section] === true,
       coverage:adapted.coverage,
-      data:adapted[section] ?? null,
+      data:section === 'lineups'
+        ? enrichLineupRatings(adapted.lineups, adapted.players)
+        : adapted[section] ?? null,
     };
   }
 
