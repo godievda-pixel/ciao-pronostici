@@ -348,6 +348,8 @@ export function adaptBsdMatchCenterSections(event = {}) {
   const rawEvents = incidentsSource(event);
   const rawLineups = lineupsSource(event);
   const rawPlayers = playerStatsSource(event);
+  const overviewMeta = object(event.overview_meta) || {};
+  const rawMomentum = firstPresent(event, ['momentum']) ?? overviewMeta.momentum ?? null;
   return Object.freeze({
     coverage,
     overview:coverage.overview ? canonicalOverviewSection(overviewInput(event)) : null,
@@ -355,6 +357,7 @@ export function adaptBsdMatchCenterSections(event = {}) {
       home:canonicalStatInput(rawStats?.home),
       away:canonicalStatInput(rawStats?.away),
       shots:list(rawShots).map(normalizeDetailedShot),
+      momentum:normalizeMomentum(rawMomentum),
     }) : null,
     events:coverage.events ? canonicalEventsSection(list(rawEvents).map(canonicalEventInput)) : null,
     lineups:coverage.lineups ? canonicalLineupsSection({
