@@ -82,10 +82,22 @@ function contextHtml(source = {}) {
   </section>`;
 }
 
+function formToken(value) {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const candidates = [value.result, value.outcome, value.code, value.value, value.status, value.form];
+    for (const candidate of candidates) {
+      const token = formToken(candidate);
+      if (token) return token;
+    }
+    return '';
+  }
+  return text(value).toUpperCase();
+}
+
 function formChip(value) {
-  const raw = text(value).toUpperCase();
+  const raw = formToken(value);
   if (!raw) return '';
-  const kind = ['W','WIN','В'].includes(raw) ? 'is-win' : ['D','DRAW','Н'].includes(raw) ? 'is-draw' : ['L','LOSS','П'].includes(raw) ? 'is-loss' : '';
+  const kind = ['W','WIN','WON','В'].includes(raw) ? 'is-win' : ['D','DRAW','Н'].includes(raw) ? 'is-draw' : ['L','LOSS','LOST','П'].includes(raw) ? 'is-loss' : '';
   const label = kind === 'is-win' ? 'В' : kind === 'is-draw' ? 'Н' : kind === 'is-loss' ? 'П' : raw.slice(0, 1);
   return `<span class="cw233-mc-form-chip ${kind}" title="${esc(raw)}">${esc(label)}</span>`;
 }
