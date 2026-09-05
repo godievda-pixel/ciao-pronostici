@@ -7,7 +7,7 @@ export const SERIE_A_MATCH_CENTER_PATH = '/api/ciao-match-center-fast-v3';
 
 export const SERIE_A_SECTION_REQUESTS = Object.freeze({
   overview:Object.freeze(['detail','stats','lineups','overview_meta','player_stats','incidents']),
-  stats:Object.freeze(['stats']),
+  stats:Object.freeze(['stats','overview_meta']),
   events:Object.freeze(['incidents','lineups']),
   lineups:Object.freeze(['lineups']),
   players:Object.freeze(['player_stats']),
