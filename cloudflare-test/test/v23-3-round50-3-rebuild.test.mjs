@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { createMatchCenterStore } from '../src/v23.3/match-center-store.mjs';
 import {
   ROUND503_VIEW_TABS,
   canonicalRound503ViewTab,
@@ -100,4 +101,99 @@ test('Round 50.3 Shots keeps interactive shot content and removes long general s
   assert.match(html, /SHOT_LIST/);
   assert.doesNotMatch(html, /PRIMARY_STATS/);
   assert.doesNotMatch(html, /PRESSURE/);
+});
+
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
+  return { promise, resolve, reject };
+}
+
+function storeHarness({ secondStatsResult = null } = {}) {
+  const staleStats = Object.freeze({ home:{ shots:8 }, away:{ shots:4 } });
+  let statsCalls = 0;
+  const repository = {
+    async base() {
+      return {
+        match:{
+          id:'serie_a:901',
+          status:'live',
+          homeTeam:{ name:'Home' },
+          awayTeam:{ name:'Away' },
+        },
+      };
+    },
+    async section(_competition, _matchId, key) {
+      if (key !== 'stats') return { available:true, data:{ key } };
+      statsCalls += 1;
+      if (statsCalls === 1) return { available:true, data:staleStats };
+      return secondStatsResult ? secondStatsResult.promise : { available:true, data:staleStats };
+    },
+  };
+  const store = createMatchCenterStore({
+    repository,
+    documentRef:{ hidden:true, addEventListener() {} },
+    setTimer:() => null,
+    clearTimer:() => {},
+  });
+  return { store, staleStats };
+}
+
+test('Round 50.3 forced refresh keeps stale READY stats visible until fresh data arrives', async () => {
+  const pending = deferred();
+  const { store, staleStats } = storeHarness({ secondStatsResult:pending });
+  const freshStats = Object.freeze({ home:{ shots:10 }, away:{ shots:5 } });
+
+  await store.open({ competition:'serie_a', matchId:'serie_a:901' });
+  await store.setActiveTab('stats');
+  assert.equal(store.getState().sections.stats, staleStats);
+
+  const refresh = store.retrySection('stats');
+  assert.equal(store.getState().sectionState.stats.status, 'ready');
+  assert.equal(store.getState().sections.stats, staleStats);
+
+  pending.resolve({ available:true, data:freshStats });
+  await refresh;
+  assert.equal(store.getState().sectionState.stats.status, 'ready');
+  assert.equal(store.getState().sections.stats, freshStats);
+});
+
+test('Round 50.3 failed background refresh preserves stale READY content', async () => {
+  const pending = deferred();
+  const { store, staleStats } = storeHarness({ secondStatsResult:pending });
+
+  await store.open({ competition:'serie_a', matchId:'serie_a:901' });
+  await store.setActiveTab('stats');
+  const refresh = store.retrySection('stats');
+  pending.reject(new Error('background_refresh_failed'));
+  await refresh;
+
+  assert.equal(store.getState().sectionState.stats.status, 'ready');
+  assert.equal(store.getState().sections.stats, staleStats);
+});
+
+test('Round 50.3 still exposes an error for an initial section load with no stale data', async () => {
+  const repository = {
+    async base() {
+      return { match:{ id:'serie_a:901', status:'finished' } };
+    },
+    async section(_competition, _matchId, key) {
+      if (key === 'stats') throw new Error('initial_stats_failed');
+      return { available:true, data:{} };
+    },
+  };
+  const store = createMatchCenterStore({
+    repository,
+    documentRef:{ hidden:true, addEventListener() {} },
+    setTimer:() => null,
+    clearTimer:() => {},
+  });
+
+  await store.open({ competition:'serie_a', matchId:'serie_a:901' });
+  await store.setActiveTab('stats');
+  assert.equal(store.getState().sectionState.stats.status, 'error');
 });
