@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 const ORIGIN = 'https://ciao-web-app-test.ciao-web.workers.dev/';
 const ARTIFACT_PATH = 'artifacts/v23-3-round49-premium-match-center.json';
 const MODULES = Object.freeze([
+  'match-center-runtime.mjs',
   'match-center-theme.mjs',
   'match-center-view.mjs',
   'match-center-stats.mjs',
@@ -37,6 +38,7 @@ export async function probeRound49PremiumMatchCenter({ fetchImpl = fetch, writeA
   ])));
   const source = Object.fromEntries(MODULES.map(moduleName => [moduleName, compact(responses[moduleName].text)]));
 
+  const runtime = source['match-center-runtime.mjs'];
   const theme = source['match-center-theme.mjs'];
   const view = source['match-center-view.mjs'];
   const stats = source['match-center-stats.mjs'];
@@ -45,6 +47,14 @@ export async function probeRound49PremiumMatchCenter({ fetchImpl = fetch, writeA
   const players = source['match-center-players.mjs'];
 
   const responseOk = MODULES.every(moduleName => responses[moduleName].ok);
+  const premiumScrollHost = includesAll(runtime, [
+    "MATCH_CENTER_RUNTIME_ID = 'ciao-v239-match-center-overlay'",
+    'MATCH_CENTER_HOST_SCROLLBAR_CSS',
+    'scrollbar-width:none',
+    '::-webkit-scrollbar{display:none;width:0;height:0}',
+    "scrollbarWidth:'none'",
+    "msOverflowStyle:'none'",
+  ]);
   const fiveTournamentThemes = includesAll(theme, [
     "serie_a:freezeTheme('serie-a'",
     "coppa_italia:freezeTheme('coppa'",
@@ -102,6 +112,7 @@ export async function probeRound49PremiumMatchCenter({ fetchImpl = fetch, writeA
 
   const report = {
     ok:responseOk
+      && premiumScrollHost
       && fiveTournamentThemes
       && premiumHero
       && premiumStats
@@ -114,6 +125,7 @@ export async function probeRound49PremiumMatchCenter({ fetchImpl = fetch, writeA
       status:responses[moduleName].status,
       responseOk:responses[moduleName].ok,
     }])),
+    premiumScrollHost,
     fiveTournamentThemes,
     premiumHero,
     premiumStats,
