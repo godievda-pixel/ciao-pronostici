@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { renderMatchCenterEvents, sortEvents } from '../src/v23.3/match-center-events.mjs';
 import { renderMatchCenterLineups, parseFormation, gridPosition } from '../src/v23.3/match-center-lineups.mjs';
+import { renderMatchCenterPlayers } from '../src/v23.3/match-center-players.mjs';
 
 const context = { match:{ homeTeam:{ name:'Home United' }, awayTeam:{ name:'Away City' } } };
 
@@ -92,4 +93,44 @@ test('invalid or incomplete lineup keeps text list and shows tactical unavailabl
   assert.match(html, /Схема недоступна/);
   assert.match(html, /Only Player/);
   assert.match(html, /data-cw233-mc-lineup-list/);
+});
+
+test('premium Players uses tournament surfaces and shows every provider-supplied performance field', () => {
+  const html = renderMatchCenterPlayers([
+    {
+      playerId:10,
+      name:'Marco Rossi',
+      teamName:'Home United',
+      rating:8.7,
+      minutes:90,
+      goals:2,
+      assists:1,
+      xg:1.34,
+      xa:0.42,
+      shots:5,
+      keyPasses:3,
+    },
+    {
+      playerId:20,
+      name:'Paolo Neri',
+      teamName:'Away City',
+      rating:7.4,
+      minutes:84,
+      shots:2,
+      keyPasses:1,
+    },
+  ], context);
+
+  assert.match(html, /cw233-mc-player-card/);
+  assert.match(html, /data-cw233-mc-player-rank="1"/);
+  assert.match(html, /data-cw233-mc-player-rank="2"/);
+  assert.match(html, /Marco Rossi/);
+  assert.match(html, /Home United/);
+  assert.match(html, />8\.7</);
+  for (const label of ['90 мин', '2 гола', '1 ассист', 'xG 1.34', 'xA 0.42', '5 ударов', '3 ключ. передачи']) {
+    assert.match(html, new RegExp(label.replaceAll('.', '\\.')));
+  }
+  assert.match(html, /var\(--mc-surface-raised\)/);
+  assert.match(html, /var\(--mc-accent-soft\)/);
+  assert.match(html, /@media\(max-width:360px\)/);
 });
