@@ -66,8 +66,8 @@ test('Round 18 normalizes event chronology data defensively', () => {
   ]);
   assert.equal(events.length, 1);
   assert.deepEqual(events[0], {
-    type:'goal', minute:23, addedTime:1, side:'home', player:'Lautaro', assist:'', reason:'',
-    playerIn:'', playerOut:'', homeScore:1, awayScore:0, text:'',
+    type:'goal', minute:23, addedTime:1, side:'home', playerId:null, player:'Lautaro', assist:'', reason:'',
+    playerInId:null, playerOutId:null, playerIn:'', playerOut:'', homeScore:1, awayScore:0, text:'',
   });
 });
 
