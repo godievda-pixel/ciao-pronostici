@@ -59,6 +59,23 @@ function normalizeShotContainer(container) {
   return { ...source, [key]:source[key].map(normalizeShot) };
 }
 
+function rawShotSource(raw) {
+  const source = object(raw) || {};
+  const stats = object(source.stats) || {};
+  const overview = object(source.overview_meta ?? source.overviewMeta) || {};
+  return [
+    source.shots,
+    source.shotmap,
+    source.shot_map,
+    stats.shots,
+    stats.shotmap,
+    stats.shot_map,
+    overview.shots,
+    overview.shotmap,
+    overview.shot_map,
+  ].find(Array.isArray) || [];
+}
+
 export function normalizeRound512SerieARaw(raw) {
   const source = object(raw);
   if (!source) return raw;
@@ -76,6 +93,27 @@ export function normalizeRound512SerieARaw(raw) {
     ...(topShotKey ? { [topShotKey]:source[topShotKey].map(normalizeShot) } : {}),
     ...(source.incidents !== undefined ? { incidents } : {}),
     ...(source.player_stats !== undefined ? { player_stats:normalizePlayerStatsEnvelope(source.player_stats) } : {}),
+  };
+}
+
+export function restoreRound512NormalizedShotIds(normalized, recoveredRaw) {
+  if (!normalized || typeof normalized !== 'object') return normalized;
+  const normalizedStats = object(normalized.stats);
+  const shots = list(normalizedStats?.shots);
+  if (!shots.length) return normalized;
+  const rawShots = rawShotSource(recoveredRaw);
+  if (!rawShots.length) return normalized;
+  const patched = shots.map((shot, index) => {
+    const raw = object(rawShots[index]);
+    if (!raw) return shot;
+    const playerId = raw.player_id ?? raw.playerId ?? raw.pid ?? raw.player?.id ?? raw.shooter?.id;
+    return playerId === null || playerId === undefined || playerId === ''
+      ? shot
+      : { ...shot, playerId };
+  });
+  return {
+    ...normalized,
+    stats:{ ...normalizedStats, shots:patched },
   };
 }
 
