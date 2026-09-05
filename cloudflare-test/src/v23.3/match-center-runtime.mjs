@@ -193,6 +193,7 @@ export function createCanonicalMatchCenterRuntime({
   if (typeof enhanceView !== 'function') throw new Error('match_center_enhancer_required');
 
   let source = null;
+  let restoreExplicitSource = false;
   let destroyed = false;
   let lastState = null;
   let viewState = defaultViewState();
@@ -227,7 +228,10 @@ export function createCanonicalMatchCenterRuntime({
     if (!competition || !matchId) throw new Error('match_center_target_required');
 
     viewState = defaultViewState();
-    source = sourceOrDefault(payload.source || currentSource?.());
+    const explicitSource = payload.source && typeof payload.source === 'object';
+    source = sourceOrDefault(explicitSource ? payload.source : currentSource?.());
+    restoreExplicitSource = Boolean(explicitSource);
+    if (restoreExplicitSource) suspendSource(source);
     host.scrollToTop?.();
     return store.open({
       competition,
@@ -238,10 +242,13 @@ export function createCanonicalMatchCenterRuntime({
 
   function back() {
     if (destroyed) return null;
+    const sourceToRestore = restoreExplicitSource ? source : null;
     source = null;
+    restoreExplicitSource = false;
     viewState = defaultViewState();
     const result = store.close();
     host.hide();
+    if (sourceToRestore) restoreSource(sourceToRestore);
     return result;
   }
 
@@ -316,6 +323,7 @@ export function createCanonicalMatchCenterRuntime({
     if (destroyed) return;
     destroyed = true;
     source = null;
+    restoreExplicitSource = false;
     lastState = null;
     viewState = defaultViewState();
     unsubscribe?.();
