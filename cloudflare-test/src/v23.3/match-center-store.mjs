@@ -26,6 +26,30 @@ function unwrapBase(value) {
   return value;
 }
 
+function text(value) {
+  return String(value ?? '').trim();
+}
+
+function mergeTeam(bootstrap, loaded) {
+  const initial = bootstrap && typeof bootstrap === 'object' ? bootstrap : {};
+  const fresh = loaded && typeof loaded === 'object' ? loaded : {};
+  const merged = { ...initial, ...fresh };
+  if (!text(fresh.name) && text(initial.name)) merged.name = initial.name;
+  if (!text(fresh.crestUrl) && text(initial.crestUrl)) merged.crestUrl = initial.crestUrl;
+  return merged;
+}
+
+function mergeMatch(bootstrap, loaded) {
+  if (!bootstrap || typeof bootstrap !== 'object') return loaded;
+  if (!loaded || typeof loaded !== 'object') return bootstrap;
+  return {
+    ...bootstrap,
+    ...loaded,
+    homeTeam:mergeTeam(bootstrap.homeTeam, loaded.homeTeam),
+    awayTeam:mergeTeam(bootstrap.awayTeam, loaded.awayTeam),
+  };
+}
+
 function message(error, fallback) {
   return String(error?.code || error?.message || error || fallback);
 }
@@ -47,6 +71,7 @@ export function createMatchCenterStore({
 
   let generation = 0;
   let timerId = null;
+  let bootstrapMatch = null;
   const listeners = new Set();
   let state = {
     open:false,
@@ -121,8 +146,9 @@ export function createMatchCenterStore({
     try {
       const payload = await repository.base(competition, matchId, { force:force === true });
       if (!isCurrent(token, competition, matchId)) return getState();
-      const match = unwrapBase(payload);
-      if (!match || typeof match !== 'object') throw new Error('match_center_base_missing');
+      const loaded = unwrapBase(payload);
+      if (!loaded || typeof loaded !== 'object') throw new Error('match_center_base_missing');
+      const match = mergeMatch(bootstrapMatch, loaded);
       state = {
         ...state,
         match,
@@ -209,7 +235,7 @@ export function createMatchCenterStore({
     return getState();
   }
 
-  async function open({ competition, matchId } = {}) {
+  async function open({ competition, matchId, initialMatch } = {}) {
     const canonicalCompetition = String(competition || '').trim();
     const canonicalMatchId = String(matchId || '').trim();
     if (!canonicalCompetition || !canonicalMatchId) throw new Error('match_center_target_required');
@@ -217,6 +243,9 @@ export function createMatchCenterStore({
     generation += 1;
     const token = generation;
     clearPoll();
+    bootstrapMatch = initialMatch && typeof initialMatch === 'object' && !Array.isArray(initialMatch)
+      ? initialMatch
+      : null;
     state = {
       open:true,
       phase:'loading-base',
@@ -245,6 +274,7 @@ export function createMatchCenterStore({
   function close() {
     generation += 1;
     clearPoll();
+    bootstrapMatch = null;
     state = {
       ...state,
       open:false,
