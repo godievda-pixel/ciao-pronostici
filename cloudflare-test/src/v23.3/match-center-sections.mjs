@@ -164,9 +164,12 @@ function canonicalEvent(value) {
     minute:finite(value.minute),
     addedTime:finite(value.addedTime ?? value.added_time),
     side,
+    playerId:finite(value.playerId ?? value.player_id ?? value.player?.id),
     player:text(value.player),
     assist:text(value.assist),
     reason:text(value.reason),
+    playerInId:finite(value.playerInId ?? value.player_in_id ?? value.playerIn?.id ?? value.player_in?.id),
+    playerOutId:finite(value.playerOutId ?? value.player_out_id ?? value.playerOut?.id ?? value.player_out?.id),
     playerIn:text(value.playerIn ?? value.player_in),
     playerOut:text(value.playerOut ?? value.player_out),
     homeScore:finite(value.homeScore ?? value.home_score),
@@ -187,6 +190,7 @@ function canonicalShot(value) {
   const side = sideValue === 'away' ? 'away' : sideValue === 'home' ? 'home' : '';
   return Object.freeze({
     side,
+    playerId:finite(value.playerId ?? value.player_id ?? value.player?.id),
     x:coordinatesValid ? rawX : null,
     y:coordinatesValid ? rawY : null,
     minute:finite(value.minute),
@@ -204,7 +208,7 @@ function canonicalShot(value) {
 function canonicalLineupPlayer(value, starterFallback = null) {
   if (!value || typeof value !== 'object') return null;
   const playerId = finite(value.playerId ?? value.player_id ?? value.id);
-  const name = text(value.name || value.shortName || value.short_name);
+  const name = text(value.name || value.fullName || value.full_name || value.shortName || value.short_name);
   if (playerId === null && !name) return null;
   const x = canonicalCoordinate(value.x ?? value.positionX ?? value.position_x);
   const y = canonicalCoordinate(value.y ?? value.positionY ?? value.position_y);
@@ -212,12 +216,18 @@ function canonicalLineupPlayer(value, starterFallback = null) {
   return Object.freeze({
     playerId,
     name,
+    shortName:text(value.shortName ?? value.short_name),
     position:text(value.position || value.pos),
-    shirtNumber:finite(value.shirtNumber ?? value.shirt_number ?? value.number),
+    shirtNumber:finite(value.shirtNumber ?? value.shirt_number ?? value.number ?? value.jerseyNumber ?? value.jersey_number ?? value.jersey ?? value.shirt_no ?? value.squad_number ?? value.kit_number),
     x,
     y,
     grid:text(value.grid ?? value.gridPosition ?? value.grid_position),
     starter,
+    rating:finite(value.rating),
+    goals:finite(value.goals),
+    assists:finite(value.assists),
+    yellowCards:finite(value.yellowCards ?? value.yellow_cards),
+    redCards:finite(value.redCards ?? value.red_cards),
   });
 }
 
@@ -234,7 +244,7 @@ function canonicalLineupSide(value) {
 function canonicalPlayer(value) {
   if (!value || typeof value !== 'object') return null;
   const playerId = finite(value.playerId ?? value.player_id ?? value.id);
-  const name = text(value.name || value.shortName || value.short_name);
+  const name = text(value.name || value.fullName || value.full_name || value.shortName || value.short_name || value.playerName || value.player_name);
   if (playerId === null && !name) return null;
   return Object.freeze({
     playerId,
