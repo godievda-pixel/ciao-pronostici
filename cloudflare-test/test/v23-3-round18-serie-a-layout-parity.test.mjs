@@ -39,7 +39,7 @@ test('Round 18 BSD overview carries the already-fetched key stats into the canon
   assert.equal(sections.overview.summaryStats.away.shots, 9);
 });
 
-test('Round 18 overview follows the compact Serie A order and pressure chart', () => {
+test('Round 18 overview feeds the Round 50 key-indicator hierarchy and leaves pressure analytics to Stats', () => {
   const html = renderMatchCenterOverview({
     summaryStats:{
       home:{ xg:2.41, shots:18 },
@@ -53,19 +53,17 @@ test('Round 18 overview follows the compact Serie A order and pressure chart', (
     shotmap:[{ side:'home', x:70, y:40, xg:0.31 }],
   }, { match:match(), coverage:match().coverage });
 
-  const main = html.indexOf('data-cw233-mc-overview-region="main"');
-  const momentum = html.indexOf('data-cw233-mc-overview-region="momentum"');
-  const shotmap = html.indexOf('data-cw233-mc-overview-region="shotmap"');
-  assert.ok(main >= 0 && main < momentum && momentum < shotmap);
-  assert.match(html, /Главное/);
-  assert.match(html, /xG хозяев/);
-  assert.match(html, />27<\/strong><span>ударов<\/span>/);
-  assert.match(html, /cw233-mc-momentum-chart/);
-  assert.match(html, /cw233-mc-momentum-bar is-home/);
-  assert.match(html, /cw233-mc-momentum-bar is-away/);
-  assert.doesNotMatch(html, /cw233-mc-momentum-row/);
-  assert.doesNotMatch(html, /data-cw233-mc-overview-region="predictions"/);
-  assert.doesNotMatch(html, /data-cw233-mc-overview-region="form"/);
+  assert.match(html, /data-cw250-key-indicators/);
+  assert.match(html, /Ключевые показатели/);
+  assert.match(html, /<span>xG<\/span>/);
+  assert.match(html, /<strong>2\.41<\/strong>/);
+  assert.match(html, /<strong>0\.86<\/strong>/);
+  assert.match(html, /<span>Удары<\/span>/);
+  assert.match(html, /<strong>18<\/strong>/);
+  assert.match(html, /<strong>9<\/strong>/);
+  assert.doesNotMatch(html, /data-cw233-mc-overview-region="momentum"/);
+  assert.doesNotMatch(html, /data-cw233-mc-overview-region="shotmap"/);
+  assert.doesNotMatch(html, /cw233-mc-momentum-chart/);
   assert.doesNotMatch(html, /data-cw233-mc-overview-region="match-info"/);
 });
 
