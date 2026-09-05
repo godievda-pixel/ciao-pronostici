@@ -1,7 +1,7 @@
 # Round 50.2 — Match Center UX & Data Reliability
 
 Date: 2026-09-05
-Status: approved for implementation planning
+Status: awaiting written spec review
 Branch: `test/round50-2-match-center-ux-data-reliability`
 Target: `develop` only
 Production: `main` / Production must remain untouched until TEST verification is complete.
@@ -102,13 +102,13 @@ Under the selected team’s pitch, render two compact disclosure controls:
 
 Both are collapsed by default.
 
-Selecting a control expands a compact player list for the currently selected team only. Selecting it again collapses it. Switching home/away must close or correctly retarget the expanded disclosure so content can never show players from the wrong team.
+Selecting a control expands a compact player list for the currently selected team only. Selecting it again collapses it. Switching home/away closes the expanded disclosure and switches the pitch/list context to the newly selected team, so content can never show players from the wrong team.
 
 The player rows reuse existing data already present in the canonical lineup section: shirt number, name, position, rating and match badges when available.
 
 ### 6.3 Empty substitutes
 
-If the provider does not supply substitutes, render `Запасные · 0` as a disabled/empty disclosure or an equally compact `Запасные · нет данных` state. Do not reserve a large empty card.
+If the provider does not supply substitutes, render a disabled compact `Запасные · 0` disclosure. It must not expand and must not reserve a large empty card.
 
 ### 6.4 Runtime ownership
 
@@ -116,7 +116,7 @@ Disclosure clicks must be handled by the canonical Match Center host/runtime. Re
 
 Do not depend on `:has()` alone for disclosure state because expanded/collapsed state must survive deterministic re-rendering and be testable.
 
-A small local UI state object may live in the Match Center runtime/host and should reset when:
+The canonical runtime/host owns lineup UI state and resets it when:
 
 - Match Center closes
 - another match opens
@@ -145,6 +145,7 @@ Tap/click behavior:
 2. visually emphasize that point
 3. slightly de-emphasize unselected points
 4. render one compact detail card immediately beneath the pitch
+5. tapping the selected point again collapses the detail card and clears the selection
 
 Detail card fields, when available:
 
@@ -155,8 +156,6 @@ Detail card fields, when available:
 - situation
 - assist
 - xG
-
-A second click on the selected point may either keep it selected or collapse it; implementation should choose one consistent behavior. Preferred behavior: second click collapses the detail card.
 
 ### 7.3 xG formatting
 
@@ -237,17 +236,17 @@ Do not change the current active-tab visual treatment.
 
 ## 11. Canonical UI state
 
-Round 50.2 introduces transient presentation state that does not belong in provider data:
+Round 50.2 introduces transient presentation state that does not belong in provider data. The canonical browser runtime/host owns one explicit `viewState` with:
 
-- selected lineup team (already represented by the existing team switch, but state may need explicit runtime ownership for re-render safety)
-- expanded lineup disclosure: `starters | substitutes | null`
-- selected shot index/id: `number|string|null`
+- `selectedLineupTeam: 'home' | 'away'` (default `home`)
+- `expandedLineupDisclosure: 'starters' | 'substitutes' | null` (default `null`)
+- `selectedShotIndex: number | null` (default `null`)
 
-Preferred design: add a small `viewState` owned by the canonical browser runtime/host rather than putting transient selection into `match-center-store.mjs`, whose responsibility is network/domain state.
+This state must not live in `match-center-store.mjs`, whose responsibility remains network/domain state.
 
 The renderer receives the view state as context and emits stable data actions. A UI-only action re-renders from the current store snapshot without refetching the section.
 
-Network fetches must not occur when the user simply opens substitutes or selects a shot.
+Network fetches must not occur when the user simply switches lineup team, opens starters/substitutes or selects a shot.
 
 ## 12. Expected files/components
 
@@ -286,8 +285,8 @@ Required contracts:
 - `Стартовый состав · N` and `Запасные · N` controls exist for the active team.
 - default state is collapsed.
 - action expands only the selected team’s requested list.
-- switching team never leaves the previous team’s list visible.
-- empty substitutes do not create a large empty section.
+- switching team closes the previous disclosure and never leaves the previous team’s list visible.
+- empty substitutes render disabled `Запасные · 0` and do not create a large empty section.
 
 ### Shots
 
@@ -295,6 +294,7 @@ Required contracts:
 - each marker exposes an interactive action and accessible selected state.
 - selected shot renders one detail card.
 - selecting another point replaces the detail card.
+- selecting the active point again clears the selection.
 - selected shot styling is emitted.
 - shot xG uses exactly two decimals.
 
@@ -316,7 +316,7 @@ Required contracts:
 
 Implementation workflow:
 
-1. branch only from current `develop`
+1. all implementation remains on `test/round50-2-match-center-ux-data-reliability`, created from current `develop`
 2. TDD: add failing Round 50.2 contracts first
 3. make the minimum canonical implementation changes
 4. run targeted Round 50.2 tests
