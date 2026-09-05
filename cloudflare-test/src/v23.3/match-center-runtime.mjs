@@ -9,6 +9,8 @@ import {
 
 export const MATCH_CENTER_RUNTIME_BUILD = 'round43-canonical-match-center';
 export const MATCH_CENTER_RUNTIME_ID = 'ciao-v239-match-center-overlay';
+export const MATCH_CENTER_HOST_SCROLLBAR_STYLE_ID = 'ciao-v239-match-center-scrollbar-style';
+export const MATCH_CENTER_HOST_SCROLLBAR_CSS = `#${MATCH_CENTER_RUNTIME_ID}{scrollbar-width:none;-ms-overflow-style:none}#${MATCH_CENTER_RUNTIME_ID}::-webkit-scrollbar{display:none;width:0;height:0}`;
 
 let installedRuntime = null;
 
@@ -34,9 +36,19 @@ function rootFor(documentRef) {
   return documentRef?.getElementById?.('ciao-miniapp-root') || documentRef?.body || null;
 }
 
+function ensureHostScrollbarStyle(documentRef) {
+  if (!documentRef?.createElement || documentRef.getElementById?.(MATCH_CENTER_HOST_SCROLLBAR_STYLE_ID)) return null;
+  const style = documentRef.createElement('style');
+  style.id = MATCH_CENTER_HOST_SCROLLBAR_STYLE_ID;
+  style.textContent = MATCH_CENTER_HOST_SCROLLBAR_CSS;
+  (documentRef.head || rootFor(documentRef))?.appendChild?.(style);
+  return style;
+}
+
 export function createBrowserMatchCenterHost(documentRef = globalThis.document) {
   if (!documentRef?.createElement) throw new Error('match_center_document_required');
 
+  ensureHostScrollbarStyle(documentRef);
   let node = documentRef.getElementById?.(MATCH_CENTER_RUNTIME_ID) || null;
   if (!node) {
     node = documentRef.createElement('div');
@@ -52,8 +64,13 @@ export function createBrowserMatchCenterHost(documentRef = globalThis.document) 
       overflowX:'hidden',
       overscrollBehavior:'contain',
       background:'#071626',
+      scrollbarWidth:'none',
+      msOverflowStyle:'none',
     });
     rootFor(documentRef)?.appendChild?.(node);
+  } else {
+    node.style.scrollbarWidth = 'none';
+    node.style.msOverflowStyle = 'none';
   }
 
   let boundRuntime = null;
