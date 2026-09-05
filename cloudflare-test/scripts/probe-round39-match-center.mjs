@@ -52,7 +52,10 @@ export async function probeRound39MatchCenter({ fetchImpl = fetch, writeArtifact
   const index = source['index.mjs'];
 
   const responseOk = MODULES.every(moduleName => responses[moduleName].ok);
-  const buildIdentity = runtime.includes("MATCH_CENTER_RUNTIME_BUILD = 'round39-canonical-match-center'")
+  const runtimeBuild = runtime.match(
+    /MATCH_CENTER_RUNTIME_BUILD\s*=\s*['"](round\d+-canonical-match-center)['"]/,
+  )?.[1] || '';
+  const buildIdentity = Boolean(runtimeBuild)
     && runtime.includes("MATCH_CENTER_RUNTIME_ID = 'ciao-v239-match-center-overlay'");
 
   const canonicalRouterOnly = links.includes("from './match-center-runtime.mjs'")
@@ -114,6 +117,7 @@ export async function probeRound39MatchCenter({ fetchImpl = fetch, writeArtifact
       status:responses[moduleName].status,
       responseOk:responses[moduleName].ok,
     }])),
+    runtimeBuild,
     buildIdentity,
     canonicalRouterOnly,
     canonicalView,
