@@ -4,8 +4,12 @@ import { getMatchBootstrap } from './match-bootstrap-cache.mjs';
 const PREDICTION_CONTROL_SELECTOR = '[data-cw233-delta],[data-cw233-save-all],[data-cw231-action="predict"]';
 const INTERACTIVE_SELECTOR = 'button,input,select,textarea,a,[data-cw233-pred-nav]';
 
+function text(value) {
+  return String(value ?? '').trim();
+}
+
 function sourceForTarget(target, competition = '') {
-  const key = String(competition || '').trim();
+  const key = text(competition);
   if (target?.closest?.('[data-cw233-pred-card]')) {
     return Object.freeze({ surface:'predictions', tab:'mine', competition:key });
   }
@@ -18,11 +22,48 @@ function sourceForTarget(target, competition = '') {
   return Object.freeze({ surface:'home', tab:'predict', competition:key });
 }
 
-function canonicalPair(competition, matchId, source = null) {
-  const key = String(competition || '').trim();
-  const id = String(matchId || '').trim();
+function cardAttribute(node, name) {
+  return text(node?.getAttribute?.(name));
+}
+
+function cardTeam(card, side) {
+  const selector = `.cw232-match-team--${side}`;
+  const name = text(card?.querySelector?.(`${selector} strong`)?.textContent);
+  const crestUrl = cardAttribute(card?.querySelector?.(`${selector} img`), 'src');
+  return name || crestUrl ? Object.freeze({ name, crestUrl }) : null;
+}
+
+function scheduleCardBootstrap(card, competition, matchId) {
+  if (!card?.querySelector) return null;
+  const homeTeam = cardTeam(card, 'home');
+  const awayTeam = cardTeam(card, 'away');
+  if (!homeTeam && !awayTeam) return null;
+  return Object.freeze({
+    competition:text(competition),
+    matchId:text(matchId),
+    kickoffAt:cardAttribute(card.querySelector('time[datetime]'), 'datetime'),
+    status:text(card?.dataset?.cw232MatchState).toLowerCase(),
+    homeTeam,
+    awayTeam,
+  });
+}
+
+function mergeInitialMatch(cached, direct) {
+  if (!cached) return direct || null;
+  if (!direct) return cached;
+  return Object.freeze({
+    ...cached,
+    ...direct,
+    homeTeam:Object.freeze({ ...(cached.homeTeam || {}), ...(direct.homeTeam || {}) }),
+    awayTeam:Object.freeze({ ...(cached.awayTeam || {}), ...(direct.awayTeam || {}) }),
+  });
+}
+
+function canonicalPair(competition, matchId, source = null, directInitialMatch = null) {
+  const key = text(competition);
+  const id = text(matchId);
   if (!key || !id || !id.startsWith(`${key}:`) || !id.slice(key.length + 1).trim()) return null;
-  const initialMatch = getMatchBootstrap(key, id);
+  const initialMatch = mergeInitialMatch(getMatchBootstrap(key, id), directInitialMatch);
   return Object.freeze({
     competition:key,
     matchId:id,
@@ -32,7 +73,7 @@ function canonicalPair(competition, matchId, source = null) {
 }
 
 function pairFromCanonicalId(matchId, sourceTarget = null) {
-  const id = String(matchId || '').trim();
+  const id = text(matchId);
   const separator = id.indexOf(':');
   if (separator <= 0) return null;
   const competition = id.slice(0, separator);
@@ -71,10 +112,12 @@ export function resolveCanonicalMatchTarget(target) {
   if (!scheduleCard) return null;
   const competitionHost = scheduleCard.closest?.('[data-cw232-competition]');
   const competition = competitionHost?.dataset?.cw232Competition;
+  const matchId = scheduleCard.dataset?.cw232Match;
   return canonicalPair(
     competition,
-    scheduleCard.dataset?.cw232Match,
+    matchId,
     sourceForTarget(target, competition),
+    scheduleCardBootstrap(scheduleCard, competition, matchId),
   );
 }
 
