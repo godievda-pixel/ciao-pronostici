@@ -152,6 +152,7 @@ export function adaptSerieALegacyMatchCenter(raw = {}) {
   const stats = canonicalStatsSection({
     ...(statsRaw || {}),
     shots:shotsRaw || [],
+    momentum:overviewRaw?.momentum || [],
   });
   const events = canonicalEventsSection(eventsRaw || []);
   const lineups = canonicalLineupsSection(lineupsRaw || {});

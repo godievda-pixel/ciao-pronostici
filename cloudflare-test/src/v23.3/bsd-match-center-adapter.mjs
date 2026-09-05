@@ -214,36 +214,6 @@ function predictionSplitFromModel(prediction) {
   return Object.freeze({ home, draw, away });
 }
 
-function overviewInput(event = {}) {
-  const overviewMeta = object(event.overview_meta) || {};
-  const venue = firstObject(event.venue, overviewMeta.venue) || {};
-  const referee = firstObject(event.referee, event.main_referee, overviewMeta.referee);
-  const form = firstObject(event.form, overviewMeta.form) || {};
-  const rawStats = statsSource(event);
-  const rawMomentum = firstPresent(event, ['momentum']) ?? overviewMeta.momentum ?? null;
-  const rawShotmap = firstPresent(event, ['shotmap','shot_map'])
-    ?? overviewMeta.shotmap
-    ?? overviewMeta.shot_map
-    ?? null;
-  const prediction = firstObject(event.prediction, overviewMeta.prediction);
-  const explicitPredictionSplit = firstPresent(event, ['prediction_split','predictionSplit'])
-    ?? firstPresent(overviewMeta, ['prediction_split','predictionSplit'])
-    ?? null;
-  return {
-    venue,
-    referee,
-    form,
-    prediction,
-    predictionSplit:explicitPredictionSplit ?? predictionSplitFromModel(prediction),
-    summaryStats:rawStats ? {
-      home:canonicalStatInput(rawStats.home),
-      away:canonicalStatInput(rawStats.away),
-    } : null,
-    momentum:normalizeMomentum(rawMomentum),
-    shotmap:normalizeShotmap(rawShotmap),
-  };
-}
-
 function canonicalEventInput(event = {}) {
   const goalKind = normalizeGoalKind(event);
   const cardKind = text(event.cardKind ?? event.card_kind ?? event.card_type).toLowerCase();
@@ -306,6 +276,65 @@ function playerInput(player = {}) {
   };
 }
 
+function eventClockValue(event = {}) {
+  const minute = finite(event.minute) ?? -1;
+  const addedTime = finite(event.addedTime ?? event.added_time) ?? 0;
+  return minute * 100 + addedTime;
+}
+
+function bestRatedPlayer(value) {
+  const players = canonicalPlayersSection(list(value).map(playerInput));
+  let best = null;
+  for (const player of players) {
+    const rating = finite(player?.rating);
+    if (rating === null) continue;
+    if (!best || rating > finite(best.rating)) best = player;
+  }
+  return best;
+}
+
+function recentOverviewEvents(value) {
+  const important = new Set(['goal','yellow','yellow_card','red','red_card','card','sub','substitution','var']);
+  return canonicalEventsSection(list(value).map(canonicalEventInput))
+    .filter(event => important.has(text(event?.type).toLowerCase()))
+    .sort((a, b) => eventClockValue(a) - eventClockValue(b))
+    .slice(-4);
+}
+
+function overviewInput(event = {}) {
+  const overviewMeta = object(event.overview_meta) || {};
+  const venue = firstObject(event.venue, overviewMeta.venue) || {};
+  const referee = firstObject(event.referee, event.main_referee, overviewMeta.referee);
+  const form = firstObject(event.form, overviewMeta.form) || {};
+  const rawStats = statsSource(event);
+  const rawEvents = incidentsSource(event);
+  const rawPlayers = playerStatsSource(event);
+  const rawMomentum = firstPresent(event, ['momentum']) ?? overviewMeta.momentum ?? null;
+  const rawShotmap = firstPresent(event, ['shotmap','shot_map'])
+    ?? overviewMeta.shotmap
+    ?? overviewMeta.shot_map
+    ?? null;
+  const prediction = firstObject(event.prediction, overviewMeta.prediction);
+  const explicitPredictionSplit = firstPresent(event, ['prediction_split','predictionSplit'])
+    ?? firstPresent(overviewMeta, ['prediction_split','predictionSplit'])
+    ?? null;
+  return {
+    venue,
+    referee,
+    form,
+    prediction,
+    predictionSplit:explicitPredictionSplit ?? predictionSplitFromModel(prediction),
+    summaryStats:rawStats ? {
+      home:canonicalStatInput(rawStats.home),
+      away:canonicalStatInput(rawStats.away),
+    } : null,
+    bestPlayer:bestRatedPlayer(rawPlayers),
+    recentEvents:recentOverviewEvents(rawEvents),
+    momentum:normalizeMomentum(rawMomentum),
+    shotmap:normalizeShotmap(rawShotmap),
+  };
+}
+
 function hasOverview(event = {}) {
   return Boolean(
     object(event.venue)
@@ -316,6 +345,9 @@ function hasOverview(event = {}) {
     || object(event.prediction)
     || hasOwn(event, 'prediction_split')
     || hasOwn(event, 'predictionSplit')
+    || statsSource(event)
+    || incidentsSource(event) !== undefined
+    || playerStatsSource(event) !== undefined
     || hasOwn(event, 'momentum')
     || hasOwn(event, 'shotmap')
     || hasOwn(event, 'shot_map')
@@ -348,6 +380,8 @@ export function adaptBsdMatchCenterSections(event = {}) {
   const rawEvents = incidentsSource(event);
   const rawLineups = lineupsSource(event);
   const rawPlayers = playerStatsSource(event);
+  const overviewMeta = object(event.overview_meta) || {};
+  const rawMomentum = firstPresent(event, ['momentum']) ?? overviewMeta.momentum ?? null;
   return Object.freeze({
     coverage,
     overview:coverage.overview ? canonicalOverviewSection(overviewInput(event)) : null,
@@ -355,6 +389,7 @@ export function adaptBsdMatchCenterSections(event = {}) {
       home:canonicalStatInput(rawStats?.home),
       away:canonicalStatInput(rawStats?.away),
       shots:list(rawShots).map(normalizeDetailedShot),
+      momentum:normalizeMomentum(rawMomentum),
     }) : null,
     events:coverage.events ? canonicalEventsSection(list(rawEvents).map(canonicalEventInput)) : null,
     lineups:coverage.lineups ? canonicalLineupsSection({

@@ -104,6 +104,18 @@ function canonicalStatSide(value) {
   ));
 }
 
+function canonicalMomentumPoint(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const home = finite(value.home);
+  const away = finite(value.away);
+  if (home === null || away === null) return null;
+  return Object.freeze({
+    minute:finite(value.minute ?? value.m),
+    home,
+    away,
+  });
+}
+
 function canonicalScoreAfter(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const home = finite(value.home ?? value.homeScore ?? value.home_score);
@@ -279,6 +291,8 @@ export function canonicalOverviewSection(input = {}) {
     prediction:source.prediction || null,
     predictionSplit:source.predictionSplit ?? source.prediction_split ?? null,
     summaryStats:source.summaryStats ? canonicalStatsSection(source.summaryStats) : null,
+    bestPlayer:source.bestPlayer ? canonicalPlayer(source.bestPlayer) : null,
+    recentEvents:Object.freeze(list(source.recentEvents).map(canonicalEvent).filter(Boolean)),
     momentum:source.momentum ?? null,
     shotmap:source.shotmap ?? null,
   });
@@ -290,6 +304,7 @@ export function canonicalStatsSection(input = {}) {
     home:canonicalStatSide(source.home),
     away:canonicalStatSide(source.away),
     shots:Object.freeze(list(source.shots).map(canonicalShot).filter(Boolean)),
+    momentum:Object.freeze(list(source.momentum).map(canonicalMomentumPoint).filter(Boolean)),
   });
 }
 
