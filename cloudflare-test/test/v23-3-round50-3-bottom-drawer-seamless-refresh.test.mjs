@@ -7,6 +7,13 @@ import {
   createCanonicalMatchCenterRuntime,
 } from '../src/v23.3/match-center-runtime.mjs';
 import { renderMatchCenterView } from '../src/v23.3/match-center-view.mjs';
+import { enhanceRound502MatchCenterView } from '../src/v23.3/round50-2-match-center-view.mjs';
+import {
+  MATCH_CENTER_USER_TABS,
+  enhanceRound503MatchCenterView,
+  providerTabForView,
+  resolveDrawerSnap,
+} from '../src/v23.3/round50-3-match-center-view.mjs';
 
 function deferred() {
   let resolve;
@@ -34,6 +41,26 @@ function sectionPayload(data) {
   return { available:true, coverage:{ overview:true }, data };
 }
 
+function readyState(activeTab = 'overview') {
+  return {
+    open:true,
+    phase:'ready',
+    competition:'serie_a',
+    matchId:'serie_a:503',
+    match:liveMatch(),
+    activeTab,
+    sections:{ overview:{ form:{ home:[], away:[] } }, stats:null, events:null, lineups:null, players:null },
+    sectionState:{
+      overview:{ status:'ready', error:'' },
+      stats:{ status:'idle', error:'' },
+      events:{ status:'idle', error:'' },
+      lineups:{ status:'idle', error:'' },
+      players:{ status:'idle', error:'' },
+    },
+    error:'',
+  };
+}
+
 function fakeDocument() {
   const listeners = new Map();
   const root = {
@@ -49,6 +76,7 @@ function fakeDocument() {
     hidden:false,
     innerHTML:'',
     scrollTop:0,
+    textContent:'',
     setAttribute() {},
     removeAttribute() {},
     addEventListener(type, fn) { listeners.set(`${this.id || tag}:${type}`, fn); },
@@ -56,6 +84,7 @@ function fakeDocument() {
     remove() {},
     contains() { return true; },
     querySelector() { return null; },
+    getBoundingClientRect() { return { height:624 }; },
   });
   return {
     head,
@@ -64,6 +93,8 @@ function fakeDocument() {
     createElement:makeNode,
     getElementById(id) { return id === 'ciao-miniapp-root' ? root : null; },
     querySelector() { return null; },
+    addEventListener() {},
+    removeEventListener() {},
     _listeners:listeners,
   };
 }
@@ -126,24 +157,7 @@ test('Round 50.3 failed background refresh preserves stale ready content instead
 });
 
 test('Round 50.3 user navigation is Overview, Lineups, Events, Statistics, Shots and hides Players', () => {
-  const state = {
-    open:true,
-    phase:'ready',
-    competition:'serie_a',
-    matchId:'serie_a:503',
-    match:liveMatch(),
-    activeTab:'overview',
-    sections:{ overview:{ form:{ home:[], away:[] } }, stats:null, events:null, lineups:null, players:null },
-    sectionState:{
-      overview:{ status:'ready', error:'' },
-      stats:{ status:'idle', error:'' },
-      events:{ status:'idle', error:'' },
-      lineups:{ status:'idle', error:'' },
-      players:{ status:'idle', error:'' },
-    },
-    error:'',
-  };
-  const html = renderMatchCenterView(state);
+  const html = renderMatchCenterView(readyState());
   const labels = ['Обзор','Составы','События','Статистика','Удары'];
   let cursor = -1;
   for (const label of labels) {
@@ -152,17 +166,15 @@ test('Round 50.3 user navigation is Overview, Lineups, Events, Statistics, Shots
     cursor = next;
   }
   assert.doesNotMatch(html, />Игроки<\/button>/);
+  assert.deepEqual(MATCH_CENTER_USER_TABS, ['overview','lineups','events','stats','shots']);
+  assert.equal(providerTabForView('shots'), 'stats');
+  assert.equal(providerTabForView('stats'), 'stats');
 });
 
 test('Round 50.3 shots view maps to the stats provider while runtime keeps shots as the active user view', async () => {
   let listener = null;
   let current = {
-    open:true,
-    phase:'ready',
-    competition:'serie_a',
-    matchId:'serie_a:503',
-    match:liveMatch(),
-    activeTab:'overview',
+    ...readyState('overview'),
     sections:{ overview:{}, stats:{ home:{ shots:1 }, away:{ shots:0 }, shots:[] }, events:null, lineups:null, players:null },
     sectionState:{ overview:{status:'ready',error:''}, stats:{status:'ready',error:''}, events:{status:'idle',error:''}, lineups:{status:'idle',error:''}, players:{status:'idle',error:''} },
   };
@@ -184,6 +196,51 @@ test('Round 50.3 shots view maps to the stats provider while runtime keeps shots
   assert.equal(runtime.currentViewState().activeViewTab, 'shots');
 });
 
+test('Round 50.3 Statistics and Shots split one stats payload without a second provider contract', () => {
+  const stats = {
+    home:{ possession:57, shots:9, shotsOnTarget:4, corners:5 },
+    away:{ possession:43, shots:6, shotsOnTarget:2, corners:3 },
+    momentum:[{ minute:1, home:55, away:45 }, { minute:20, home:62, away:38 }],
+    shots:[{ side:'home', minute:18, player:'Кин', outcome:'saved', x:88, y:52, xg:0.126 }],
+  };
+  const state = {
+    ...readyState('stats'),
+    sections:{ overview:{}, stats, events:null, lineups:null, players:null },
+    sectionState:{ overview:{status:'ready',error:''}, stats:{status:'ready',error:''}, events:{status:'idle',error:''}, lineups:{status:'idle',error:''}, players:{status:'idle',error:''} },
+  };
+  const base = renderMatchCenterView(state);
+  const polishedStats = enhanceRound502MatchCenterView(base, state, { selectedShotIndex:null, selectedLineupTeam:'home', expandedLineupDisclosure:null });
+
+  const statisticsHtml = enhanceRound503MatchCenterView(polishedStats, state, { activeViewTab:'stats', selectedShotIndex:null });
+  assert.match(statisticsHtml, /data-cw250-mc-stats-primary/);
+  assert.match(statisticsHtml, /data-cw250-mc-pressure/);
+  assert.doesNotMatch(statisticsHtml, /data-cw233-mc-shotmap/);
+  assert.doesNotMatch(statisticsHtml, /data-cw502-action="shot"/);
+
+  const shotsHtml = enhanceRound503MatchCenterView(polishedStats, state, { activeViewTab:'shots', selectedShotIndex:null });
+  assert.match(shotsHtml, /data-cw233-mc-shotmap/);
+  assert.match(shotsHtml, /data-cw502-action="shot"/);
+  assert.doesNotMatch(shotsHtml, /data-cw250-mc-stats-primary/);
+  assert.doesNotMatch(shotsHtml, /data-cw250-mc-stats-secondary/);
+  assert.doesNotMatch(shotsHtml, /data-cw250-mc-pressure/);
+});
+
+test('Round 50.3 drawer enhancer exposes a dedicated handle, inner scroll region and standard default', () => {
+  const state = readyState();
+  const html = enhanceRound503MatchCenterView(renderMatchCenterView(state), state, { activeViewTab:'overview' });
+  assert.match(html, /data-cw503-drawer-shell/);
+  assert.match(html, /data-cw503-drawer-handle/);
+  assert.match(html, /data-cw503-drawer-scroll/);
+  assert.match(html, /data-cw503-drawer-state="standard"/);
+});
+
+test('Round 50.3 drawer snap resolver supports compact standard expanded and deliberate compact dismissal', () => {
+  assert.equal(resolveDrawerSnap(800, 624, 0), 'standard');
+  assert.equal(resolveDrawerSnap(800, 624, -170), 'expanded');
+  assert.equal(resolveDrawerSnap(800, 624, 250), 'compact');
+  assert.equal(resolveDrawerSnap(800, 368, 120), 'close');
+});
+
 test('Round 50.3 canonical browser host is bottom anchored instead of an opaque fullscreen surface', () => {
   const documentRef = fakeDocument();
   const host = createBrowserMatchCenterHost(documentRef);
@@ -192,4 +249,5 @@ test('Round 50.3 canonical browser host is bottom anchored instead of an opaque 
   assert.equal(host.node.style.right, '0');
   assert.notEqual(host.node.style.inset, '0');
   assert.equal(host.node.style.overflow, 'hidden');
+  assert.equal(host.node.dataset.cw503DrawerState, 'standard');
 });
