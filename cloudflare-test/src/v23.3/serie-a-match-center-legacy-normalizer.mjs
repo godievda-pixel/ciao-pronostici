@@ -32,6 +32,15 @@ function firstObject(...values) {
   return values.map(object).find(Boolean) || null;
 }
 
+function firstArraySource(...values) {
+  return values.find(value => Array.isArray(value));
+}
+
+function nestedName(value) {
+  const source = object(value);
+  return source ? text(source.name ?? source.full_name ?? source.fullName ?? source.short_name ?? source.shortName) : text(value);
+}
+
 function legacyCrest(source, side) {
   return text(
     source?.[`${side}_logo`]
@@ -172,6 +181,21 @@ function normalizeMomentum(value) {
   }).filter(Boolean);
 }
 
+function shotSide(source = {}) {
+  const explicitSide = text(source.side).toLowerCase();
+  if (explicitSide === 'home' || explicitSide === 'away') return explicitSide;
+  return source.home === false || source.is_home === false ? 'away' : 'home';
+}
+
+function normalizeGoalKind(source = {}) {
+  const explicit = text(source.goalKind ?? source.goal_kind ?? source.goal_type ?? source.kind).toLowerCase();
+  if (['open_play','penalty','own_goal','free_kick','unknown'].includes(explicit)) return explicit;
+  if (source.own_goal === true || source.is_own_goal === true) return 'own_goal';
+  if (source.penalty === true || source.is_penalty === true) return 'penalty';
+  if (source.free_kick === true || source.is_free_kick === true) return 'free_kick';
+  return '';
+}
+
 function normalizeShotmap(value) {
   return (array(value) || []).map(shot => {
     const source = object(shot);
@@ -180,16 +204,29 @@ function normalizeShotmap(value) {
     const x = finite(source.x ?? position?.x);
     const y = finite(source.y ?? position?.y);
     if (x === null || y === null) return null;
-    const explicitSide = text(source.side).toLowerCase();
-    const side = explicitSide === 'away'
-      ? 'away'
-      : explicitSide === 'home'
-        ? 'home'
-        : source.home === false || source.is_home === false
-          ? 'away'
-          : 'home';
-    return { side, x, y, xg:finite(source.xg) };
+    return { side:shotSide(source), x, y, xg:finite(source.xg) };
   }).filter(Boolean);
+}
+
+function normalizeDetailedShot(shot) {
+  const source = object(shot);
+  if (!source) return null;
+  const position = firstObject(source.position, source.pos) || {};
+  const goalKind = normalizeGoalKind(source);
+  return {
+    side:shotSide(source),
+    x:source.x ?? position.x,
+    y:source.y ?? position.y,
+    minute:source.minute ?? source.min,
+    addedTime:source.addedTime ?? source.added_time,
+    player:nestedName(source.player ?? source.player_name),
+    assist:nestedName(source.assist ?? source.assist_name),
+    xg:source.xg ?? source.expected_goals,
+    outcome:source.outcome ?? source.result ?? source.type,
+    situation:source.situation ?? source.playPattern ?? source.play_pattern,
+    bodyPart:source.bodyPart ?? source.body_part,
+    ...(goalKind ? { goalKind } : {}),
+  };
 }
 
 function normalizeVenue(detail = {}, overview = {}) {
@@ -208,13 +245,11 @@ function normalizeReferee(detail = {}, overview = {}) {
   return name ? { name } : null;
 }
 
-function nestedName(value) {
-  const source = object(value);
-  return source ? text(source.name ?? source.short_name ?? source.shortName) : text(value);
-}
-
 function normalizeEvent(event) {
   const source = object(event) || {};
+  const goalKind = normalizeGoalKind(source);
+  const cardKind = text(source.cardKind ?? source.card_kind ?? source.card_type).toLowerCase();
+  const varDecision = text(source.varDecision ?? source.var_decision ?? source.var_result).toLowerCase();
   return {
     ...source,
     side:source.side || (source.is_home === true ? 'home' : source.is_home === false ? 'away' : ''),
@@ -222,6 +257,43 @@ function normalizeEvent(event) {
     assist:nestedName(source.assist ?? source.assist_name),
     playerIn:nestedName(source.playerIn ?? source.player_in),
     playerOut:nestedName(source.playerOut ?? source.player_out),
+    ...(goalKind ? { goalKind } : {}),
+    ...(cardKind ? { cardKind } : {}),
+    ...(varDecision ? { varDecision } : {}),
+  };
+}
+
+function normalizeLineupPlayer(player, starter) {
+  const source = object(player) || {};
+  return {
+    ...source,
+    name:nestedName(source.name || source.short_name || source.shortName || source.player),
+    shirtNumber:source.shirtNumber ?? source.shirt_number ?? source.number,
+    x:source.x ?? source.position_x ?? source.coordinates?.x,
+    y:source.y ?? source.position_y ?? source.coordinates?.y,
+    grid:source.grid ?? source.grid_position ?? source.formation_position,
+    starter:typeof source.starter === 'boolean' ? source.starter : starter,
+  };
+}
+
+function normalizeLineupSide(side) {
+  const source = object(side) || {};
+  const startersSource = array(source.starters) || array(source.players) || [];
+  const substitutesSource = array(source.substitutes) || array(source.bench) || [];
+  return {
+    ...source,
+    formation:source.formation,
+    coach:nestedName(source.coach ?? source.coach_name),
+    starters:startersSource.map(player => normalizeLineupPlayer(player, true)),
+    substitutes:substitutesSource.map(player => normalizeLineupPlayer(player, false)),
+  };
+}
+
+function normalizeLineups(value) {
+  const source = object(value) || {};
+  return {
+    home:normalizeLineupSide(source.home),
+    away:normalizeLineupSide(source.away),
   };
 }
 
@@ -288,6 +360,19 @@ export function normalizeSerieALegacyMatchCenter(raw = {}) {
   const source = object(raw) || {};
   const statsEnvelope = object(source.stats) || {};
   const statsRaw = object(statsEnvelope.stats ?? source.stats);
+  const overviewRaw = object(source.overview_meta ?? source.overviewMeta) || {};
+  const shotSource = firstArraySource(
+    source.shots,
+    source.shotmap,
+    source.shot_map,
+    statsEnvelope.shots,
+    statsEnvelope.shotmap,
+    statsEnvelope.shot_map,
+    overviewRaw.shots,
+    overviewRaw.shotmap,
+    overviewRaw.shot_map,
+  );
+  const richShots = (shotSource || []).map(normalizeDetailedShot).filter(Boolean);
   const incidentsRaw = array(source.incidents?.incidents ?? source.incidents);
   const lineupsRaw = object(source.lineups?.lineups ?? source.lineups);
   const playersRaw = array(source.player_stats?.player_stats ?? source.playerStats ?? source.player_stats);
@@ -296,16 +381,17 @@ export function normalizeSerieALegacyMatchCenter(raw = {}) {
   return {
     match:normalizeMatch(source),
     ...(overview ? { overview_meta:overview } : {}),
-    ...(statsRaw ? {
+    ...(statsRaw || richShots.length ? {
       stats:{
         stats:{
-          home:normalizeStatSide(statsRaw.home),
-          away:normalizeStatSide(statsRaw.away),
+          home:normalizeStatSide(statsRaw?.home),
+          away:normalizeStatSide(statsRaw?.away),
         },
+        ...(richShots.length ? { shots:richShots } : {}),
       },
     } : {}),
     ...(incidentsRaw ? { incidents:{ incidents:incidentsRaw.map(normalizeEvent) } } : {}),
-    ...(lineupsRaw ? { lineups:{ lineups:lineupsRaw } } : {}),
+    ...(lineupsRaw ? { lineups:{ lineups:normalizeLineups(lineupsRaw) } } : {}),
     ...(playersRaw ? { player_stats:{ player_stats:playersRaw.map(normalizePlayer) } } : {}),
     ...(object(source.capabilities) ? { capabilities:source.capabilities } : {}),
   };
