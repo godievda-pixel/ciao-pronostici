@@ -144,6 +144,9 @@ function canonicalEvent(value) {
   if (!type) return null;
   const sideValue = text(value.side).toLowerCase();
   const side = sideValue === 'away' ? 'away' : sideValue === 'home' ? 'home' : '';
+  const goalKindRaw = value.goalKind ?? value.goal_kind;
+  const cardKind = text(value.cardKind ?? value.card_kind).toLowerCase();
+  const varDecision = text(value.varDecision ?? value.var_decision).toLowerCase();
   return Object.freeze({
     type,
     minute:finite(value.minute),
@@ -157,9 +160,9 @@ function canonicalEvent(value) {
     homeScore:finite(value.homeScore ?? value.home_score),
     awayScore:finite(value.awayScore ?? value.away_score),
     text:text(value.text),
-    goalKind:enumValue(value.goalKind ?? value.goal_kind, GOAL_KINDS),
-    cardKind:text(value.cardKind ?? value.card_kind).toLowerCase(),
-    varDecision:text(value.varDecision ?? value.var_decision).toLowerCase(),
+    ...(goalKindRaw !== null && goalKindRaw !== undefined && text(goalKindRaw) ? { goalKind:enumValue(goalKindRaw, GOAL_KINDS) } : {}),
+    ...(cardKind ? { cardKind } : {}),
+    ...(varDecision ? { varDecision } : {}),
   });
 }
 
