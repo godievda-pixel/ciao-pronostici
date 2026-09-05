@@ -25,6 +25,8 @@ import './round31-match-center-stability.mjs';
 import './round35-match-center-overview-fixes.mjs';
 import './round37-runtime.mjs';
 import './round43-serie-a-ui.mjs';
+import './round51-1-current-round.mjs';
+import './round51-1-active-match-center-ui.mjs';
 
 export const CiaoV233 = Object.freeze({
   version: '23.3',
@@ -54,6 +56,8 @@ export const CiaoV233 = Object.freeze({
   round35MatchCenterOverviewFixes: 'enabled',
   round37Runtime: 'enabled',
   round43SerieAUi: 'enabled',
+  round511CurrentRound: 'enabled',
+  round511ActiveMatchCenterUi: 'enabled',
 });
 
 globalThis.CiaoV233 = CiaoV233;
