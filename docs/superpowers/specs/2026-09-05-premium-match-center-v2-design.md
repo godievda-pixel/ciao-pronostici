@@ -91,6 +91,7 @@ Rules:
 - added time renders as `45+2′`.
 - do not infer own goal or penalty from score alone.
 - if provider has no event qualifier, use `unknown`, never fabricate a marker.
+- render one hero line per goal, sorted by match minute, so every qualifier remains unambiguous.
 
 ### Events
 
@@ -145,8 +146,8 @@ Keep the existing aggregate stats object and extend the Stats section to:
 ```js
 {
   side: 'home' | 'away',
-  x: number,
-  y: number,
+  x: number | null,
+  y: number | null,
   minute: number | null,
   addedTime: number | null,
   player: string,
@@ -161,15 +162,16 @@ Keep the existing aggregate stats object and extend the Stats section to:
 
 Coordinate policy:
 
-- canonical coordinates use a 0–100 football-pitch coordinate system;
-- adapter clamps invalid values;
-- shots without valid x/y may still appear in the textual shot list but must not be plotted;
-- never synthesize xG.
+- canonical plotted coordinates use a 0–100 football-pitch coordinate system;
+- provider-specific adapters may convert a documented provider scale into 0–100;
+- after conversion, out-of-range/non-finite coordinates become `null` rather than being moved to the pitch edge;
+- shots without valid x/y remain in the textual shot list but are not plotted;
+- never synthesize xG or shot coordinates.
 
 Backward compatibility:
 
 - existing `overview.shotmap` remains supported during migration;
-- adapters should populate `stats.shots` from the richest available source and may derive the old overview shotmap from it for legacy tests until those tests are migrated.
+- adapters should populate `stats.shots` from the richest available source and may derive the old overview shotmap from it for legacy tests until those tests are deliberately migrated.
 
 ### Lineups
 
@@ -338,10 +340,10 @@ Layout:
 
 Scorer list rules:
 
-- show one line per scorer or aggregate repeated scorer goals into one line only if every minute/qualifier remains visible;
+- one line per goal, in chronological order;
 - use compact typography; hero must remain readable at 320px width;
 - long names wrap/ellipsis safely without overlapping score;
-- for scheduled 0–0 matches there is no scorer area.
+- for scheduled matches there is no scorer area.
 
 Crests:
 
@@ -370,7 +372,7 @@ Keep the existing correct data from Round 45 and upgrade presentation:
 - key match numbers if available;
 - momentum only when actual provider data exists.
 
-Do not duplicate the full shot map here once Stats owns the detailed shot experience. Overview may contain only a compact link/summary if shot data exists.
+Do not duplicate the full shot map here once Stats owns the detailed shot experience. Overview may contain only a compact shot summary if shot data exists.
 
 ## Stats
 
@@ -422,16 +424,18 @@ Rules:
 
 Presentation order:
 
-1. pitch view;
-2. formation labels;
-3. textual starters;
-4. substitutes;
-5. coach when available.
+1. team segmented control;
+2. pitch view for the selected team;
+3. formation label;
+4. textual starters for both teams;
+5. substitutes for both teams;
+6. coach when available.
 
 ### Pitch view
 
-- use a single vertical pitch on mobile;
-- home and away can be switched with a compact segmented control or displayed as two consecutive pitch panels; choose the variant that fits the existing tab width without horizontal scroll;
+- use one vertical pitch panel on mobile;
+- a compact segmented control switches explicitly between home and away team; default is home;
+- switching the pitch does not hide the authoritative text lists below;
 - player marker shows shirt number and compact surname/name;
 - long names must not overlap adjacent markers;
 - formation-derived positions are deterministic and tested;
@@ -462,9 +466,10 @@ Hero, tabs, event timeline, pitch player labels and shot map must remain within 
 - A failed section must not destroy the already-loaded hero/base match.
 - Retry remains per-section.
 - `Данные пока недоступны` is used only when provider coverage is false/unavailable.
-- `Нет событий` is valid only for a loaded Events section with an empty canonical event list.
+- `Нет событий` is valid for a successfully loaded Events section with a valid empty event array, including a legitimate 0:0 match.
 - scheduled matches may legitimately have no events/stats/lineups.
-- finished/live matches with provider-declared coverage but empty malformed payloads should emit adapter/test failures rather than silently invent content.
+- malformed provider shapes/types must fail normalization/tests rather than silently stringifying raw objects or inventing content.
+- a valid but empty canonical array/object is not automatically treated as malformed.
 
 ## Testing strategy
 
@@ -490,7 +495,9 @@ Fixtures for Serie A and BSD-based competitions must cover:
 - shot map with goal/saved/off-target/blocked shots;
 - lineup with explicit positions;
 - lineup with formation-only fallback;
-- missing data paths.
+- valid empty section data;
+- malformed provider data;
+- missing/unavailable data paths.
 
 ### Renderer tests
 
@@ -501,7 +508,7 @@ Verify semantic output for:
 - hero scorer list;
 - premium Stats shot map and shot list;
 - premium Events timeline;
-- lineup pitch and text fallback;
+- lineup pitch, team switch and text fallback;
 - 320px-safe responsive rules.
 
 ### Integration tests
@@ -512,7 +519,7 @@ For every supported competition key:
 - switch all five tabs;
 - confirm section lazy loading;
 - confirm no raw provider object stringification (`[object Object]`, `undefined`, `null` UI leaks);
-- confirm no unsupported tournament falls through to the wrong theme.
+- confirm no supported tournament falls through to another tournament theme.
 
 ### CI / deployed TEST probes
 
@@ -564,6 +571,7 @@ This is one final Match Center upgrade, but implementation should be committed i
 ### Slice E — Lineups + players
 
 - pitch projection;
+- explicit home/away segmented pitch switch;
 - formation/grid/coordinate logic;
 - text fallback, substitutes, coach;
 - players visual alignment;
@@ -575,6 +583,7 @@ This is one final Match Center upgrade, but implementation should be committed i
 - inspect every supported competition through canonical fixtures;
 - search built source for stale old Match Center styling hooks that override new shell;
 - verify no duplicate theme systems can win the CSS cascade;
+- verify all five competition themes map to the intended tokens;
 - merge only after complete TEST verification.
 
 ## Acceptance criteria
@@ -588,7 +597,7 @@ The upgrade is not considered finished until all are true:
 5. Serie A, Coppa Italia, UCL, UEL and UECL are visibly distinct but unmistakably part of the same app.
 6. Stats contains detailed comparative numbers, a shot map and a detailed shot list when provider data exists.
 7. Events is a premium chronological timeline and preserves all supported event metadata.
-8. Lineups show a pitch representation plus complete text lists when data exists.
+8. Lineups show a switchable pitch representation plus complete text lists when data exists.
 9. No renderer reads raw provider payloads.
 10. No fake zero, fake player, fake xG, fake lineup or fake event is introduced for missing data.
 11. No horizontal overflow at 320px.
