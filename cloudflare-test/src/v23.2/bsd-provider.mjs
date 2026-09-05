@@ -5,6 +5,8 @@ import { canonicalMatchCenterSnapshot } from '../v23.3/match-center-snapshot.mjs
 import {
   canonicalCoverage,
   canonicalMatchCenterBase,
+  canonicalStatsSection,
+  canonicalLineupsSection,
 } from '../v23.3/match-center-sections.mjs';
 import { adaptBsdMatchCenterSections } from '../v23.3/bsd-match-center-adapter.mjs';
 
@@ -56,6 +58,12 @@ function object(value) {
 
 function hasOwn(source, key) {
   return Boolean(source && Object.prototype.hasOwnProperty.call(source, key));
+}
+
+function finite(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
 }
 
 function isoDate(value) {
@@ -344,8 +352,19 @@ function mergeSectionCoverage(baseCoverage, section, available, extra = {}) {
   });
 }
 
-function resourceSections(payload) {
-  return adaptBsdMatchCenterSections(object(payload) || {});
+function resourceEnvelope(resource, payload) {
+  if (payload === null || payload === undefined) return {};
+  if (object(payload)) return payload;
+  if (!Array.isArray(payload)) return {};
+  if (resource === 'player-stats') return { player_stats:payload };
+  if (resource === 'incidents') return { incidents:payload };
+  if (resource === 'lineups') return { lineups:payload };
+  if (resource === 'stats') return { stats:payload };
+  return {};
+}
+
+function resourceSections(payload, resource = '') {
+  return adaptBsdMatchCenterSections(resourceEnvelope(resource, payload));
 }
 
 function lineupPlayers(side) {
@@ -378,6 +397,65 @@ function enrichPlayersFromLineups(players, lineups, match) {
   }));
 }
 
+function playerLookup(players, lineups, match) {
+  const enriched = enrichPlayersFromLineups(players, lineups, match);
+  return new Map(enriched.map(player => [text(player?.playerId), player]).filter(([id]) => id));
+}
+
+function enrichStatsShots(stats, players, lineups, match) {
+  if (!stats) return null;
+  const byId = playerLookup(players, lineups, match);
+  return canonicalStatsSection({
+    ...stats,
+    shots:list(stats.shots).map(shot => {
+      const found = byId.get(text(shot?.playerId));
+      return found && !text(shot?.player) ? { ...shot, player:found.name } : shot;
+    }),
+  });
+}
+
+function eventTotals(events) {
+  const totals = new Map();
+  for (const event of list(events)) {
+    const id = text(event?.playerId);
+    if (!id) continue;
+    const current = totals.get(id) || { goals:0, yellowCards:0, redCards:0 };
+    const type = text(event?.type).toLowerCase();
+    if (type === 'goal') current.goals += 1;
+    if (type === 'yellow' || type === 'yellow_card' || (type === 'card' && text(event?.cardKind).includes('yellow'))) current.yellowCards += 1;
+    if (type === 'red' || type === 'red_card' || (type === 'card' && text(event?.cardKind).includes('red'))) current.redCards += 1;
+    totals.set(id, current);
+  }
+  return totals;
+}
+
+function enrichLineups(lineups, players, events, match) {
+  if (!lineups) return null;
+  const byId = playerLookup(players, lineups, match);
+  const byEvent = eventTotals(events);
+  const side = value => ({
+    ...value,
+    starters:list(value?.starters).map(player => enrichLineupPlayer(player, byId, byEvent)),
+    substitutes:list(value?.substitutes).map(player => enrichLineupPlayer(player, byId, byEvent)),
+  });
+  return canonicalLineupsSection({ home:side(lineups.home), away:side(lineups.away) });
+}
+
+function enrichLineupPlayer(player, byId, byEvent) {
+  const id = text(player?.playerId);
+  const stats = byId.get(id) || {};
+  const events = byEvent.get(id) || {};
+  return {
+    ...player,
+    name:text(player?.name) || text(stats?.name),
+    rating:finite(player?.rating) ?? finite(stats?.rating),
+    goals:finite(player?.goals) ?? finite(stats?.goals) ?? finite(events?.goals),
+    assists:finite(player?.assists) ?? finite(stats?.assists),
+    yellowCards:finite(player?.yellowCards) ?? finite(events?.yellowCards),
+    redCards:finite(player?.redCards) ?? finite(events?.redCards),
+  };
+}
+
 function predictionPayload(payload) {
   const source = object(payload);
   if (!source) return null;
@@ -393,7 +471,7 @@ function predictionPayload(payload) {
   return null;
 }
 
-function composeOverviewEvent(event, statsPayload, modelPayload, incidentsPayload, playerStatsPayload) {
+function composeOverviewEvent(event, statsPayload, modelPayload, incidentsPayload, playerStatsPayload, lineupPayload, match) {
   const combined = { ...event };
   const stats = object(statsPayload);
   if (stats) {
@@ -409,7 +487,13 @@ function composeOverviewEvent(event, statsPayload, modelPayload, incidentsPayloa
   if (Array.isArray(incidentsPayload)) combined.incidents = incidentsPayload;
   else if (object(incidentsPayload)) combined.incidents = incidentsPayload;
 
-  if (Array.isArray(playerStatsPayload)) combined.player_stats = playerStatsPayload;
+  const playerSections = resourceSections(playerStatsPayload, 'player-stats');
+  const lineupSections = resourceSections(lineupPayload, 'lineups');
+  const rawPlayers = playerSections.coverage.players ? playerSections.players : [];
+  const lineups = lineupSections.coverage.lineups ? lineupSections.lineups : null;
+  const enrichedPlayers = enrichPlayersFromLineups(rawPlayers, lineups, match);
+  if (enrichedPlayers.length) combined.player_stats = enrichedPlayers;
+  else if (Array.isArray(playerStatsPayload)) combined.player_stats = playerStatsPayload;
   else if (object(playerStatsPayload)) combined.player_stats = playerStatsPayload;
 
   return combined;
@@ -473,33 +557,14 @@ export async function fetchBsdMatchCenterSection(args) {
   const baseCoverage = baseMatchCenterCoverage(event);
 
   if (section === 'overview') {
-    const [statsPayload, modelPayload, incidentsPayload, playerStatsPayload] = await Promise.all([
-      fetchOptionalEventResource({
-        sourceId,
-        resource:'stats',
-        apiKey:args.apiKey,
-        fetchImpl:args.fetchImpl,
-      }),
-      fetchOptionalEventResource({
-        sourceId,
-        resource:'prediction',
-        apiKey:args.apiKey,
-        fetchImpl:args.fetchImpl,
-      }),
-      fetchOptionalEventResource({
-        sourceId,
-        resource:'incidents',
-        apiKey:args.apiKey,
-        fetchImpl:args.fetchImpl,
-      }),
-      fetchOptionalEventResource({
-        sourceId,
-        resource:'player-stats',
-        apiKey:args.apiKey,
-        fetchImpl:args.fetchImpl,
-      }),
+    const [statsPayload, modelPayload, incidentsPayload, playerStatsPayload, lineupPayload] = await Promise.all([
+      fetchOptionalEventResource({ sourceId, resource:'stats', apiKey:args.apiKey, fetchImpl:args.fetchImpl }),
+      fetchOptionalEventResource({ sourceId, resource:'prediction', apiKey:args.apiKey, fetchImpl:args.fetchImpl }),
+      fetchOptionalEventResource({ sourceId, resource:'incidents', apiKey:args.apiKey, fetchImpl:args.fetchImpl }),
+      fetchOptionalEventResource({ sourceId, resource:'player-stats', apiKey:args.apiKey, fetchImpl:args.fetchImpl }),
+      fetchOptionalEventResource({ sourceId, resource:'lineups', apiKey:args.apiKey, fetchImpl:args.fetchImpl }).catch(() => null),
     ]);
-    const combined = composeOverviewEvent(event, statsPayload, modelPayload, incidentsPayload, playerStatsPayload);
+    const combined = composeOverviewEvent(event, statsPayload, modelPayload, incidentsPayload, playerStatsPayload, lineupPayload, match);
     const sections = adaptBsdMatchCenterSections(combined);
     const available = sections.coverage.overview === true;
     return Object.freeze({
@@ -515,60 +580,66 @@ export async function fetchBsdMatchCenterSection(args) {
 
   if (section === 'players') {
     const [payload, lineupPayload] = await Promise.all([
-      fetchOptionalEventResource({
-        sourceId,
-        resource:'player-stats',
-        apiKey:args.apiKey,
-        fetchImpl:args.fetchImpl,
-      }),
-      fetchOptionalEventResource({
-        sourceId,
-        resource:'lineups',
-        apiKey:args.apiKey,
-        fetchImpl:args.fetchImpl,
-      }).catch(() => null),
+      fetchOptionalEventResource({ sourceId, resource:'player-stats', apiKey:args.apiKey, fetchImpl:args.fetchImpl }),
+      fetchOptionalEventResource({ sourceId, resource:'lineups', apiKey:args.apiKey, fetchImpl:args.fetchImpl }).catch(() => null),
     ]);
-    const fetchedSections = resourceSections(payload);
+    const fetchedSections = resourceSections(payload, 'player-stats');
     const fetchedAvailable = fetchedSections.coverage.players === true;
     const fallbackAvailable = payload === null && baseSections.coverage.players === true;
     const available = fetchedAvailable || fallbackAvailable;
-    const rawData = fetchedAvailable
-      ? fetchedSections.players
-      : fallbackAvailable
-        ? baseSections.players
-        : null;
-    const fetchedLineups = resourceSections(lineupPayload);
-    const lineups = fetchedLineups.coverage.lineups
-      ? fetchedLineups.lineups
-      : baseSections.coverage.lineups
-        ? baseSections.lineups
-        : null;
+    const rawData = fetchedAvailable ? fetchedSections.players : fallbackAvailable ? baseSections.players : null;
+    const fetchedLineups = resourceSections(lineupPayload, 'lineups');
+    const lineups = fetchedLineups.coverage.lineups ? fetchedLineups.lineups : baseSections.coverage.lineups ? baseSections.lineups : null;
     const data = available ? enrichPlayersFromLineups(rawData, lineups, match) : null;
 
-    return Object.freeze({
-      section,
-      available,
-      coverage:mergeSectionCoverage(baseCoverage, section, available),
-      data,
-    });
+    return Object.freeze({ section, available, coverage:mergeSectionCoverage(baseCoverage, section, available), data });
+  }
+
+  if (section === 'stats') {
+    const [payload, playerStatsPayload, lineupPayload] = await Promise.all([
+      fetchOptionalEventResource({ sourceId, resource:'stats', apiKey:args.apiKey, fetchImpl:args.fetchImpl }),
+      fetchOptionalEventResource({ sourceId, resource:'player-stats', apiKey:args.apiKey, fetchImpl:args.fetchImpl }).catch(() => null),
+      fetchOptionalEventResource({ sourceId, resource:'lineups', apiKey:args.apiKey, fetchImpl:args.fetchImpl }).catch(() => null),
+    ]);
+    const fetchedSections = resourceSections(payload, 'stats');
+    const fetchedAvailable = fetchedSections.coverage.stats === true;
+    const fallbackAvailable = payload === null && baseSections.coverage.stats === true;
+    const available = fetchedAvailable || fallbackAvailable;
+    const stats = fetchedAvailable ? fetchedSections.stats : fallbackAvailable ? baseSections.stats : null;
+    const playerSections = resourceSections(playerStatsPayload, 'player-stats');
+    const lineupSections = resourceSections(lineupPayload, 'lineups');
+    const players = playerSections.coverage.players ? playerSections.players : baseSections.players || [];
+    const lineups = lineupSections.coverage.lineups ? lineupSections.lineups : baseSections.lineups || null;
+    const data = available ? enrichStatsShots(stats, players, lineups, match) : null;
+    return Object.freeze({ section, available, coverage:mergeSectionCoverage(baseCoverage, section, available), data });
+  }
+
+  if (section === 'lineups') {
+    const [payload, playerStatsPayload, incidentsPayload] = await Promise.all([
+      fetchOptionalEventResource({ sourceId, resource:'lineups', apiKey:args.apiKey, fetchImpl:args.fetchImpl }),
+      fetchOptionalEventResource({ sourceId, resource:'player-stats', apiKey:args.apiKey, fetchImpl:args.fetchImpl }).catch(() => null),
+      fetchOptionalEventResource({ sourceId, resource:'incidents', apiKey:args.apiKey, fetchImpl:args.fetchImpl }).catch(() => null),
+    ]);
+    const fetchedSections = resourceSections(payload, 'lineups');
+    const fetchedAvailable = fetchedSections.coverage.lineups === true;
+    const fallbackAvailable = payload === null && baseSections.coverage.lineups === true;
+    const available = fetchedAvailable || fallbackAvailable;
+    const lineups = fetchedAvailable ? fetchedSections.lineups : fallbackAvailable ? baseSections.lineups : null;
+    const playerSections = resourceSections(playerStatsPayload, 'player-stats');
+    const incidentSections = resourceSections(incidentsPayload, 'incidents');
+    const players = playerSections.coverage.players ? playerSections.players : baseSections.players || [];
+    const events = incidentSections.coverage.events ? incidentSections.events : baseSections.events || [];
+    const data = available ? enrichLineups(lineups, players, events, match) : null;
+    return Object.freeze({ section, available, coverage:mergeSectionCoverage(baseCoverage, section, available), data });
   }
 
   const resource = MATCH_CENTER_RESOURCE[section];
-  const payload = await fetchOptionalEventResource({
-    sourceId,
-    resource,
-    apiKey:args.apiKey,
-    fetchImpl:args.fetchImpl,
-  });
-  const fetchedSections = resourceSections(payload);
+  const payload = await fetchOptionalEventResource({ sourceId, resource, apiKey:args.apiKey, fetchImpl:args.fetchImpl });
+  const fetchedSections = resourceSections(payload, resource);
   const fetchedAvailable = fetchedSections.coverage[section] === true;
   const fallbackAvailable = payload === null && baseSections.coverage[section] === true;
   const available = fetchedAvailable || fallbackAvailable;
-  const data = fetchedAvailable
-    ? fetchedSections[section]
-    : fallbackAvailable
-      ? baseSections[section]
-      : null;
+  const data = fetchedAvailable ? fetchedSections[section] : fallbackAvailable ? baseSections[section] : null;
 
   return Object.freeze({
     section,
