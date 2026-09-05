@@ -9,11 +9,11 @@ function freezeTheme(key, vars) {
 
 const THEMES = Object.freeze({
   serie_a:freezeTheme('serie-a', {
-    '--mc-bg':'#07162e',
+    '--mc-bg':'#071626',
     '--mc-surface':'rgba(255,255,255,.055)',
-    '--mc-border':'rgba(112,157,232,.18)',
-    '--mc-accent':'#0f52ba',
-    '--mc-accent-2':'#2153f8',
+    '--mc-border':'rgba(40,127,199,.28)',
+    '--mc-accent':'#0c5aa8',
+    '--mc-accent-2':'#287fc7',
   }),
   coppa_italia:freezeTheme('coppa', {
     '--mc-bg':'#180b12',

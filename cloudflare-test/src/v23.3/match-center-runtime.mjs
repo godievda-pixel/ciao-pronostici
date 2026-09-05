@@ -7,7 +7,7 @@ import {
   restoreMatchSource,
 } from './match-center-lifecycle.mjs';
 
-export const MATCH_CENTER_RUNTIME_BUILD = 'round39-canonical-match-center';
+export const MATCH_CENTER_RUNTIME_BUILD = 'round43-canonical-match-center';
 export const MATCH_CENTER_RUNTIME_ID = 'ciao-v239-match-center-overlay';
 
 let installedRuntime = null;
@@ -51,7 +51,7 @@ export function createBrowserMatchCenterHost(documentRef = globalThis.document) 
       overflowY:'auto',
       overflowX:'hidden',
       overscrollBehavior:'contain',
-      background:'#07162e',
+      background:'#071626',
     });
     rootFor(documentRef)?.appendChild?.(node);
   }
@@ -143,7 +143,11 @@ export function createCanonicalMatchCenterRuntime({
     source = sourceOrDefault(payload.source || currentSource?.());
     suspendSource?.(source);
     host.scrollToTop?.();
-    return store.open({ competition, matchId });
+    return store.open({
+      competition,
+      matchId,
+      initialMatch:payload.initialMatch && typeof payload.initialMatch === 'object' ? payload.initialMatch : null,
+    });
   }
 
   function back() {

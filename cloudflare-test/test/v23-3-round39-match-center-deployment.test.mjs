@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 const read = path => readFile(new URL(path, import.meta.url), 'utf8');
 
-test('browser graph reaches the canonical Round 39 runtime without importing the legacy Match Center facade', async () => {
+test('browser graph reaches the current canonical runtime without importing the legacy Match Center facade', async () => {
   const [index, home, links, runtime] = await Promise.all([
     read('../src/v23.3/index.mjs'),
     read('../src/v23.3/home-integration.mjs'),
@@ -16,7 +16,7 @@ test('browser graph reaches the canonical Round 39 runtime without importing the
   assert.match(home, /from '\.\/match-center-links\.mjs'/);
   assert.match(home, /installCanonicalMatchLinks\(globalThis\.document\)/);
   assert.match(links, /from '\.\/match-center-runtime\.mjs'/);
-  assert.match(runtime, /MATCH_CENTER_RUNTIME_BUILD = 'round39-canonical-match-center'/);
+  assert.match(runtime, /MATCH_CENTER_RUNTIME_BUILD = 'round\d+-canonical-match-center'/);
 
   assert.doesNotMatch(index, /import '\.\/match-center\.mjs'/);
   assert.doesNotMatch(home, /from '\.\/match-center\.mjs'/);
