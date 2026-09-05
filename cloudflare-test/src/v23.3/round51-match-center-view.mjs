@@ -96,10 +96,21 @@ function shotsView(html) {
   return output;
 }
 
+function annotateUserPrediction(html) {
+  if (!html.includes('class="cw250-user-prediction"')) return html;
+  return html
+    .replace('class="cw250-user-prediction"', 'class="cw250-user-prediction" data-cw511-user-prediction')
+    .replace(/(<div class="cw250-user-prediction" data-cw511-user-prediction>[\s\S]*?<\/div>)<b>([^<]*)<\/b><\/div>/, '$1<b data-cw511-user-prediction-score>$2</b></div>');
+}
+
 function round511FeedbackStyles() {
   return `<style data-cw511-feedback-style>
     .cw233-mc-form-run{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
     .cw233-mc-form-chip{min-width:0;width:100%;height:24px}
+    .cw250-user-prediction{padding:15px;border-color:color-mix(in srgb,var(--mc-accent) 48%,var(--mc-border));background:linear-gradient(145deg,color-mix(in srgb,var(--mc-accent-soft) 52%,var(--mc-surface-raised)),var(--mc-surface));box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 10px 26px rgba(0,0,0,.16)}
+    .cw250-user-prediction small{font-size:9px;letter-spacing:.06em}
+    .cw250-user-prediction strong{font-size:12px}
+    .cw250-user-prediction b{font-size:32px;min-width:84px;padding:13px 12px;border-radius:15px}
   </style>`;
 }
 
@@ -108,6 +119,7 @@ export function enhanceRound51MatchCenterView(html, state = {}, viewState = {}) 
   if (!output) return output;
   const activeViewTab = canonicalRound51ViewTab(viewState?.activeViewTab || state?.activeTab);
   output = replaceProviderTabs(output, activeViewTab);
+  if (activeViewTab === 'overview') output = annotateUserPrediction(output);
   if (activeViewTab === 'statistics') output = statisticsView(output);
   if (activeViewTab === 'shots') output = shotsView(output);
   return `${output}${round511FeedbackStyles()}`;
