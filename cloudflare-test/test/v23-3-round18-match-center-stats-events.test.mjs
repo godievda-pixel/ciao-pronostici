@@ -112,7 +112,7 @@ test('Round 18 event timeline follows premium chronological order and preserves 
   assert.ok(html.indexOf('54′') < html.indexOf('61′'));
   assert.ok(html.indexOf('61′') < html.indexOf('66′'));
   assert.match(html, /cw233-mc-event-minute/);
-  assert.match(html, /cw233-mc-event-text/);
+  assert.match(html, /cw250-mc-event-card/);
   assert.match(html, /data-cw233-mc-event="goal"/);
   assert.match(html, /data-cw233-mc-event="yellow_card"/);
   assert.match(html, /data-cw233-mc-event="red_card"/);
