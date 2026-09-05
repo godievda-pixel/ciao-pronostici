@@ -4,6 +4,10 @@ import {
   normalizeCanonicalSection,
 } from './match-center-contract.mjs';
 import { createPredictionService } from './prediction-service.mjs';
+import {
+  recoverRound512SerieASection,
+  round512NeedsCanonicalSectionRecovery,
+} from './round51-2-serie-a-provider-recovery.mjs';
 
 const SUPPORTED_COMPETITIONS = new Set([
   'serie_a',
@@ -115,7 +119,20 @@ export function createMatchCenterProviders({
       ? requireLoader(loadSerieASection, 'serie_a_provider_unavailable')
       : requireLoader(loadExternalSection, 'external_provider_unavailable');
     const payload = await loader({ ...context, ...target, section:canonicalSection });
-    const normalized = normalizeCanonicalSection(canonicalSection, unwrapSection(payload));
+    let normalized = normalizeCanonicalSection(canonicalSection, unwrapSection(payload));
+
+    if (target.competition === 'serie_a'
+        && round512NeedsCanonicalSectionRecovery(normalized, canonicalSection)) {
+      try {
+        const recovered = await recoverRound512SerieASection({
+          ...context,
+          ...target,
+          section:canonicalSection,
+        });
+        if (recovered) normalized = normalizeCanonicalSection(canonicalSection, recovered);
+      } catch {}
+    }
+
     if (canonicalSection !== 'overview' || normalized?.available === false || !normalized?.data) return normalized;
 
     let prediction = null;
