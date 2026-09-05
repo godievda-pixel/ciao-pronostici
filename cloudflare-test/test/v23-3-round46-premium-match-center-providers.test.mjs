@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { adaptBsdMatchCenterSections } from '../src/v23.3/bsd-match-center-adapter.mjs';
 import { normalizeSerieALegacyMatchCenter } from '../src/v23.3/serie-a-match-center-legacy-normalizer.mjs';
 import { adaptSerieALegacyMatchCenter } from '../src/v23.3/serie-a-match-center-adapter.mjs';
+import { loadSerieAMatchCenterBase } from '../src/v23.3/serie-a-match-center-provider.mjs';
 
 const richGoal = {
   type:'goal',
@@ -50,6 +51,13 @@ const richLineups = {
   },
   away:{ formation:'4-4-2', coach_name:'Away Coach', players:[], substitutes:[] },
 };
+
+function json(payload, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers:{ 'content-type':'application/json' },
+  });
+}
 
 test('BSD adapter preserves rich goal qualifiers, detailed shots and lineup placement', () => {
   const result = adaptBsdMatchCenterSections({
@@ -106,4 +114,82 @@ test('Serie A legacy boundary emits the same rich canonical semantics and hero g
   assert.equal(result.base.goals.home[0].addedTime, 2);
   assert.equal(result.base.goals.home[0].kind, 'penalty');
   assert.equal(result.base.goals.away[0].kind, 'own_goal');
+});
+
+test('finished Serie A base enriches hero scorers while scheduled base stays summary-only', async () => {
+  const finishedCalls = [];
+  const finishedEnv = {
+    CIAO_WEB_API:{
+      fetch:async req => {
+        const url = new URL(req.url);
+        const body = await req.clone().json();
+        finishedCalls.push({ path:url.pathname, body });
+        if (url.pathname.endsWith('summary-fast-v2')) {
+          return json({
+            ok:true,
+            match:{
+              id:900,
+              status:'finished',
+              home_score:2,
+              away_score:1,
+              home:{ id:10, name:'Home' },
+              away:{ id:20, name:'Away' },
+            },
+          });
+        }
+        return json({
+          ok:true,
+          match:{
+            id:900,
+            status:'finished',
+            home_score:2,
+            away_score:1,
+            home:{ id:10, name:'Home' },
+            away:{ id:20, name:'Away' },
+          },
+          incidents:{ incidents:[richGoal] },
+        });
+      },
+    },
+  };
+  const request = new Request('https://test.local/api/v23.3/match-center');
+  const finished = await loadSerieAMatchCenterBase({
+    request,
+    env:finishedEnv,
+    initData:'signed-user',
+    matchId:'serie_a:900',
+  });
+
+  assert.equal(finished.match.goals.home.length, 1);
+  assert.equal(finished.match.goals.home[0].kind, 'penalty');
+  assert.equal(finishedCalls.length, 2);
+  assert.deepEqual(finishedCalls[1].body.sections, ['incidents']);
+
+  const scheduledCalls = [];
+  const scheduledEnv = {
+    CIAO_WEB_API:{
+      fetch:async req => {
+        const url = new URL(req.url);
+        const body = await req.clone().json();
+        scheduledCalls.push({ path:url.pathname, body });
+        return json({
+          ok:true,
+          match:{
+            id:901,
+            status:'scheduled',
+            home:{ id:10, name:'Home' },
+            away:{ id:20, name:'Away' },
+          },
+        });
+      },
+    },
+  };
+  const scheduled = await loadSerieAMatchCenterBase({
+    request,
+    env:scheduledEnv,
+    initData:'signed-user',
+    matchId:'serie_a:901',
+  });
+  assert.deepEqual(scheduled.match.goals, { home:[], away:[] });
+  assert.equal(scheduledCalls.length, 1);
 });
