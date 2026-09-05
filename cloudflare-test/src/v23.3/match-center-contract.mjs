@@ -7,6 +7,7 @@ export const MATCH_CENTER_SECTIONS = Object.freeze([
 ]);
 
 const SECTION_SET = new Set(MATCH_CENTER_SECTIONS);
+const GOAL_KINDS = new Set(['open_play','penalty','own_goal','free_kick','unknown']);
 
 function textOrNull(...values) {
   for (const value of values) {
@@ -26,9 +27,17 @@ function numberOrNull(...values) {
   return null;
 }
 
+function object(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function list(value) {
+  return Array.isArray(value) ? value : [];
+}
+
 function normalizeTeam(input = {}, fallback = {}) {
-  const source = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
-  const legacy = fallback && typeof fallback === 'object' && !Array.isArray(fallback) ? fallback : {};
+  const source = object(input);
+  const legacy = object(fallback);
   return Object.freeze({
     id:textOrNull(source.id, source.teamId, source.team_id, legacy.id, legacy.teamId, legacy.team_id) || '',
     name:textOrNull(source.name, source.teamName, source.team_name, legacy.name, legacy.teamName, legacy.team_name) || '—',
@@ -49,8 +58,47 @@ function normalizeTeam(input = {}, fallback = {}) {
   });
 }
 
+function normalizeGoalKind(value) {
+  const kind = String(value ?? '').trim().toLowerCase();
+  return GOAL_KINDS.has(kind) ? kind : 'unknown';
+}
+
+function normalizeScoreAfter(value = {}) {
+  const source = object(value);
+  const home = numberOrNull(source.home, source.homeScore, source.home_score);
+  const away = numberOrNull(source.away, source.awayScore, source.away_score);
+  if (home === null && away === null) return null;
+  return Object.freeze({ home, away });
+}
+
+function normalizeGoalSummary(value = {}) {
+  const source = object(value);
+  const player = textOrNull(source.player, source.playerName, source.player_name) || '';
+  const minute = numberOrNull(source.minute);
+  const addedTime = numberOrNull(source.addedTime, source.added_time);
+  if (!player && minute === null) return null;
+  return Object.freeze({
+    player,
+    minute,
+    addedTime,
+    kind:normalizeGoalKind(source.kind ?? source.goalKind ?? source.goal_kind),
+    scoreAfter:normalizeScoreAfter(source.scoreAfter ?? source.score_after ?? {
+      home:source.homeScore ?? source.home_score,
+      away:source.awayScore ?? source.away_score,
+    }),
+  });
+}
+
+function normalizeGoalSides(value = {}) {
+  const source = object(value);
+  return Object.freeze({
+    home:Object.freeze(list(source.home).map(normalizeGoalSummary).filter(Boolean)),
+    away:Object.freeze(list(source.away).map(normalizeGoalSummary).filter(Boolean)),
+  });
+}
+
 export function normalizeCanonicalCoverage(value = {}) {
-  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const source = object(value);
   return Object.freeze(Object.fromEntries(
     MATCH_CENTER_SECTIONS.map(section => [section, source[section] === true]),
   ));
@@ -76,10 +124,8 @@ function fallbackTeam(input, side) {
 }
 
 export function normalizeCanonicalBase(input = {}, competition, matchId) {
-  const source = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
-  const score = source.score && typeof source.score === 'object' && !Array.isArray(source.score)
-    ? source.score
-    : {};
+  const source = object(input);
+  const score = object(source.score);
   const canonicalCompetition = textOrNull(competition, source.competition) || '';
   const canonicalMatchId = textOrNull(matchId, source.matchId, source.match_id, source.id) || '';
 
@@ -97,6 +143,7 @@ export function normalizeCanonicalBase(input = {}, competition, matchId) {
     }),
     venue:textOrNull(source.venue?.name, source.venue, source.venueName, source.venue_name),
     referee:textOrNull(source.referee?.name, source.referee, source.refereeName, source.referee_name),
+    goals:normalizeGoalSides(source.goals),
     coverage:normalizeCanonicalCoverage(source.coverage),
     updatedAt:textOrNull(source.updatedAt, source.updated_at),
   });
@@ -105,7 +152,7 @@ export function normalizeCanonicalBase(input = {}, competition, matchId) {
 export function normalizeCanonicalSection(section, input = {}) {
   const key = String(section || '').trim().toLowerCase();
   if (!SECTION_SET.has(key)) throw new Error('invalid_match_center_section');
-  const source = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
+  const source = object(input);
   const hasData = Object.prototype.hasOwnProperty.call(source, 'data');
   const data = hasData ? source.data : null;
   return Object.freeze({
@@ -126,3 +173,5 @@ export function isCanonicalBase(value) {
   if (!value.coverage || typeof value.coverage !== 'object') return false;
   return MATCH_CENTER_SECTIONS.every(section => typeof value.coverage[section] === 'boolean');
 }
+
+export { normalizeGoalSummary, normalizeGoalSides };

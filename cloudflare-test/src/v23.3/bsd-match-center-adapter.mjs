@@ -25,6 +25,10 @@ function finite(value) {
   return Number.isFinite(number) ? number : null;
 }
 
+function text(value) {
+  return String(value ?? '').trim();
+}
+
 function firstObject(...values) {
   return values.map(object).find(Boolean) || null;
 }
@@ -38,6 +42,11 @@ function firstPresent(source, keys) {
     if (hasOwn(source, key)) return source[key];
   }
   return undefined;
+}
+
+function nestedName(value) {
+  const source = object(value);
+  return source ? text(source.name ?? source.short_name ?? source.shortName) : text(value);
 }
 
 function numericStat(source, aliases) {
@@ -94,6 +103,22 @@ function playerStatsSource(event = {}) {
   return firstArraySource(event.player_stats, event.players_stats);
 }
 
+function shotSource(event = {}) {
+  const statsEnvelope = firstObject(event.statistics, event.stats) || {};
+  const overview = object(event.overview_meta) || {};
+  return firstArraySource(
+    event.shots,
+    event.shotmap,
+    event.shot_map,
+    statsEnvelope.shots,
+    statsEnvelope.shotmap,
+    statsEnvelope.shot_map,
+    overview.shots,
+    overview.shotmap,
+    overview.shot_map,
+  );
+}
+
 function normalizeMomentum(value) {
   return list(value).map(point => {
     if (!point || typeof point !== 'object') return null;
@@ -138,6 +163,39 @@ function normalizeShotmap(value) {
       xg:finite(shot.xg),
     });
   }).filter(Boolean);
+}
+
+function normalizeGoalKind(event = {}) {
+  const explicit = text(event.goalKind ?? event.goal_kind ?? event.goal_type).toLowerCase();
+  if (explicit) return explicit;
+  if (event.own_goal === true || event.is_own_goal === true) return 'own_goal';
+  if (event.penalty === true || event.is_penalty === true) return 'penalty';
+  if (event.free_kick === true || event.is_free_kick === true) return 'free_kick';
+  return '';
+}
+
+function shotSide(shot = {}) {
+  const explicit = text(shot.side).toLowerCase();
+  if (explicit === 'home' || explicit === 'away') return explicit;
+  return shot.home === false || shot.is_home === false ? 'away' : 'home';
+}
+
+function normalizeDetailedShot(shot = {}) {
+  const position = firstObject(shot.position, shot.pos) || {};
+  return {
+    side:shotSide(shot),
+    x:shot.x ?? position.x,
+    y:shot.y ?? position.y,
+    minute:shot.minute ?? shot.min,
+    addedTime:shot.addedTime ?? shot.added_time,
+    player:nestedName(shot.player ?? shot.player_name),
+    assist:nestedName(shot.assist ?? shot.assist_name),
+    xg:shot.xg ?? shot.expected_goals,
+    outcome:shot.outcome ?? shot.result ?? shot.type,
+    situation:shot.situation ?? shot.playPattern ?? shot.play_pattern,
+    bodyPart:shot.bodyPart ?? shot.body_part,
+    goalKind:normalizeGoalKind(shot),
+  };
 }
 
 function predictionSplitFromModel(prediction) {
@@ -187,28 +245,38 @@ function overviewInput(event = {}) {
 }
 
 function canonicalEventInput(event = {}) {
+  const goalKind = normalizeGoalKind(event);
+  const cardKind = text(event.cardKind ?? event.card_kind ?? event.card_type).toLowerCase();
+  const varDecision = text(event.varDecision ?? event.var_decision ?? event.var_result).toLowerCase();
   return {
     type:event.type,
     minute:event.minute,
     addedTime:event.addedTime ?? event.added_time,
     side:event.side || (event.is_home === true ? 'home' : event.is_home === false ? 'away' : ''),
-    player:event.player || event.player_name,
-    assist:event.assist || event.assist_name,
+    player:nestedName(event.player ?? event.player_name),
+    assist:nestedName(event.assist ?? event.assist_name),
     reason:event.reason,
-    playerIn:event.playerIn ?? event.player_in,
-    playerOut:event.playerOut ?? event.player_out,
+    playerIn:nestedName(event.playerIn ?? event.player_in),
+    playerOut:nestedName(event.playerOut ?? event.player_out),
     homeScore:event.homeScore ?? event.home_score,
     awayScore:event.awayScore ?? event.away_score,
     text:event.text,
+    ...(goalKind ? { goalKind } : {}),
+    ...(cardKind ? { cardKind } : {}),
+    ...(varDecision ? { varDecision } : {}),
   };
 }
 
 function lineupPlayerInput(player = {}) {
   return {
     playerId:player.playerId ?? player.player_id ?? player.id,
-    name:player.name || player.short_name || player.shortName,
+    name:nestedName(player.name || player.short_name || player.shortName),
     position:player.position || player.pos,
     shirtNumber:player.shirtNumber ?? player.shirt_number ?? player.number,
+    x:player.x ?? player.position_x ?? player.coordinates?.x,
+    y:player.y ?? player.position_y ?? player.coordinates?.y,
+    grid:player.grid ?? player.grid_position ?? player.formation_position,
+    starter:typeof player.starter === 'boolean' ? player.starter : undefined,
   };
 }
 
@@ -217,6 +285,7 @@ function lineupSideInput(side = {}) {
     formation:side.formation,
     starters:list(side.starters || side.players).map(lineupPlayerInput),
     substitutes:list(side.substitutes || side.bench).map(lineupPlayerInput),
+    coach:nestedName(side.coach ?? side.coach_name),
   };
 }
 
@@ -260,9 +329,10 @@ export function extractBsdCoverage(event = {}) {
     || hasOwn(event, 'shot_map')
     || hasOwn(overviewMeta, 'shotmap')
     || hasOwn(overviewMeta, 'shot_map');
+  const shots = shotSource(event);
   return canonicalCoverage({
     overview:hasOverview(event),
-    stats:Boolean(statsSource(event)),
+    stats:Boolean(statsSource(event) || shots !== undefined),
     events:incidentsSource(event) !== undefined,
     lineups:Boolean(lineupsSource(event)),
     players:playerStatsSource(event) !== undefined,
@@ -274,6 +344,7 @@ export function extractBsdCoverage(event = {}) {
 export function adaptBsdMatchCenterSections(event = {}) {
   const coverage = extractBsdCoverage(event);
   const rawStats = statsSource(event);
+  const rawShots = shotSource(event);
   const rawEvents = incidentsSource(event);
   const rawLineups = lineupsSource(event);
   const rawPlayers = playerStatsSource(event);
@@ -283,6 +354,7 @@ export function adaptBsdMatchCenterSections(event = {}) {
     stats:coverage.stats ? canonicalStatsSection({
       home:canonicalStatInput(rawStats?.home),
       away:canonicalStatInput(rawStats?.away),
+      shots:list(rawShots).map(normalizeDetailedShot),
     }) : null,
     events:coverage.events ? canonicalEventsSection(list(rawEvents).map(canonicalEventInput)) : null,
     lineups:coverage.lineups ? canonicalLineupsSection({

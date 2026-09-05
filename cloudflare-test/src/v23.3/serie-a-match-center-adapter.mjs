@@ -101,11 +101,38 @@ function hasOverview(source) {
   );
 }
 
+function eventClockValue(event = {}) {
+  const minute = finite(event.minute) ?? -1;
+  const addedTime = finite(event.addedTime ?? event.added_time) ?? 0;
+  return minute * 100 + addedTime;
+}
+
+function goalSummariesFromEvents(events = []) {
+  const goals = { home:[], away:[] };
+  for (const event of [...events].sort((a, b) => eventClockValue(a) - eventClockValue(b))) {
+    if (text(event?.type).toLowerCase() !== 'goal') continue;
+    const side = event?.side === 'away' ? 'away' : event?.side === 'home' ? 'home' : null;
+    if (!side) continue;
+    const home = finite(event?.homeScore);
+    const away = finite(event?.awayScore);
+    goals[side].push({
+      player:text(event?.player),
+      minute:finite(event?.minute),
+      addedTime:finite(event?.addedTime),
+      kind:text(event?.goalKind).toLowerCase() || 'unknown',
+      scoreAfter:home === null && away === null ? null : { home, away },
+    });
+  }
+  return goals;
+}
+
 export function adaptSerieALegacyMatchCenter(raw = {}) {
   const source = object(raw) || {};
   const match = canonicalLegacyMatch(source.match);
   const overviewRaw = object(source.overview_meta ?? source.overviewMeta);
-  const statsRaw = object(source.stats?.stats ?? source.stats);
+  const statsEnvelope = object(source.stats) || {};
+  const statsRaw = object(statsEnvelope.stats ?? source.stats);
+  const shotsRaw = array(statsEnvelope.shots ?? source.shots ?? source.shotmap ?? source.shot_map);
   const eventsRaw = array(source.incidents?.incidents ?? source.incidents);
   const lineupsRaw = object(source.lineups?.lineups ?? source.lineups);
   const playersRaw = array(source.player_stats?.player_stats ?? source.playerStats ?? source.player_stats);
@@ -113,7 +140,7 @@ export function adaptSerieALegacyMatchCenter(raw = {}) {
 
   const coverage = canonicalCoverage({
     overview:hasOverview(overviewRaw),
-    stats:statsRaw !== null,
+    stats:statsRaw !== null || shotsRaw !== null,
     events:eventsRaw !== null,
     lineups:lineupsRaw !== null,
     players:playersRaw !== null,
@@ -122,11 +149,17 @@ export function adaptSerieALegacyMatchCenter(raw = {}) {
   });
 
   const overview = canonicalOverviewSection(normalizeOverview(overviewRaw));
-  const stats = canonicalStatsSection(statsRaw || {});
+  const stats = canonicalStatsSection({
+    ...(statsRaw || {}),
+    shots:shotsRaw || [],
+  });
   const events = canonicalEventsSection(eventsRaw || []);
   const lineups = canonicalLineupsSection(lineupsRaw || {});
   const players = canonicalPlayersSection(normalizePlayers(playersRaw || []));
-  const base = canonicalMatchCenterBase(match, coverage);
+  const base = canonicalMatchCenterBase({
+    ...match,
+    goals:goalSummariesFromEvents(events),
+  }, coverage);
   const capabilities = Object.freeze({
     navigation:capabilitiesRaw.navigation === true,
     live:capabilitiesRaw.live === true,
@@ -143,3 +176,5 @@ export function adaptSerieALegacyMatchCenter(raw = {}) {
     capabilities,
   });
 }
+
+export { goalSummariesFromEvents };

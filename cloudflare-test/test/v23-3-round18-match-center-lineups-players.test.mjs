@@ -57,7 +57,7 @@ function lineups() {
   };
 }
 
-test('Round 18 lineups renderer keeps all starters and substitutes in compact Serie A lists', () => {
+test('Round 18 lineups renderer keeps all players and now includes premium pitch view', () => {
   const html = renderMatchCenterLineups(lineups(), { match:match() });
 
   assert.match(html, /data-cw233-mc-lineups/);
@@ -67,7 +67,8 @@ test('Round 18 lineups renderer keeps all starters and substitutes in compact Se
   assert.match(html, />4-3-3</);
   assert.match(html, /cw233-mc-lineup-list/);
   assert.match(html, /data-cw233-mc-lineup-player/);
-  assert.doesNotMatch(html, /data-cw233-mc-pitch/);
+  assert.match(html, /data-cw233-mc-lineup-pitch/);
+  assert.match(html, /data-cw233-mc-lineup-switch/);
   for (const name of ['Sommer', 'Pavard', 'Barella', 'Lautaro', 'Raya', 'Saliba', 'Odegaard', 'Saka']) {
     assert.match(html, new RegExp(name));
   }
@@ -93,13 +94,14 @@ test('Round 18 lineups renderer keeps starters even when formation is unavailabl
   }, { match:match() });
 
   assert.match(html, /cw233-mc-lineup-list/);
+  assert.match(html, /Схема недоступна/);
   for (const name of ['Keeper', 'Defender', 'Midfielder', 'Forward']) {
     assert.match(html, new RegExp(name));
   }
   assert.match(html, /Нет данных/);
 });
 
-test('Round 18 players renderer keeps Serie A rating rows and legacy compact performance metrics', () => {
+test('Round 18 players renderer keeps canonical rating hooks and adds premium performance cards', () => {
   const html = renderMatchCenterPlayers([
     {
       playerId:10,
@@ -132,18 +134,18 @@ test('Round 18 players renderer keeps Serie A rating rows and legacy compact per
   assert.match(html, /data-cw233-mc-players/);
   assert.match(html, /data-cw233-mc-player="10"/);
   assert.match(html, /data-cw233-mc-player="27"/);
+  assert.match(html, /cw233-mc-player-card/);
+  assert.match(html, /data-cw233-mc-player-rank="1"/);
   assert.match(html, /cw233-mc-rating-row/);
   assert.match(html, /cw233-mc-rating-name/);
   assert.match(html, /cw233-mc-rating-meta/);
   assert.match(html, /cw233-mc-rating/);
+  assert.match(html, /Интер/);
   assert.match(html, />8\.4</);
   assert.match(html, />7\.2</);
-  for (const label of ['90 мин', '1 гол', '1 ассист', 'xG 0.82', 'xA 0.34']) {
-    assert.match(html, new RegExp(label.replace('.', '\\.')));
+  for (const label of ['90 мин', '1 гол', '1 ассист', 'xG 0.82', 'xA 0.34', '4 удара', '3 ключ. передачи']) {
+    assert.match(html, new RegExp(label.replaceAll('.', '\\.')));
   }
-  assert.doesNotMatch(html, /4 удара/);
-  assert.doesNotMatch(html, /3 ключ\. передачи/);
-  assert.doesNotMatch(html, /cw233-mc-player-card/);
 });
 
 test('Round 18 players renderer shows stable unavailable state instead of fabricating ratings', () => {

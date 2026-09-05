@@ -95,20 +95,20 @@ test('Round 18 stats follow Serie A compact primary and extended groups and omit
   assert.doesNotMatch(html, /data-cw233-mc-stat="interceptions"/);
 });
 
-test('Round 18 events follow Serie A latest-first compact chronology', () => {
+test('Round 18 events follow premium chronological top-to-bottom order', () => {
   const html = renderMatchCenterEvents([
     { type:'goal', minute:12, side:'home', player:'Первый', homeScore:1, awayScore:0 },
     { type:'yellow_card', minute:44, side:'away', player:'Второй' },
     { type:'goal', minute:70, side:'home', player:'Последний', homeScore:2, awayScore:0 },
   ], { match:match() });
 
-  assert.ok(html.indexOf('70′') < html.indexOf('44′'));
-  assert.ok(html.indexOf('44′') < html.indexOf('12′'));
+  assert.ok(html.indexOf('12′') < html.indexOf('44′'));
+  assert.ok(html.indexOf('44′') < html.indexOf('70′'));
   assert.match(html, /cw233-mc-event-minute/);
   assert.match(html, /cw233-mc-event-text/);
 });
 
-test('Round 18 lineups use the same compact team lists as Serie A instead of a pitch diagram', () => {
+test('Round 18 lineups keep authoritative lists alongside the premium pitch diagram', () => {
   const html = renderMatchCenterLineups({
     home:{ formation:'3-5-2', starters:[{ name:'Sommer', shirtNumber:1 }, { name:'Lautaro', shirtNumber:10 }], substitutes:[{ name:'Frattesi', shirtNumber:16 }] },
     away:{ formation:'4-3-3', starters:[{ name:'Raya', shirtNumber:22 }, { name:'Saka', shirtNumber:7 }], substitutes:[{ name:'Trossard', shirtNumber:19 }] },
@@ -119,24 +119,26 @@ test('Round 18 lineups use the same compact team lists as Serie A instead of a p
   assert.match(html, /Запасные/);
   assert.match(html, /Sommer/);
   assert.match(html, /Saka/);
-  assert.doesNotMatch(html, /data-cw233-mc-pitch/);
-  assert.doesNotMatch(html, /cw233-mc-pitch-row/);
+  assert.match(html, /data-cw233-mc-pitch/);
+  assert.match(html, /cw233-mc-pitch-player/);
 });
 
-test('Round 18 players use compact Serie A rating rows and legacy metric set', () => {
+test('Round 18 players preserve canonical hooks inside premium cards and expose the full provider metric set', () => {
   const html = renderMatchCenterPlayers([
     { playerId:10, name:'Lautaro', teamName:'Интер', rating:8.4, minutes:90, goals:1, assists:1, xg:0.82, xa:0.34, shots:4, keyPasses:3 },
     { playerId:27, name:'Rice', teamName:'Арсенал', rating:7.2, minutes:90, shots:1, keyPasses:2 },
   ], { match:match() });
 
+  assert.match(html, /cw233-mc-player-card/);
+  assert.match(html, /data-cw233-mc-player-rank="1"/);
   assert.match(html, /cw233-mc-rating-row/);
   assert.match(html, /cw233-mc-rating-name/);
   assert.match(html, /cw233-mc-rating-meta/);
   assert.match(html, /cw233-mc-rating/);
-  assert.doesNotMatch(html, /cw233-mc-player-card/);
+  assert.match(html, /Интер/);
   assert.match(html, /90 мин/);
   assert.match(html, /xG 0\.82/);
   assert.match(html, /xA 0\.34/);
-  assert.doesNotMatch(html, /4 удара/);
-  assert.doesNotMatch(html, /ключ\. перед/);
+  assert.match(html, /4 удара/);
+  assert.match(html, /3 ключ\. передачи/);
 });

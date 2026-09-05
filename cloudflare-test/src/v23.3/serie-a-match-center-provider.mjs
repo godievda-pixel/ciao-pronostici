@@ -136,6 +136,21 @@ function richEnoughBase(adapted) {
   return Boolean(home && away && home !== '—' && away !== '—');
 }
 
+function scorerCount(adapted) {
+  const home = Array.isArray(adapted?.base?.goals?.home) ? adapted.base.goals.home.length : 0;
+  const away = Array.isArray(adapted?.base?.goals?.away) ? adapted.base.goals.away.length : 0;
+  return home + away;
+}
+
+function needsHeroGoalEnrichment(adapted) {
+  const status = String(adapted?.base?.status || '').trim().toLowerCase();
+  if (status !== 'live' && status !== 'finished') return false;
+  const homeScore = Number(adapted?.base?.homeScore);
+  const awayScore = Number(adapted?.base?.awayScore);
+  const scored = (Number.isFinite(homeScore) ? homeScore : 0) + (Number.isFinite(awayScore) ? awayScore : 0);
+  return scored > 0 && scorerCount(adapted) < scored;
+}
+
 function canonicalBaseFromAdapted(adapted) {
   return {
     ...adapted.base,
@@ -172,7 +187,8 @@ export async function loadSerieAMatchCenterBase({ request, env, initData, matchI
     path:SERIE_A_MATCH_SUMMARY_PATH,
     body:{ match_id:id },
   });
-  let adapted = adaptLegacy(summaryRaw);
+  let mergedRaw = summaryRaw;
+  let adapted = adaptLegacy(mergedRaw);
   if (!richEnoughBase(adapted)) {
     const fullRaw = await postStable({
       request,
@@ -181,9 +197,23 @@ export async function loadSerieAMatchCenterBase({ request, env, initData, matchI
       path:SERIE_A_MATCH_CENTER_PATH,
       body:{ match_id:id, sections:[], include_split:false },
     });
-    adapted = adaptLegacy(mergeSerieALegacyPayload(summaryRaw, fullRaw));
+    mergedRaw = mergeSerieALegacyPayload(mergedRaw, fullRaw);
+    adapted = adaptLegacy(mergedRaw);
   }
   if (!richEnoughBase(adapted)) throw providerError('match_not_found', 404);
+
+  if (needsHeroGoalEnrichment(adapted)) {
+    const incidentRaw = await postStable({
+      request,
+      env,
+      initData,
+      path:SERIE_A_MATCH_CENTER_PATH,
+      body:{ match_id:id, sections:['incidents'], include_split:false },
+    });
+    mergedRaw = mergeSerieALegacyPayload(mergedRaw, incidentRaw);
+    adapted = adaptLegacy(mergedRaw);
+  }
+
   return { match:canonicalBaseFromAdapted(adapted) };
 }
 
@@ -227,3 +257,5 @@ export async function loadSerieAMatchCenterSection({ request, env, initData, mat
     }),
   };
 }
+
+export { needsHeroGoalEnrichment };
