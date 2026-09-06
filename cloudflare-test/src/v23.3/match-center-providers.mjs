@@ -5,7 +5,10 @@ import {
 } from './match-center-contract.mjs';
 import { createPredictionService } from './prediction-service.mjs';
 import {
+  applyRound512RecoveredBase,
+  recoverRound512SerieABase,
   recoverRound512SerieASection,
+  round512NeedsCanonicalBaseRecovery,
   round512NeedsCanonicalSectionRecovery,
 } from './round51-2-serie-a-provider-recovery.mjs';
 
@@ -109,7 +112,15 @@ export function createMatchCenterProviders({
       ? requireLoader(loadSerieABase, 'serie_a_provider_unavailable')
       : requireLoader(loadExternalBase, 'external_provider_unavailable');
     const payload = await loader({ ...context, ...target });
-    return normalizeCanonicalBase(unwrapMatch(payload), target.competition, target.matchId);
+    let normalized = normalizeCanonicalBase(unwrapMatch(payload), target.competition, target.matchId);
+
+    if (target.competition === 'serie_a' && round512NeedsCanonicalBaseRecovery(normalized)) {
+      try {
+        const recovered = await recoverRound512SerieABase({ ...context, ...target });
+        if (recovered) normalized = applyRound512RecoveredBase(normalized, recovered);
+      } catch {}
+    }
+    return normalized;
   }
 
   async function loadSection({ competition, matchId, section, ...context } = {}) {
