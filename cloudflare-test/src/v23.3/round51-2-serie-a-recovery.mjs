@@ -10,15 +10,53 @@ function text(value) {
   return String(value ?? '').trim();
 }
 
-function normalizeShot(shot) {
+function normalizePlayerStatsEnvelope(value) {
+  if (Array.isArray(value)) return { player_stats:value };
+  const source = object(value);
+  if (!source) return value;
+  if (Array.isArray(source.player_stats)) return source;
+  const combined = [
+    ...list(source.players),
+    ...list(source.home),
+    ...list(source.away),
+    ...list(source.home_players),
+    ...list(source.away_players),
+  ];
+  return combined.length ? { ...source, player_stats:combined } : source;
+}
+
+function rawPlayerNameIndex(playerStats) {
+  const envelope = object(playerStats);
+  const rows = envelope ? list(envelope.player_stats) : list(playerStats);
+  const byId = new Map();
+  for (const player of rows) {
+    const id = text(player?.playerId ?? player?.player_id ?? player?.id ?? player?.pid);
+    const name = text(player?.name ?? player?.short_name ?? player?.shortName ?? player?.player_name ?? player?.playerName);
+    if (id && name && !byId.has(id)) byId.set(id, name);
+  }
+  return byId;
+}
+
+function normalizeShot(shot, namesById = new Map()) {
   const source = object(shot);
   if (!source) return shot;
-  const directPlayer = source.player ?? source.player_name ?? source.playerName;
-  const aliasPlayer = source.short_name ?? source.shortName ?? source.name ?? source.shooter_name ?? source.shooterName ?? source.shooter;
+  const playerObject = object(source.player);
+  const directName = text(
+    playerObject?.name
+    ?? playerObject?.full_name
+    ?? playerObject?.fullName
+    ?? playerObject?.short_name
+    ?? playerObject?.shortName
+    ?? source.player_name
+    ?? source.playerName,
+  );
+  const aliasName = text(source.short_name ?? source.shortName ?? source.name ?? source.shooter_name ?? source.shooterName);
   const playerId = source.player_id ?? source.playerId ?? source.pid ?? source.player?.id ?? source.shooter?.id;
+  const recoveredName = directName || aliasName || namesById.get(text(playerId)) || '';
   return {
     ...source,
-    ...(directPlayer === undefined && aliasPlayer !== undefined ? { player_name:aliasPlayer } : {}),
+    ...(playerObject && !directName && recoveredName ? { player:{ ...playerObject, name:recoveredName } } : {}),
+    ...(!playerObject && source.player === undefined && source.player_name === undefined && recoveredName ? { player_name:recoveredName } : {}),
     ...(source.player_id === undefined && playerId !== undefined ? { player_id:playerId } : {}),
   };
 }
@@ -36,27 +74,12 @@ function normalizeIncident(event) {
   };
 }
 
-function normalizePlayerStatsEnvelope(value) {
-  if (Array.isArray(value)) return { player_stats:value };
-  const source = object(value);
-  if (!source) return value;
-  if (Array.isArray(source.player_stats)) return source;
-  const combined = [
-    ...list(source.players),
-    ...list(source.home),
-    ...list(source.away),
-    ...list(source.home_players),
-    ...list(source.away_players),
-  ];
-  return combined.length ? { ...source, player_stats:combined } : source;
-}
-
-function normalizeShotContainer(container) {
+function normalizeShotContainer(container, namesById) {
   const source = object(container);
   if (!source) return container;
   const key = ['shotmap','shot_map','shots'].find(name => Array.isArray(source[name]));
   if (!key) return source;
-  return { ...source, [key]:source[key].map(normalizeShot) };
+  return { ...source, [key]:source[key].map(shot => normalizeShot(shot, namesById)) };
 }
 
 function rawShotSource(raw) {
@@ -79,7 +102,13 @@ function rawShotSource(raw) {
 export function normalizeRound512SerieARaw(raw) {
   const source = object(raw);
   if (!source) return raw;
-  const stats = normalizeShotContainer(source.stats);
+  const playerStats = source.player_stats !== undefined
+    ? normalizePlayerStatsEnvelope(source.player_stats)
+    : source.player_stats;
+  const namesById = rawPlayerNameIndex(playerStats);
+  const stats = normalizeShotContainer(source.stats, namesById);
+  const overviewKey = source.overview_meta !== undefined ? 'overview_meta' : source.overviewMeta !== undefined ? 'overviewMeta' : '';
+  const overview = overviewKey ? normalizeShotContainer(source[overviewKey], namesById) : null;
   const topShotKey = ['shotmap','shot_map','shots'].find(name => Array.isArray(source[name]));
   const incidentsEnvelope = object(source.incidents);
   const incidents = incidentsEnvelope && Array.isArray(incidentsEnvelope.incidents)
@@ -90,9 +119,10 @@ export function normalizeRound512SerieARaw(raw) {
   return {
     ...source,
     ...(stats ? { stats } : {}),
-    ...(topShotKey ? { [topShotKey]:source[topShotKey].map(normalizeShot) } : {}),
+    ...(overviewKey && overview ? { [overviewKey]:overview } : {}),
+    ...(topShotKey ? { [topShotKey]:source[topShotKey].map(shot => normalizeShot(shot, namesById)) } : {}),
     ...(source.incidents !== undefined ? { incidents } : {}),
-    ...(source.player_stats !== undefined ? { player_stats:normalizePlayerStatsEnvelope(source.player_stats) } : {}),
+    ...(source.player_stats !== undefined ? { player_stats:playerStats } : {}),
   };
 }
 
@@ -154,10 +184,13 @@ export function round512NeedsSectionRecovery(adapted, section) {
   }
   if (section === 'players') {
     const players = list(adapted?.players);
-    return players.length === 0 || !players.some(player => Number.isFinite(Number(player?.rating)));
+    return players.length === 0 || !players.some(player => {
+      if (player?.rating === null || player?.rating === undefined || player?.rating === '') return false;
+      return Number.isFinite(Number(player.rating));
+    });
   }
   if (section === 'stats') {
-    return list(adapted?.stats?.shots).some(shot => !text(shot?.player) && text(shot?.playerId));
+    return list(adapted?.stats?.shots).some(shot => !text(shot?.player));
   }
   return false;
 }
