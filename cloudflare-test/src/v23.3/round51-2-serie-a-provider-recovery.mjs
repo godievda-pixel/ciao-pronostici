@@ -1,0 +1,180 @@
+import {
+  SERIE_A_MATCH_CENTER_PATH,
+  unwrapSerieAMatchCenterPayload,
+} from './serie-a-match-center-provider.mjs';
+import { normalizeSerieALegacyMatchCenter } from './serie-a-match-center-legacy-normalizer.mjs';
+import { adaptSerieALegacyMatchCenter } from './serie-a-match-center-adapter.mjs';
+import { normalizeRound512SerieARaw } from './round51-2-serie-a-recovery.mjs';
+
+function text(value) {
+  return String(value ?? '').trim();
+}
+
+function list(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function finiteRating(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const rating = Number(value);
+  return Number.isFinite(rating) ? rating : null;
+}
+
+function numericMatchId(matchId) {
+  const value = Number(text(matchId).replace(/^serie_a:/, ''));
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function ratingIndex(players) {
+  const byId = new Map();
+  const byName = new Map();
+  for (const player of list(players)) {
+    const rating = finiteRating(player?.rating);
+    if (rating === null) continue;
+    const id = text(player?.playerId ?? player?.player_id ?? player?.id);
+    const name = text(player?.name ?? player?.shortName ?? player?.short_name).toLocaleLowerCase('ru-RU');
+    if (id) byId.set(id, rating);
+    if (name) byName.set(name, rating);
+  }
+  return { byId, byName };
+}
+
+function enrichPlayer(player, index) {
+  if (finiteRating(player?.rating) !== null) return player;
+  const id = text(player?.playerId ?? player?.player_id ?? player?.id);
+  const name = text(player?.name ?? player?.shortName ?? player?.short_name).toLocaleLowerCase('ru-RU');
+  const rating = (id && index.byId.get(id)) ?? (name && index.byName.get(name));
+  return finiteRating(rating) !== null ? Object.freeze({ ...player, rating:finiteRating(rating) }) : player;
+}
+
+function enrichLineups(lineups, players) {
+  const index = ratingIndex(players);
+  const side = value => Object.freeze({
+    ...(value || {}),
+    starters:Object.freeze(list(value?.starters).map(player => enrichPlayer(player, index))),
+    substitutes:Object.freeze(list(value?.substitutes).map(player => enrichPlayer(player, index))),
+  });
+  return Object.freeze({
+    home:side(lineups?.home),
+    away:side(lineups?.away),
+  });
+}
+
+function goals(match) {
+  return [...list(match?.goals?.home), ...list(match?.goals?.away)];
+}
+
+function scoredGoals(match) {
+  const home = Number(match?.score?.home ?? match?.homeScore ?? match?.home_score);
+  const away = Number(match?.score?.away ?? match?.awayScore ?? match?.away_score);
+  return (Number.isFinite(home) ? home : 0) + (Number.isFinite(away) ? away : 0);
+}
+
+function goalQuality(match) {
+  const rows = goals(match);
+  return {
+    total:rows.length,
+    named:rows.filter(goal => text(goal?.player)).length,
+  };
+}
+
+export function round512NeedsCanonicalBaseRecovery(match) {
+  const status = text(match?.status).toLowerCase();
+  if (status !== 'live' && status !== 'finished') return false;
+  const rows = goals(match);
+  return rows.some(goal => !text(goal?.player)) || scoredGoals(match) > rows.length;
+}
+
+export function applyRound512RecoveredBase(current, recovered) {
+  if (!current || !recovered) return current;
+  const before = goalQuality(current);
+  const after = goalQuality(recovered);
+  const improves = after.total > before.total
+    || (after.total >= before.total && after.named > before.named);
+  return improves ? Object.freeze({ ...current, goals:recovered.goals }) : current;
+}
+
+export function round512NeedsCanonicalSectionRecovery(sectionPayload, section) {
+  if (section === 'lineups') {
+    const homeStarters = list(sectionPayload?.data?.home?.starters).length;
+    const awayStarters = list(sectionPayload?.data?.away?.starters).length;
+    const substitutes = list(sectionPayload?.data?.home?.substitutes).length
+      + list(sectionPayload?.data?.away?.substitutes).length;
+    return homeStarters === 11 && awayStarters === 11 && substitutes === 0;
+  }
+  if (section === 'stats') {
+    return list(sectionPayload?.data?.shots).some(shot => !text(shot?.player));
+  }
+  return false;
+}
+
+async function postRecovery({ request, env, initData, matchId, sections }) {
+  if (!env?.CIAO_WEB_API?.fetch || !request?.url) return null;
+  const id = numericMatchId(matchId);
+  if (!id) return null;
+  const upstream = await env.CIAO_WEB_API.fetch(new Request(new URL(SERIE_A_MATCH_CENTER_PATH, request.url), {
+    method:'POST',
+    headers:{
+      'content-type':'application/json',
+      'x-telegram-init-data':text(initData),
+    },
+    body:JSON.stringify({ match_id:id, sections, include_split:false }),
+  }));
+  if (!upstream.ok) return null;
+  let payload;
+  try {
+    payload = await upstream.json();
+  } catch {
+    return null;
+  }
+  return payload?.ok === false ? null : unwrapSerieAMatchCenterPayload(payload);
+}
+
+export async function recoverRound512SerieABase({ request, env, initData, matchId } = {}) {
+  const recoveredRaw = await postRecovery({
+    request,
+    env,
+    initData,
+    matchId,
+    sections:['incidents','player_stats'],
+  });
+  if (!recoveredRaw) return null;
+  const raw = normalizeRound512SerieARaw(recoveredRaw);
+  const adapted = adaptSerieALegacyMatchCenter(normalizeSerieALegacyMatchCenter(raw));
+  return goals(adapted?.base).length ? adapted.base : null;
+}
+
+function recoverySections(section) {
+  if (section === 'lineups') return ['lineups','player_stats'];
+  if (section === 'stats') return ['stats','overview_meta','player_stats'];
+  return null;
+}
+
+export async function recoverRound512SerieASection({ request, env, initData, matchId, section } = {}) {
+  const sections = recoverySections(section);
+  if (!sections) return null;
+  const recoveredRaw = await postRecovery({ request, env, initData, matchId, sections });
+  if (!recoveredRaw) return null;
+
+  const raw = normalizeRound512SerieARaw(recoveredRaw);
+  const adapted = adaptSerieALegacyMatchCenter(normalizeSerieALegacyMatchCenter(raw));
+
+  if (section === 'lineups') {
+    const substitutes = list(adapted?.lineups?.home?.substitutes).length
+      + list(adapted?.lineups?.away?.substitutes).length;
+    if (!substitutes) return null;
+    return Object.freeze({
+      available:true,
+      coverage:adapted.coverage,
+      data:enrichLineups(adapted.lineups, adapted.players),
+    });
+  }
+
+  const shots = list(adapted?.stats?.shots);
+  if (!shots.length || !shots.some(shot => text(shot?.player))) return null;
+  return Object.freeze({
+    available:true,
+    coverage:adapted.coverage,
+    data:adapted.stats,
+  });
+}

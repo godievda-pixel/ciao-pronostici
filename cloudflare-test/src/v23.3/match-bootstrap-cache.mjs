@@ -11,12 +11,23 @@ function keyFor(competition, matchId) {
   return competitionKey && id ? `${competitionKey}|${id}` : '';
 }
 
-function canonicalBootstrap(match = {}) {
+function mergeTeam(previous, incoming) {
+  const oldTeam = previous && typeof previous === 'object' ? previous : null;
+  const newTeam = incoming && typeof incoming === 'object' ? incoming : null;
+  if (!oldTeam) return newTeam;
+  if (!newTeam) return oldTeam;
+  const merged = { ...oldTeam, ...newTeam };
+  if (!text(newTeam.name) && text(oldTeam.name)) merged.name = oldTeam.name;
+  if (!text(newTeam.crestUrl) && text(oldTeam.crestUrl)) merged.crestUrl = oldTeam.crestUrl;
+  return merged;
+}
+
+function canonicalBootstrap(match = {}, previous = null) {
   return Object.freeze({
     competition:text(match?.competition),
     matchId:text(match?.matchId),
-    homeTeam:match?.homeTeam || null,
-    awayTeam:match?.awayTeam || null,
+    homeTeam:mergeTeam(previous?.homeTeam, match?.homeTeam) || null,
+    awayTeam:mergeTeam(previous?.awayTeam, match?.awayTeam) || null,
     kickoffAt:text(match?.kickoffAt),
     status:text(match?.status),
     minute:match?.minute ?? null,
@@ -32,8 +43,9 @@ function canonicalBootstrap(match = {}) {
 export function rememberMatchBootstrap(match = {}) {
   const key = keyFor(match?.competition, match?.matchId);
   if (!key) return;
-  if (BOOTSTRAPS.has(key)) BOOTSTRAPS.delete(key);
-  BOOTSTRAPS.set(key, canonicalBootstrap(match));
+  const previous = BOOTSTRAPS.get(key) || null;
+  if (previous) BOOTSTRAPS.delete(key);
+  BOOTSTRAPS.set(key, canonicalBootstrap(match, previous));
   while (BOOTSTRAPS.size > MAX_BOOTSTRAPS) {
     const oldest = BOOTSTRAPS.keys().next().value;
     if (!oldest) break;
