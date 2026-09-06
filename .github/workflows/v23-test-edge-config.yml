@@ -20,7 +20,25 @@ jobs:
       PROJECT_REF: lcnwccnkkxaosxnfvjvr
       CHECK_URL: https://lcnwccnkkxaosxnfvjvr.supabase.co/functions/v1/ciao-v23-env-check
     steps:
-      - name: Confirm management token is configured
+      - name: Read TEST Edge config presence
+        id: presence
+        shell: bash
+        run: |
+          node - <<'NODE'
+          import {appendFile} from 'node:fs/promises';
+          const response = await fetch(process.env.CHECK_URL, {headers:{'cache-control':'no-cache'}});
+          if (!response.ok) throw new Error(`env_check_http_${response.status}`);
+          const payload = await response.json();
+          const configured = payload.environment_configured === true && payload.origins_configured === true;
+          console.log(JSON.stringify({
+            environment_configured: payload.environment_configured === true,
+            origins_configured: payload.origins_configured === true,
+          }));
+          await appendFile(process.env.GITHUB_OUTPUT, `configured=${configured}\n`);
+          NODE
+
+      - name: Confirm management token is configured when needed
+        if: steps.presence.outputs.configured != 'true'
         shell: bash
         run: |
           if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
@@ -29,7 +47,8 @@ jobs:
           fi
           echo "supabase_access_token_configured=true"
 
-      - name: Set TEST-only v23 runtime config
+      - name: Set TEST-only v23 runtime config when needed
+        if: steps.presence.outputs.configured != 'true'
         run: >-
           npx --yes supabase@latest secrets set
           CIAO_ENVIRONMENT=test
@@ -40,15 +59,12 @@ jobs:
         shell: bash
         run: |
           node - <<'NODE'
-          const url = process.env.CHECK_URL;
-          const response = await fetch(url, {headers:{'cache-control':'no-cache'}});
+          const response = await fetch(process.env.CHECK_URL, {headers:{'cache-control':'no-cache'}});
           if (!response.ok) throw new Error(`env_check_http_${response.status}`);
           const payload = await response.json();
           console.log(JSON.stringify({
             environment_configured: payload.environment_configured === true,
             origins_configured: payload.origins_configured === true,
           }));
-          if (payload.environment_configured !== true || payload.origins_configured !== true) {
-            process.exitCode = 3;
-          }
+          if (payload.environment_configured !== true || payload.origins_configured !== true) process.exitCode = 3;
           NODE
