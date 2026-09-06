@@ -5,7 +5,8 @@
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "build": "node scripts/build.mjs",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "probe:api": "node scripts/probe-current-api.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.37.0"
