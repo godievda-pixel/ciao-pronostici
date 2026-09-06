@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CURRENT_API, resolveTelegramInitData, normalizeApiError } from '../src/modular/data/api-contract.mjs';
 
-test('API contract names the current production services and supported competitions', () => {
-  assert.equal(typeof CURRENT_API.core, 'string');
-  assert.match(CURRENT_API.core, /ciao-core-api-fast-v6$/);
+test('API contract names the isolated v23 TEST service and supported competitions', () => {
+  assert.equal(CURRENT_API.origin, 'https://lcnwccnkkxaosxnfvjvr.supabase.co');
+  assert.match(CURRENT_API.core, /ciao-v23-api$/);
   assert.equal(CURRENT_API.capabilities.serieA, true);
   assert.equal(CURRENT_API.capabilities.predictions, true);
   assert.equal(CURRENT_API.capabilities.rankings, true);
@@ -21,9 +21,5 @@ test('API contract resolves Telegram init data without inventing auth', () => {
 
 test('API errors normalize without leaking response bodies', () => {
   const error = Object.assign(new Error('provider unavailable'), { status:503, code:'provider_unavailable' });
-  assert.deepEqual(normalizeApiError(error), {
-    code:'provider_unavailable',
-    status:503,
-    message:'provider unavailable',
-  });
+  assert.deepEqual(normalizeApiError(error), { code:'provider_unavailable', status:503, message:'provider unavailable' });
 });
