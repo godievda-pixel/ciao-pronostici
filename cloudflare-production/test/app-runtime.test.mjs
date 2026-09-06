@@ -39,8 +39,9 @@ function appHarness() {
     hideHomeCompanion(){ return true; },
   };
   const adapterFactory = options => { navigateFromLegacy = options.onNavigate; return adapter; };
+  const history = historyHarness();
   const windowRef = {
-    history:historyHarness(), scrollY:0,
+    history, scrollY:0,
     addEventListener(type, listener){ windowListeners.push({ type, listener }); },
     removeEventListener(type, listener){ const i=windowListeners.findIndex(x=>x.type===type&&x.listener===listener); if(i>=0)windowListeners.splice(i,1); },
     scrollTo(){}, requestAnimationFrame(fn){ fn(); },
@@ -72,7 +73,7 @@ function appHarness() {
   return {
     app, shown, homeShown, renderedRoutes, rootListeners, windowListeners, liveStarts,
     navigate:screen=>navigateFromLegacy(screen), hidden:()=>hidden,
-    liveFactoryCalls:()=>liveFactoryCalls, liveStops:()=>liveStops,
+    liveFactoryCalls:()=>liveFactoryCalls, liveStops:()=>liveStops, history,
   };
 }
 
@@ -85,6 +86,19 @@ test('modular app starts idempotently and owns only one root/popstate listener',
   h.app.stop();
   assert.equal(h.rootListeners.length, 0);
   assert.equal(h.windowListeners.length, 0);
+});
+
+test('initial boot enhances the default legacy Home without a navigation click or history write', async () => {
+  const h = appHarness();
+  h.app.start();
+  await h.app.flush();
+
+  assert.equal(h.app.router().current().screen, 'home');
+  assert.equal(h.history.length, 0);
+  assert.deepEqual(h.liveStarts.map(x=>x.screen), ['home']);
+  assert.equal(h.renderedRoutes.at(-1).screen, 'home');
+  assert.match(h.homeShown.at(-1), /data-screen="home"/);
+  h.app.stop();
 });
 
 test('legacy migrated navigation is converted into router state and modular rendering', async () => {
