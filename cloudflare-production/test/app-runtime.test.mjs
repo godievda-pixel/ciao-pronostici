@@ -18,6 +18,7 @@ function appHarness() {
   const windowListeners = [];
   const shown = [];
   const homeShown = [];
+  const homeHidden = [];
   const renderedRoutes = [];
   const liveStarts = [];
   let liveFactoryCalls = 0;
@@ -36,7 +37,7 @@ function appHarness() {
     showModular(html){ shown.push(String(html)); return {}; },
     hideModular(){ hidden += 1; return true; },
     showHomeCompanion(html){ homeShown.push(String(html)); return {}; },
-    hideHomeCompanion(){ return true; },
+    hideHomeCompanion(options = {}){ homeHidden.push(options); return true; },
   };
   const adapterFactory = options => { navigateFromLegacy = options.onNavigate; return adapter; };
   const history = historyHarness();
@@ -71,7 +72,7 @@ function appHarness() {
     documentRef:{ documentElement:{ dataset:{} } }, windowRef, dataService:{}, adapterFactory, routeRenderer, liveEngineFactory,
   });
   return {
-    app, shown, homeShown, renderedRoutes, rootListeners, windowListeners, liveStarts,
+    app, shown, homeShown, homeHidden, renderedRoutes, rootListeners, windowListeners, liveStarts,
     navigate:screen=>navigateFromLegacy(screen), hidden:()=>hidden,
     liveFactoryCalls:()=>liveFactoryCalls, liveStops:()=>liveStops, history,
   };
@@ -124,6 +125,18 @@ test('stable v22.5 Home tab keeps legacy ownership while mounting the modular Ho
   assert.equal(h.renderedRoutes.at(-1).screen, 'home');
   assert.match(h.homeShown.at(-1), /data-screen="home"/);
   assert.doesNotMatch(h.shown.at(-1), /data-screen="home"/);
+});
+
+test('leaving Home deactivates its companion before a modular screen takes ownership', async () => {
+  const h = appHarness();
+  h.app.start();
+  await h.app.flush();
+
+  h.navigate('ranking');
+  await h.app.flush();
+
+  assert.equal(h.app.router().current().screen, 'ranking');
+  assert.deepEqual(h.homeHidden, [{ restore:true }]);
 });
 
 test('runtime owns one Live Engine, starts it on Home and stops it off Home', async () => {
