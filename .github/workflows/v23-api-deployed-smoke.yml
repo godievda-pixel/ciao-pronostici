@@ -1,0 +1,45 @@
+name: v23 deployed API smoke
+
+on:
+  push:
+    branches: [v23-test]
+    paths:
+      - '.github/workflows/v23-api-deployed-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Smoke deployed TEST API
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const url = 'https://lcnwccnkkxaosxnfvjvr.supabase.co/functions/v1/ciao-v23-api';
+          const testOrigin = 'https://ciao-web-v23-test.ciao-web.workers.dev';
+
+          const health = await fetch(url, {headers:{'cache-control':'no-cache'}});
+          const healthBody = await health.json();
+          console.log(JSON.stringify({health_status:health.status,service:healthBody.service,version:healthBody.version,environment:healthBody.environment}));
+          if (!health.ok || healthBody.service !== 'Ciao v23 API' || healthBody.version !== 23 || healthBody.environment !== 'test') process.exit(2);
+
+          const preflight = await fetch(url, {
+            method:'OPTIONS',
+            headers:{origin:testOrigin,'access-control-request-method':'POST','access-control-request-headers':'content-type,x-telegram-init-data'}
+          });
+          const allowOrigin = preflight.headers.get('access-control-allow-origin');
+          console.log(JSON.stringify({preflight_status:preflight.status,allow_origin_ok:allowOrigin===testOrigin}));
+          if (preflight.status !== 204 || allowOrigin !== testOrigin) process.exit(3);
+
+          const unauth = await fetch(url, {
+            method:'POST',
+            headers:{origin:testOrigin,'content-type':'application/json'},
+            body:JSON.stringify({action:'profile'})
+          });
+          const unauthBody = await unauth.json();
+          console.log(JSON.stringify({unauth_status:unauth.status,unauth_code:unauthBody?.error?.code}));
+          if (unauth.status !== 401 || unauthBody?.error?.code !== 'telegram_auth_required') process.exit(4);
+          NODE
