@@ -77,6 +77,14 @@ function insertAfterMarkedElement(html, marker, insertion) {
   return block ? `${html.slice(0, block.end)}${insertion}${html.slice(block.end)}` : `${html}${insertion}`;
 }
 
+function round512MobileLayoutStyles() {
+  return `<style data-cw512-mobile-layout-style>
+    .cw512-mc-tabs .cw239-mc-tab{font-size:9px;padding-left:1px;padding-right:1px}
+    @media(max-width:430px){.cw250-recent-events{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible;gap:6px}.cw250-event-chip{min-width:0;max-width:none;overflow:hidden;text-overflow:ellipsis}.cw512-mc-tabs .cw239-mc-tab{font-size:8.5px}}
+    @media(max-width:350px){.cw250-recent-events{grid-template-columns:1fr}}
+  </style>`;
+}
+
 export function canonicalRound512UserView(value) {
   const key = text(value).toLowerCase();
   return USER_VIEW_KEYS.has(key) ? key : 'overview';
@@ -116,6 +124,7 @@ export function enhanceRound512MatchCenterView(html, state = {}, viewState = {})
   let output = String(html || '');
   if (!output) return output;
 
+  output = `${round512MobileLayoutStyles()}${output}`;
   const activeUserView = canonicalRound512UserView(viewState.activeUserView);
   output = replaceMarkedElement(output, 'class="cw239-mc-tabs', userTabsHtml(activeUserView, state));
 
