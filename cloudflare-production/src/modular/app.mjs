@@ -121,11 +121,11 @@ export function createModularApplication({
       if (!sameLiveRoute(current, snapshot?.context)) return;
 
       if (current.screen === 'home') {
-        if (snapshot?.error) {
-          adapter?.hideHomeCompanion?.({ restore:true });
+        if (snapshot?.data != null) {
+          adapter?.showHomeCompanion?.(String(snapshot.data));
           return;
         }
-        if (snapshot?.data != null) adapter?.showHomeCompanion?.(String(snapshot.data));
+        if (snapshot?.error) adapter?.hideHomeCompanion?.({ restore:true });
         return;
       }
 
@@ -152,7 +152,7 @@ export function createModularApplication({
           const engine = ensureLiveEngine();
           const snapshot = await engine.start(route);
           if (!started || generation !== renderGeneration) return snapshot?.data || '';
-          if (snapshot?.error) adapter?.hideHomeCompanion?.({ restore:true });
+          if (snapshot?.error && snapshot?.data == null) adapter?.hideHomeCompanion?.({ restore:true });
           return snapshot?.data || '';
         } catch (_error) {
           if (started && generation === renderGeneration) adapter?.hideHomeCompanion?.({ restore:true });
