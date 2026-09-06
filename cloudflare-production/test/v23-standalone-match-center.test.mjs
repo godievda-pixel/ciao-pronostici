@@ -91,7 +91,7 @@ test('events translate event type while preserving player proper names',()=>{
   assert.match(html,/Жёлтая карточка/);
   assert.match(html,/Замена/);
   assert.match(html,/Lautaro Martínez/);
-  assert.match(html,/24'/);
+  assert.match(html,/24&#39;/);
   assert.doesNotMatch(html,/>goal<|yellowCard|substitution/);
 });
 
