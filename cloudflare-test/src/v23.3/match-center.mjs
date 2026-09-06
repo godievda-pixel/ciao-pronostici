@@ -1,23 +1,9 @@
-import * as Core from './match-center-core.mjs';
 import { loadMatchCenterBase, loadMatchCenterSection } from './data-client.mjs';
 import { toSerieALegacyMatchCenterData } from './bsd-serie-a-cw20-adapter.mjs';
 
-export * from './match-center-core.mjs';
-
 const EXTERNAL_SECTIONS = Object.freeze(['overview', 'stats', 'events', 'lineups', 'players']);
+const SERIE_A_EVENT = 'ciao-v233-open-serie-a-match';
 const EXTERNAL_EVENT = 'ciao-v233-open-external-legacy-match';
-
-export function createMatchCenterController(options) {
-  return Core.createMatchCenterController(options);
-}
-
-export function renderMatchCenter(state) {
-  return Core.renderMatchCenter(state);
-}
-
-export function patchMatchCenterOverlay(overlay, state) {
-  return Core.patchMatchCenterOverlay(overlay, state);
-}
 
 export function prepareCanonicalMatchCenterPayload(payload = {}) {
   if (payload?.competition === 'serie_a') return payload;
@@ -25,6 +11,29 @@ export function prepareCanonicalMatchCenterPayload(payload = {}) {
   if (!initialMatch || typeof initialMatch !== 'object' || Array.isArray(initialMatch)) return payload;
   const { coverage: _bootstrapCoverage, ...bootstrap } = initialMatch;
   return { ...payload, initialMatch:bootstrap };
+}
+
+function serieALegacyId(matchId) {
+  const value = String(matchId || '').trim();
+  if (!value.startsWith('serie_a:')) return 0;
+  const id = Number(value.slice('serie_a:'.length));
+  return Number.isFinite(id) && id > 0 ? id : 0;
+}
+
+export function openSerieALegacyMatchCenter(payload = {}, target = globalThis) {
+  const legacyId = serieALegacyId(payload?.matchId);
+  if (!legacyId) throw new Error('serie_a_legacy_match_id_required');
+  const CustomEventCtor = target?.CustomEvent || globalThis.CustomEvent;
+  if (typeof target?.dispatchEvent !== 'function' || typeof CustomEventCtor !== 'function') {
+    throw new Error('serie_a_legacy_match_center_bridge_unavailable');
+  }
+  target.dispatchEvent(new CustomEventCtor(SERIE_A_EVENT, {
+    detail:Object.freeze({
+      matchId:String(payload.matchId),
+      legacyId,
+    }),
+  }));
+  return 'legacy';
 }
 
 function baseMatch(payload) {
@@ -82,26 +91,13 @@ function dispatchExternalLegacy(data, context, target = globalThis) {
   return data;
 }
 
-let routedApi = null;
 let externalPending = null;
 let externalContext = null;
 
-export function installCanonicalMatchCenter(
-  documentRef = globalThis.document,
-  options = {},
-) {
-  if (!documentRef?.createElement || !documentRef?.addEventListener) return null;
-  if (routedApi) return routedApi;
-  // Keep the real core document listeners intact. The previous proxy swallowed
-  // every click event, which made the canonical tabs non-interactive.
-  routedApi = Core.installCanonicalMatchCenter(documentRef, options);
-  return routedApi;
-}
-
 export async function openExternalLegacyMatchCenter(payload = {}) {
   const prepared = prepareCanonicalMatchCenterPayload(payload);
-  const competition = String(prepared?.competition || '');
-  const matchId = String(prepared?.matchId || '');
+  const competition = String(prepared?.competition || '').trim();
+  const matchId = String(prepared?.matchId || '').trim();
   if (!competition || !matchId) throw new Error('external_match_center_target_missing');
 
   const context = Object.freeze({ competition, matchId, initialMatch:prepared?.initialMatch || null });
@@ -120,8 +116,8 @@ export async function openExternalLegacyMatchCenter(payload = {}) {
 }
 
 export async function refreshExternalLegacyMatchCenter(context = externalContext) {
-  const competition = String(context?.competition || '');
-  const matchId = String(context?.matchId || '');
+  const competition = String(context?.competition || '').trim();
+  const matchId = String(context?.matchId || '').trim();
   if (!competition || !matchId) return null;
   return loadExternalLegacyMatchCenter(competition, matchId, {
     initialMatch:context?.initialMatch || null,
@@ -129,8 +125,9 @@ export async function refreshExternalLegacyMatchCenter(context = externalContext
   });
 }
 
-export function openCanonicalMatchCenter(payload) {
-  if (payload?.competition === 'serie_a') return Core.openCanonicalMatchCenter(payload);
+export function openCanonicalMatchCenter(payload = {}) {
+  const competition = String(payload?.competition || '').trim();
+  if (competition === 'serie_a') return openSerieALegacyMatchCenter(payload);
   return openExternalLegacyMatchCenter(payload);
 }
 
