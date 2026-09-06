@@ -82,3 +82,11 @@ test('Round 51.2 Shots view keeps shot map/list but removes general statistics',
   assert.match(html, /data-cw233-mc-shot-list/);
   assert.match(html, /Paulo Dybala/);
 });
+
+test('Round 51.2 mobile view prevents recent event chips from being clipped horizontally', () => {
+  const html = enhanceRound512MatchCenterView('<div class="cw239-mc"></div>', {}, { activeUserView:'overview' });
+  assert.match(html, /data-cw512-mobile-layout-style/);
+  assert.match(html, /@media\(max-width:430px\)/);
+  assert.match(html, /\.cw250-recent-events\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\);overflow:visible/);
+  assert.match(html, /\.cw250-event-chip\{min-width:0;max-width:none;overflow:hidden;text-overflow:ellipsis/);
+});
