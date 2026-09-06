@@ -39,10 +39,11 @@ function availableCard(item = {}, index) {
   const competition = text(item.competition || item?.match?.competition);
   const tournament = competitionMeta(competition);
   const matchId = text(item.match_id || item.id || item?.match?.id);
+  const round = text(item.round || item?.match?.round);
   const prediction = item.prediction || {};
   const deadline = dateTime(item.deadline_at || item.deadlineAt);
   const kickoff = dateTime(item.kickoff_at || item.kickoffAt || item?.match?.kickoffAt);
-  return `<article class="ciao-predictions-card ciao-predictions-card--${esc(tournament.theme)}" data-prediction-card data-prediction-item="${index}" data-prediction-competition="${esc(competition)}" data-prediction-match-id="${esc(matchId)}">
+  return `<article class="ciao-predictions-card ciao-predictions-card--${esc(tournament.theme)}" data-prediction-card data-prediction-item="${index}" data-prediction-competition="${esc(competition)}" data-prediction-match-id="${esc(matchId)}"${round ? ` data-prediction-round="${esc(round)}"` : ''}>
     <div class="ciao-predictions-card-meta"><span>${esc(tournament.label)}</span>${kickoff ? `<time>${esc(kickoff)}</time>` : ''}</div>
     <div class="ciao-predictions-match-title">${esc(names.home)} <span>—</span> ${esc(names.away)}</div>
     <div class="ciao-predictions-score-editor">
