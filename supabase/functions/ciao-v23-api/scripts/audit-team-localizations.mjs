@@ -10,17 +10,25 @@ function env(name) {
 }
 
 function teamId(team) {
-  return String(team?.id ?? '').trim();
+  return String(team?.id ?? team?.team_id ?? team?.teamId ?? '').trim();
 }
 
 function remember(map, team, source) {
   const id = teamId(team);
   if (!id) return;
-  const name = String(team?.name ?? team?.shortName ?? '').trim();
+  const name = String(team?.name ?? team?.team_name ?? team?.teamName ?? '').trim();
   const current = map.get(id) ?? {id, name, sources: new Set()};
   if (!current.name && name) current.name = name;
   current.sources.add(source);
   map.set(id, current);
+}
+
+function standingRows(payload) {
+  if (Array.isArray(payload?.standings)) return payload.standings;
+  if (Array.isArray(payload?.groups)) return payload.groups.flatMap(group => group?.standings ?? group?.rows ?? []);
+  if (Array.isArray(payload?.results)) return payload.results;
+  if (Array.isArray(payload?.data)) return payload.data;
+  return Array.isArray(payload) ? payload : [];
 }
 
 async function loadLocalizationIds({supabaseUrl, serviceRoleKey}) {
@@ -39,25 +47,26 @@ async function loadLocalizationIds({supabaseUrl, serviceRoleKey}) {
 }
 
 async function rememberStandings(provider, competition, teams) {
-  const standings = await provider.loadStandings({competition});
-  for (const row of standings?.rows ?? []) remember(teams, row?.team, `${competition}:standings`);
+  const standings = await provider.getStandings({competition});
+  for (const row of standingRows(standings)) {
+    remember(teams, row?.team ?? {id:row?.team_id ?? row?.teamId, name:row?.team_name ?? row?.teamName}, `${competition}:standings`);
+  }
 }
 
 async function discover(provider) {
   const teams = new Map();
 
-  // Current Serie A membership is authoritative even when the provider returns
-  // no event rows for an unbounded match query.
+  // Current Serie A membership is authoritative even when an unbounded events
+  // query has no rows yet for the active season.
   await rememberStandings(provider, 'serie_a', teams);
 
-  const coppaMatches = await provider.loadMatches({competition:'coppa_italia'});
+  const coppaMatches = await provider.listMatches({competition:'coppa_italia'});
   for (const match of coppaMatches) {
-    remember(teams, match?.home, 'coppa_italia:matches');
-    remember(teams, match?.away, 'coppa_italia:matches');
+    remember(teams, match?.home_team ?? {id:match?.home_team_id,name:match?.home_team_name}, 'coppa_italia:matches');
+    remember(teams, match?.away_team ?? {id:match?.away_team_id,name:match?.away_team_name}, 'coppa_italia:matches');
   }
 
   for (const competition of EUROPE) await rememberStandings(provider, competition, teams);
-
   return teams;
 }
 
