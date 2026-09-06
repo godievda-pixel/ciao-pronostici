@@ -76,7 +76,15 @@ export function createModularApplication({
     renderTask = Promise.resolve().then(async () => {
       if (route?.screen === 'home') {
         if (generation === renderGeneration) adapter?.hideModular?.();
-        return '';
+        try {
+          const html = await routeRenderer(route, { dataService:service, now:new Date() });
+          if (generation !== renderGeneration) return html;
+          adapter?.showHomeCompanion?.(html);
+          return html;
+        } catch (_error) {
+          if (generation === renderGeneration) adapter?.hideHomeCompanion?.({ restore:true });
+          return '';
+        }
       }
 
       if (generation === renderGeneration) adapter?.showModular?.(loadingHtml());
