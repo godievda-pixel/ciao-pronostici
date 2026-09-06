@@ -29,7 +29,16 @@ export async function renderModularRoute(route = {}, { dataService, now = new Da
   if (!dataService) throw new Error('route_data_service_required');
   const screen = text(route.screen);
 
-  if (screen === 'home') return '';
+  if (screen === 'home') {
+    const [favoriteClub, result, clubIndex] = await Promise.all([
+      dataService.loadFavoriteClub(),
+      dataService.loadAllMatches({}),
+      serieAClubIndex(dataService),
+    ]);
+    const matches = result?.matches || [];
+    return renderFavoriteClub({ favoriteClub, matches, now })
+      + renderCalcioToday({ matches, clubIndex, now });
+  }
 
   if (screen === 'favorite') {
     const [favoriteClub, result] = await Promise.all([
