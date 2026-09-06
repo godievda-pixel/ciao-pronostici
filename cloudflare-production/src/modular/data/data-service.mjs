@@ -12,11 +12,14 @@ function normalizeMatches(value, competition) {
   return rows(value).map(match => normalizeMatch(match, competition));
 }
 
-export function createDataService({ apiClient }) {
-  if (!apiClient?.get) throw new Error('api_client_required');
+export function createDataService({ apiClient, coreUrl } = {}) {
+  if (!apiClient?.post) throw new Error('api_client_required');
+  if (!coreUrl) throw new Error('core_url_required');
+
+  const core = (action, payload = {}) => apiClient.post(coreUrl, { action, ...payload });
 
   async function loadMatches({ competition, from = '', to = '', force = false } = {}) {
-    const value = await apiClient.get('/api/modular/matches', { competition, from, to }, { force });
+    const value = await core('modular_matches', { competition, from, to, ...(force ? { force:true } : {}) });
     return normalizeMatches(value, competition);
   }
 
@@ -39,19 +42,22 @@ export function createDataService({ apiClient }) {
     loadMatches,
     loadAllMatches,
     loadStandings(competition, { force = false } = {}) {
-      return apiClient.get('/api/modular/standings', { competition }, { force });
+      return core('modular_standings', { competition, ...(force ? { force:true } : {}) });
     },
     loadFavoriteClub({ force = false } = {}) {
-      return apiClient.get('/api/modular/favorite', {}, { force });
+      return core('modular_favorite', { ...(force ? { force:true } : {}) });
     },
     loadPredictions({ mode = 'predictions', competition = '', force = false } = {}) {
-      return apiClient.get('/api/modular/predictions', { mode, competition }, { force });
+      return core('modular_predictions', { mode, competition, ...(force ? { force:true } : {}) });
+    },
+    savePredictions(payload = {}) {
+      return core('modular_save_predictions', payload);
     },
     loadRanking({ scope = 'all', force = false } = {}) {
-      return apiClient.get('/api/modular/ranking', { scope }, { force });
+      return core('modular_ranking', { scope, ...(force ? { force:true } : {}) });
     },
     loadMatchCenter({ competition, matchId, section = 'overview', force = false } = {}) {
-      return apiClient.get('/api/modular/match-center', { competition, match_id:matchId, section }, { force });
+      return core('modular_match_center', { competition, match_id:matchId, section, ...(force ? { force:true } : {}) });
     },
   });
 }
