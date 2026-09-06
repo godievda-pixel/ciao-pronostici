@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 export const RELEASE_SOURCE_URL = 'https://dkefzepiiudehhzbbrjn.supabase.co/storage/v1/object/public/ciao-miniapp/migration/v22-5-resolved-no-x2.html';
 export const RELEASE_PATH = '/releases/v22-5.html';
 export const NO_X2_MARKER = 'ciao-prod-no-x2-20260903';
+export const MODULAR_MARKER = 'main-v1';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const distDir = resolve(root, 'dist');
@@ -14,24 +15,6 @@ const modularDistDir = resolve(distDir, 'modular');
 
 export function rootHtmlFor({ release }) {
   return String(release || '');
-}
-
-export function injectModularAssets(input) {
-  const html = String(input || '');
-  if (html.includes('data-ciao-modular="main-v1"')) return html;
-  const assets = '<link rel="stylesheet" href="/modular/app.css" data-ciao-modular="main-v1">\n'
-    + '<script type="module" src="/modular/app.mjs" data-ciao-modular="main-v1"></script>\n';
-  const headEnd = html.lastIndexOf('</head>');
-  if (headEnd < 0) throw new Error('production head closing tag missing');
-  return html.slice(0, headEnd) + assets + html.slice(headEnd);
-}
-
-export async function copyModularAssets({ sourceDir = modularSourceDir, distDir: targetDir = modularDistDir } = {}) {
-  await mkdir(targetDir, { recursive: true });
-  await Promise.all([
-    copyFile(resolve(sourceDir, 'app.mjs'), resolve(targetDir, 'app.mjs')),
-    copyFile(resolve(sourceDir, 'app.css'), resolve(targetDir, 'app.css')),
-  ]);
 }
 
 export function validateReleaseHtml(input) {
@@ -51,6 +34,24 @@ export function validateReleaseHtml(input) {
   return true;
 }
 
+export function injectModularAssets(input) {
+  const html = String(input || '')
+    .replace(/<link\b[^>]*data-ciao-modular=["']main-v1["'][^>]*>\s*/gi, '')
+    .replace(/<script\b[^>]*data-ciao-modular=["']main-v1["'][^>]*>\s*<\/script>\s*/gi, '');
+  const assets = `<link rel="stylesheet" href="/modular/app.css" data-ciao-modular="${MODULAR_MARKER}">\n<script type="module" src="/modular/app.mjs" data-ciao-modular="${MODULAR_MARKER}"></script>\n`;
+  return html.includes('</head>') ? html.replace('</head>', `${assets}</head>`) : `${assets}${html}`;
+}
+
+export async function copyModularAssets({ sourceDir = modularSourceDir, distDir: targetDir = modularDistDir } = {}) {
+  const source = sourceDir instanceof URL ? fileURLToPath(sourceDir) : resolve(String(sourceDir));
+  const target = targetDir instanceof URL ? fileURLToPath(targetDir) : resolve(String(targetDir));
+  await mkdir(target, { recursive: true });
+  await Promise.all([
+    copyFile(resolve(source, 'app.mjs'), resolve(target, 'app.mjs')),
+    copyFile(resolve(source, 'app.css'), resolve(target, 'app.css')),
+  ]);
+}
+
 export async function build() {
   const releaseResponse = await fetch(RELEASE_SOURCE_URL, { headers: { 'cache-control': 'no-cache' } });
   if (!releaseResponse.ok) throw new Error(`release source HTTP ${releaseResponse.status}`);
@@ -59,9 +60,9 @@ export async function build() {
   const modularRelease = injectModularAssets(release);
   const rootHtml = rootHtmlFor({ release: modularRelease });
   await mkdir(resolve(distDir, 'releases'), { recursive: true });
+  await copyModularAssets();
   await writeFile(resolve(distDir, 'index.html'), rootHtml, 'utf8');
   await writeFile(releaseOut, modularRelease, 'utf8');
-  await copyModularAssets();
   return { ok: true, entry: 'dist/index.html', release: 'dist/releases/v22-5.html', bytes: Buffer.byteLength(modularRelease) };
 }
 
