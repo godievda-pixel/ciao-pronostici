@@ -209,7 +209,7 @@ export function createLegacySurfaceAdapter({
     if (!homeObserver) homeObserver = mutationObserverFactory(queueHomeRepair) || null;
     if (!homeObserver?.observe) return;
     if (homeObservedParent === parent) return;
-    homeObserver.disconnect?.();
+    if (homeObservedParent) homeObserver.disconnect?.();
     homeObserver.observe(parent, { childList:true });
     homeObservedParent = parent;
   }
