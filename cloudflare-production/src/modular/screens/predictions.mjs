@@ -4,7 +4,7 @@ export const DEFAULT_PREDICTION_MODE = 'predictions';
 const MODES = new Set(['predictions','mine']);
 
 function text(value) { return String(value ?? '').trim(); }
-function esc(value) { return text(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function esc(value) { return text(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c])); }
 function scoreValue(value) { const n = Number(value); return Number.isInteger(n) && n >= 0 && n <= 20 ? String(n) : ''; }
 function competitionMeta(id) {
   try { return getTournament(id); }
@@ -62,7 +62,8 @@ function mineCard(item = {}, index) {
   const tournament = competitionMeta(competition);
   const home = scoreValue(item.home_score ?? item.prediction?.home_score);
   const away = scoreValue(item.away_score ?? item.prediction?.away_score);
-  const points = Number(item.points);
+  const hasPoints = item.points !== null && item.points !== undefined && text(item.points) !== '';
+  const points = hasPoints ? Number(item.points) : NaN;
   return `<article class="ciao-predictions-card ciao-predictions-card--mine ciao-predictions-card--${esc(tournament.theme)}" data-prediction-card data-prediction-item="${index}" data-prediction-competition="${esc(competition)}">
     <div class="ciao-predictions-card-meta"><span>${esc(tournament.label)}</span></div>
     <div class="ciao-predictions-match-title">${esc(names.title)}</div>
