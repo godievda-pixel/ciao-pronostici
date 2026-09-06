@@ -42,6 +42,23 @@ test('available prediction cards expose editable score, tournament identity and 
   assert.match(html, /5 \/ 3 \/ 2 \/ 0/);
 });
 
+test('Serie A prediction card carries its round into the save surface', () => {
+  const html = renderPredictionsScreen({
+    mode:'predictions',
+    data:{ items:[{
+      id:'serie_a:77', match_id:'serie_a:77', competition:'serie_a',
+      deadline_at:'2026-09-10T17:45:00Z',
+      match:{
+        id:'serie_a:77', competition:'serie_a', kickoffAt:'2026-09-10T18:00:00Z', round:'4',
+        home:{ name:'Inter' }, away:{ name:'Milan' },
+      },
+    }] },
+  });
+
+  assert.match(html, /data-prediction-match-id="serie_a:77"/);
+  assert.match(html, /data-prediction-round="4"/);
+});
+
 test('mine prediction cards show saved score and points without edit controls', () => {
   const html = renderPredictionsScreen({
     mode:'mine',
