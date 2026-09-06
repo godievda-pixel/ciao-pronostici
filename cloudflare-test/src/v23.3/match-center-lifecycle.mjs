@@ -193,7 +193,6 @@ export function installMatchCenterLifecycle(documentRef = globalThis.document, r
 
   const onOpen = () => {
     restoreQueued = false;
-    suspendMatchSource(documentRef);
   };
 
   const queueRestore = () => {
