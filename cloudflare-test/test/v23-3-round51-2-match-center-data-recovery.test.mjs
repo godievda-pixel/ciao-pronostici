@@ -130,3 +130,49 @@ test('Round 51.2 Worker recovers substitutes and ratings when the lazy Serie A p
   assert.equal(payload.data.data.away.substitutes[0].name, 'Away Bench');
   assert.equal(payload.data.data.away.substitutes[0].rating, 7.2);
 });
+
+test('Round 51.2 Worker restores a shot author from player_id and player_stats', async () => {
+  const calls = [];
+  const shot = { pos:{ x:74, y:38 }, home:true, xg:0.31, minute:64, player_id:77, result:'saved' };
+  const env = {
+    CIAO_WEB_API:{
+      fetch:async request => {
+        const body = await request.clone().json();
+        calls.push(body);
+        if (calls.length === 1) {
+          return Response.json({
+            ok:true,
+            match:{ id:901, status:'finished', home:{ id:10, name:'Рома' }, away:{ id:20, name:'Аталанта' } },
+            stats:{
+              stats:{ home:{ total_shots:1 }, away:{ total_shots:0 } },
+              shotmap:[shot],
+            },
+          });
+        }
+        return Response.json({
+          ok:true,
+          match:{ id:901, status:'finished', home:{ id:10, name:'Рома' }, away:{ id:20, name:'Аталанта' } },
+          stats:{
+            stats:{ home:{ total_shots:1 }, away:{ total_shots:0 } },
+            shotmap:[shot],
+          },
+          player_stats:{ player_stats:[
+            { player_id:77, short_name:'Paulo Dybala', team_id:10, rating:7.6 },
+          ] },
+        });
+      },
+    },
+  };
+
+  const response = await worker.fetch(new Request(
+    'https://test.local/api/v23.3/match-center?competition=serie_a&match_id=serie_a%3A901&section=stats',
+    { headers:{ 'x-telegram-init-data':'signed-user' } },
+  ), env, {});
+
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls[0].sections, ['stats','overview_meta']);
+  assert.deepEqual(calls[1].sections, ['stats','overview_meta','player_stats']);
+  assert.equal(payload.data.data.shots[0].player, 'Paulo Dybala');
+});
