@@ -40,6 +40,15 @@ function element(className='') {
   };
 }
 
+function linkChildren(content, nodes) {
+  content.children = nodes;
+  nodes.forEach((node,index) => {
+    node.parentElement = content;
+    node.previousElementSibling = nodes[index - 1] || null;
+    node.nextElementSibling = nodes[index + 1] || null;
+  });
+}
+
 function legacyHomeHarness() {
   const classes = [
     'cw18-favorite-home cw211-home-shell',
@@ -54,19 +63,14 @@ function legacyHomeHarness() {
   ];
   const nodes = classes.map(element);
   const content = element('content');
-  content.children = nodes;
+  linkChildren(content, nodes);
   content.insertBefore = (node, before) => {
     const index = content.children.indexOf(before);
     if (index < 0) content.children.push(node);
     else content.children.splice(index, 0, node);
-    node.parentElement = content;
+    linkChildren(content, content.children);
   };
-  content.appendChild = node => { content.children.push(node); node.parentElement = content; };
-  nodes.forEach((node,index) => {
-    node.parentElement = content;
-    node.previousElementSibling = nodes[index - 1] || null;
-    node.nextElementSibling = nodes[index + 1] || null;
-  });
+  content.appendChild = node => { content.children.push(node); linkChildren(content, content.children); };
 
   const all = () => content.children;
   const matchesSimple = (node, selector) => {
@@ -234,6 +238,48 @@ test('Home companion replaces favorite/today and prediction controls while prese
     assert.equal(byClass(name).hidden, false, `${name} should remain visible on Home`);
   }
   assert.ok(h.content.children.indexOf(host) < h.content.children.indexOf(byClass('cw18-favorite-home')));
+});
+
+test('Home companion repairs itself after a late v22.5 DOM replacement', async () => {
+  const h = legacyHomeHarness();
+  let mutationCallback = null;
+  let disconnects = 0;
+  const mutationObserverFactory = callback => ({
+    observe(){ mutationCallback = callback; },
+    disconnect(){ disconnects += 1; },
+  });
+  const adapter = createLegacySurfaceAdapter({ documentRef:h.documentRef, mutationObserverFactory });
+  adapter.start();
+  const firstHost = adapter.showHomeCompanion('<section data-new-home>NEW HOME</section>');
+
+  const replacement = [
+    element('cw18-favorite-home cw211-home-shell'),
+    element('cw211-today'),
+    element('cw18-round-summary'),
+    element('cw18-rules-button'),
+    element('hero'),
+    element('rounds'),
+    element('section-title'),
+    element('matches'),
+    element('savebar'),
+  ];
+  firstHost.isConnected = false;
+  linkChildren(h.content, replacement);
+  mutationCallback?.();
+  await Promise.resolve();
+
+  const repaired = adapter.homeHost();
+  assert.notEqual(repaired, firstHost);
+  assert.equal(repaired.innerHTML, '<section data-new-home>NEW HOME</section>');
+  assert.equal(repaired.hidden, false);
+  assert.ok(h.content.children.indexOf(repaired) < h.content.children.indexOf(replacement[0]));
+  assert.equal(replacement[0].hidden, true);
+  assert.equal(replacement[1].hidden, true);
+  assert.equal(replacement[5].hidden, true);
+  assert.equal(replacement[7].hidden, true);
+
+  adapter.stop();
+  assert.equal(disconnects, 1);
 });
 
 test('adapter fails closed when the legacy host disappears', () => {
