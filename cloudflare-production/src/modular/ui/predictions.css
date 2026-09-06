@@ -1,1 +1,42 @@
-.ciao-predictions-screen{min-height:100%;color:#f8fbff}.ciao-predictions-head{margin:4px 2px 12px}.ciao-predictions-head span{display:block;color:#7f91ba;font-size:8px;font-weight:850;letter-spacing:.07em;text-transform:uppercase}.ciao-predictions-head h2{margin:3px 0 0;font-size:18px}.ciao-predictions-switch{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:12px;padding:4px;border:1px solid rgba(132,153,255,.10);border-radius:15px;background:rgba(255,255,255,.03)}.ciao-predictions-mode{min-height:40px;border:0;border-radius:11px;background:transparent;color:#8293bb;font-size:9px;font-weight:900}.ciao-predictions-mode.is-active{color:#fff;background:linear-gradient(180deg,rgba(49,80,255,.48),rgba(9,27,189,.38));box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}.ciao-predictions-content{display:grid;gap:8px}.ciao-predictions-list{display:grid;gap:8px}.ciao-predictions-item,.ciao-predictions-empty,.ciao-predictions-loading,.ciao-predictions-error{padding:14px;border:1px solid rgba(132,153,255,.08);border-radius:17px;background:linear-gradient(145deg,rgba(16,30,67,.78),rgba(6,15,37,.94));font-size:10px}.ciao-predictions-empty,.ciao-predictions-loading,.ciao-predictions-error{min-height:100px;display:grid;place-items:center;text-align:center;color:#8999c0}.ciao-predictions-error{color:#ffc0c9;border-color:rgba(255,91,121,.18)}
+.ciao-predictions-screen{min-height:100%;color:#f8fbff}
+.ciao-predictions-head{margin:4px 2px 12px}
+.ciao-predictions-head span{display:block;color:#7f91ba;font-size:8px;font-weight:850;letter-spacing:.07em;text-transform:uppercase}
+.ciao-predictions-head h2{margin:3px 0 0;font-size:18px}
+.ciao-predictions-switch{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:12px;padding:4px;border:1px solid rgba(132,153,255,.10);border-radius:15px;background:rgba(255,255,255,.03)}
+.ciao-predictions-mode{min-height:40px;border:0;border-radius:11px;background:transparent;color:#8293bb;font-size:9px;font-weight:900}
+.ciao-predictions-mode.is-active{color:#fff;background:linear-gradient(180deg,rgba(49,80,255,.48),rgba(9,27,189,.38));box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+.ciao-predictions-content{display:grid;gap:8px}
+.ciao-predictions-list{display:grid;gap:9px}
+.ciao-predictions-item,.ciao-predictions-empty,.ciao-predictions-loading,.ciao-predictions-error{padding:14px;border:1px solid rgba(132,153,255,.08);border-radius:17px;background:linear-gradient(145deg,rgba(16,30,67,.78),rgba(6,15,37,.94));font-size:10px}
+.ciao-predictions-empty,.ciao-predictions-loading,.ciao-predictions-error{min-height:100px;display:grid;place-items:center;text-align:center;color:#8999c0}
+.ciao-predictions-error{color:#ffc0c9;border-color:rgba(255,91,121,.18)}
+
+.ciao-predictions-card{position:relative;overflow:hidden;padding:14px;border:1px solid rgba(132,153,255,.13);border-radius:18px;background:linear-gradient(145deg,rgba(16,30,67,.90),rgba(6,15,37,.98));box-shadow:0 14px 34px rgba(0,0,0,.18),inset 0 1px 0 rgba(255,255,255,.04)}
+.ciao-predictions-card::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:linear-gradient(180deg,#4d72ff,#223cbb);opacity:.9}
+.ciao-predictions-card--coppa::before{background:linear-gradient(180deg,#ef3f45,#168b52)}
+.ciao-predictions-card--champions::before{background:linear-gradient(180deg,#8069ff,#2945cb)}
+.ciao-predictions-card--europa::before{background:linear-gradient(180deg,#ff8c33,#84431c)}
+.ciao-predictions-card--conference::before{background:linear-gradient(180deg,#47cf80,#187b47)}
+.ciao-predictions-card-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#8999c1;font-size:8px;font-weight:850;letter-spacing:.02em}
+.ciao-predictions-card-meta span{color:#afbbe0;text-transform:uppercase;letter-spacing:.05em}
+.ciao-predictions-card-meta time{white-space:nowrap}
+.ciao-predictions-match-title{margin:10px 0 12px;color:#f8fbff;font-size:13px;font-weight:950;line-height:1.28;text-align:center}
+.ciao-predictions-match-title>span{color:#6679a8;font-weight:700}
+.ciao-predictions-score-editor{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:end;gap:8px}
+.ciao-predictions-score-editor label{display:grid;min-width:0;gap:5px;color:#8798c1;font-size:8px;font-weight:850;text-align:center}
+.ciao-predictions-score-editor label>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ciao-predictions-score-editor input{box-sizing:border-box;width:100%;min-width:0;height:48px;padding:0 6px;border:1px solid rgba(132,153,255,.19);border-radius:13px;outline:0;background:rgba(3,10,29,.76);color:#fff;font:950 21px/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;text-align:center;appearance:textfield;-moz-appearance:textfield;transition:border-color .16s ease,box-shadow .16s ease,background .16s ease}
+.ciao-predictions-score-editor input::-webkit-outer-spin-button,.ciao-predictions-score-editor input::-webkit-inner-spin-button{margin:0;-webkit-appearance:none}
+.ciao-predictions-score-editor input:focus{border-color:rgba(103,130,255,.78);background:rgba(8,19,51,.92);box-shadow:0 0 0 3px rgba(64,94,255,.14)}
+.ciao-predictions-score-separator{padding-bottom:13px;color:#7184b4;font-size:18px;font-weight:950;line-height:1}
+.ciao-predictions-deadline{margin-top:9px;color:#7f91ba;font-size:8px;font-weight:750;text-align:center}
+.ciao-predictions-save{width:100%;min-height:42px;margin-top:10px;padding:0 14px;border:0;border-radius:12px;background:linear-gradient(135deg,#315aff,#1735c9);box-shadow:0 8px 20px rgba(25,58,213,.24),inset 0 1px 0 rgba(255,255,255,.12);color:#fff;font-size:10px;font-weight:950;letter-spacing:.01em;cursor:pointer}
+.ciao-predictions-save:active{transform:translateY(1px)}
+.ciao-predictions-card--mine{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:12px;row-gap:5px}
+.ciao-predictions-card--mine .ciao-predictions-card-meta{grid-column:1/-1}
+.ciao-predictions-card--mine .ciao-predictions-match-title{margin:4px 0;text-align:left}
+.ciao-predictions-saved-score{color:#fff;font-size:24px;font-weight:950;line-height:1;letter-spacing:.04em;white-space:nowrap}
+.ciao-predictions-points{display:inline-flex;align-items:center;justify-content:center;justify-self:start;min-width:29px;height:22px;margin-top:2px;padding:0 7px;border:1px solid rgba(83,215,145,.20);border-radius:999px;background:rgba(38,173,100,.10);color:#70e7aa;font-size:9px;font-weight:950}
+.ciao-predictions-rules{padding:9px 12px;border:1px solid rgba(132,153,255,.08);border-radius:12px;background:rgba(255,255,255,.025);color:#8494bc;font-size:8px;font-weight:850;text-align:center;letter-spacing:.06em}
+
+@media(max-width:340px){.ciao-predictions-card{padding:12px}.ciao-predictions-score-editor{gap:6px}.ciao-predictions-score-editor input{height:44px;font-size:19px}.ciao-predictions-match-title{font-size:12px}}
