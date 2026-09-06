@@ -44,6 +44,12 @@ function closest(target, selector) {
   return target?.closest?.(selector) || null;
 }
 
+function sameLiveRoute(current, context) {
+  if (!current?.screen || current.screen !== context?.screen) return false;
+  if (current.screen === 'matches') return text(current.tournament) === text(context?.tournament);
+  return current.screen === 'home';
+}
+
 function predictionScore(value) {
   const raw = text(value);
   if (!raw) return null;
@@ -112,12 +118,21 @@ export function createModularApplication({
     unsubscribeLive = liveEngine?.subscribe?.(snapshot => {
       if (!started) return;
       const current = router.current();
-      if (current?.screen !== 'home' || snapshot?.context?.screen !== 'home') return;
-      if (snapshot?.error) {
-        adapter?.hideHomeCompanion?.({ restore:true });
+      if (!sameLiveRoute(current, snapshot?.context)) return;
+
+      if (current.screen === 'home') {
+        if (snapshot?.error) {
+          adapter?.hideHomeCompanion?.({ restore:true });
+          return;
+        }
+        if (snapshot?.data != null) adapter?.showHomeCompanion?.(String(snapshot.data));
         return;
       }
-      if (snapshot?.data != null) adapter?.showHomeCompanion?.(String(snapshot.data));
+
+      if (current.screen === 'matches') {
+        if (snapshot?.error) return;
+        if (snapshot?.data != null) adapter?.showModular?.(String(snapshot.data));
+      }
     }) || null;
     return liveEngine;
   }
