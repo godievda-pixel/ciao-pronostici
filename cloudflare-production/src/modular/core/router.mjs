@@ -21,18 +21,33 @@ export function createRouter({
     return target;
   }
 
+  function callHistory(method, ...args) {
+    try {
+      const fn = history?.[method];
+      if (typeof fn !== 'function') return false;
+      fn.apply(history, args);
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  }
+
   function writeHistory(target, replace) {
     const state = routeState(target);
-    if (!state || !history) return;
-    if (replace && typeof history.replaceState === 'function') history.replaceState(state, '');
-    else if (typeof history.pushState === 'function') history.pushState(state, '');
+    if (!state || !history) return false;
+    if (replace) return callHistory('replaceState', state, '');
+    return callHistory('pushState', state, '');
   }
 
   function persistCurrentScroll() {
     const captured = normalizeRoute({ ...currentRoute, scrollY:readScroll() }) || currentRoute;
     currentRoute = captured;
     if (isTopLevelScreen(captured.screen)) lastValidTopLevel = captured;
-    if (history?.length > 0 && typeof history.replaceState === 'function') history.replaceState(routeState(captured), '');
+    try {
+      if (history?.length > 0) callHistory('replaceState', routeState(captured), '');
+    } catch (_error) {
+      // History is an enhancement only; navigation must remain usable in embedded WebViews.
+    }
     return captured;
   }
 
@@ -65,10 +80,9 @@ export function createRouter({
     },
     back() {
       const origin = currentRoute?.origin && normalizeRoute(currentRoute.origin, { allowMatchCenter:false });
-      if (history?.length > 1 && typeof history.back === 'function') {
-        history.back();
-        return true;
-      }
+      let canGoBack = false;
+      try { canGoBack = Number(history?.length) > 1; } catch (_error) { canGoBack = false; }
+      if (canGoBack && callHistory('back')) return true;
       commit(origin || fallback(), { replace:true, write:true });
       return true;
     },
