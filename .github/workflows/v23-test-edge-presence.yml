@@ -1,0 +1,30 @@
+name: v23 TEST Edge presence
+
+on:
+  push:
+    branches: [v23-test]
+    paths:
+      - '.github/workflows/v23-test-edge-presence.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check TEST runtime flags only
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const response = await fetch('https://lcnwccnkkxaosxnfvjvr.supabase.co/functions/v1/ciao-v23-env-check', {headers:{'cache-control':'no-cache'}});
+          if (!response.ok) throw new Error(`env_check_http_${response.status}`);
+          const payload = await response.json();
+          const out = {
+            environment_configured: payload.environment_configured === true,
+            origins_configured: payload.origins_configured === true,
+          };
+          console.log(JSON.stringify(out));
+          if (!out.environment_configured || !out.origins_configured) process.exit(3);
+          NODE
