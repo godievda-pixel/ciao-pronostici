@@ -39,3 +39,9 @@ test('prediction stylesheet owns the new editable card, score controls and save 
   assert.match(css,/\.ciao-predictions-saved-score\s*\{/);
   assert.match(css,/\.ciao-predictions-points\s*\{/);
 });
+
+test('prediction validation has visible inline feedback and invalid input styling',async()=>{
+  const css=await readFile(resolve(root,'src/modular/ui/predictions.css'),'utf8');
+  assert.match(css,/\.ciao-predictions-feedback\s*\{/);
+  assert.match(css,/\.ciao-predictions-score-editor\s+input\[aria-invalid=["']true["']\]\s*\{/);
+});
