@@ -2,7 +2,7 @@
 
 ## Goal
 
-Create a brand-new isolated Telegram/Cloudflare test environment for the current v23 candidate while keeping Production on the stable v22.5 release.
+Create a brand-new isolated Telegram/Cloudflare/Supabase test environment for the current v23 candidate while keeping Production on the stable v22.5 release.
 
 The test environment must be disposable and must never be required for Production to function.
 
@@ -11,12 +11,14 @@ The test environment must be disposable and must never be required for Productio
 ### Production
 - Branch: `main`
 - Worker: existing `ciao-web-app`
+- Supabase project: `dkefzepiiudehhzbbrjn`
 - Release: stable v22.5
 - Production remains untouched while v23 is tested.
 
 ### v23 TEST
 - Branch: `v23-test`
 - Worker: `ciao-web-v23-test`
+- Supabase project: `lcnwccnkkxaosxnfvjvr` (`Ciao, Web!`)
 - Public URL: `https://ciao-web-v23-test.ciao-web.workers.dev/`
 - Telegram button label: `🧪 Ciao v23 TEST`
 - The old TEST Worker/button is not reused.
@@ -43,6 +45,21 @@ Cloudflare Workers Builds settings:
 
 The first Worker connection may require one manual Cloudflare Dashboard step because no Cloudflare management credential is currently available to ChatGPT.
 
+## Supabase TEST backend
+
+Use the existing non-production Supabase project `lcnwccnkkxaosxnfvjvr` as the dedicated v23 TEST backend.
+
+Rules:
+- Production Supabase `dkefzepiiudehhzbbrjn` is never used for TEST writes.
+- TEST receives the database schema and only the Edge Functions required by v23.
+- Production user-generated data is not copied into TEST: no real predictions, user profiles, ranking rows tied to real users, private tokens, or notification state.
+- Reference/static data may be recreated or seeded when required for functional testing.
+- TEST Telegram users may create isolated TEST profiles, predictions, favorite-club settings, and ranking state inside `lcnwccnkkxaosxnfvjvr`.
+- Secrets and provider credentials are configured separately in TEST; they are never copied into Git.
+- Every v23 client API URL must point to `lcnwccnkkxaosxnfvjvr` before the TEST button is enabled.
+
+The initial migration should prefer the smallest schema/function subset required by current v23 rather than cloning unrelated Supabase functions from the production project.
+
 ## Telegram button
 
 After the new Worker has a live `workers.dev` URL, replace the old TEST entry with a new button:
@@ -56,12 +73,16 @@ The repository currently does not contain the Telegram button definition, so upd
 ## Verification gate
 
 Before the new TEST URL is given to the user:
-1. `npm test`
-2. `npm run build`
-3. `npx wrangler deploy --dry-run`
-4. Cloudflare TEST deployment succeeds
-5. TEST URL serves the v23 artifact
-6. Production `main` and `ciao-web-app` remain unchanged
+1. Supabase TEST project is `ACTIVE_HEALTHY`.
+2. Required v23 TEST schema/functions are deployed to `lcnwccnkkxaosxnfvjvr`.
+3. v23 API contract points only to TEST Supabase.
+4. `npm test` passes on `v23-test`.
+5. `npm run build` passes on `v23-test`.
+6. `npx wrangler deploy --dry-run` passes.
+7. Cloudflare TEST deployment succeeds.
+8. TEST URL serves the v23 artifact.
+9. Write smoke proves test predictions/profile changes stay in TEST Supabase.
+10. Production `main`, `ciao-web-app`, and Supabase production remain unchanged.
 
 After deployment, the user performs the real Telegram smoke on `🧪 Ciao v23 TEST`.
 
@@ -76,6 +97,8 @@ Required manual areas:
 - visible Back
 - Telegram/system Back
 - state restoration after Back
+- save prediction in TEST
+- Telegram profile sync in TEST
 
 Any defects found during this smoke are fixed only on `v23-test`.
 
