@@ -35,6 +35,7 @@ test('available prediction cards expose editable score, tournament identity and 
   assert.match(html, /data-prediction-match-id="ucl:601024"/);
   assert.match(html, /data-prediction-home[^>]*value="2"/);
   assert.match(html, /data-prediction-away[^>]*value="1"/);
+  assert.match(html, /data-prediction-feedback/);
   assert.match(html, /Milan/);
   assert.match(html, /Real Madrid/);
   assert.match(html, /18:45|20 сент/i);
