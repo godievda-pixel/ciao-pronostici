@@ -5,6 +5,7 @@ import {
   ROUND512_USER_VIEW_TABS,
   canonicalRound512UserView,
   providerSectionForRound512UserView,
+  enhanceRound512MatchCenterView,
 } from '../src/v23.3/round51-2-match-center-view.mjs';
 
 test('Round 51.2 exposes exactly the five approved user-facing Match Center tabs', () => {
@@ -29,4 +30,55 @@ test('Round 51.2 canonicalizes unknown user views to overview without exposing p
   assert.equal(canonicalRound512UserView('shots'), 'shots');
   assert.equal(canonicalRound512UserView('players'), 'overview');
   assert.equal(canonicalRound512UserView('anything'), 'overview');
+});
+
+const statsHtml = `
+<div class="cw239-mc">
+  <div class="cw239-mc-tabs">
+    <button data-cw239-tab="overview">Обзор</button>
+    <button data-cw239-tab="stats">Статы</button>
+    <button data-cw239-tab="events">События</button>
+    <button data-cw239-tab="lineups">Составы</button>
+    <button data-cw239-tab="players">Игроки</button>
+  </div>
+  <section class="cw239-mc-detail" data-cw239-active-section="stats">
+    <div data-cw233-mc-stats-section><b>Владение</b></div>
+    <div data-cw250-mc-pressure><b>Давление</b></div>
+    <div data-cw233-mc-shotmap><button data-cw502-action="shot">xG 0.31</button></div>
+    <div data-cw233-mc-shot-list><article>Paulo Dybala</article></div>
+    <article class="cw502-selected-shot" data-cw502-selected-shot="0">Paulo Dybala · xG 0.31</article>
+  </section>
+</div>`;
+
+const state = {
+  activeTab:'stats',
+  match:{ homeTeam:{ name:'Рома' }, awayTeam:{ name:'Аталанта' } },
+  sectionState:{ stats:{ status:'ready' } },
+  sections:{
+    stats:{
+      shots:[{ player:'Paulo Dybala', minute:64, xg:0.31, outcome:'saved', side:'home' }],
+    },
+  },
+};
+
+test('Round 51.2 Statistics view keeps metrics but removes shot-specific UI', () => {
+  const html = enhanceRound512MatchCenterView(statsHtml, state, { activeUserView:'statistics' });
+  assert.match(html, />Статистика<\/button>/);
+  assert.match(html, /data-cw512-user-view="statistics"[^>]*aria-selected="true"/);
+  assert.match(html, /data-cw233-mc-stats-section/);
+  assert.match(html, /data-cw250-mc-pressure/);
+  assert.doesNotMatch(html, /data-cw233-mc-shotmap/);
+  assert.doesNotMatch(html, /data-cw233-mc-shot-list/);
+  assert.doesNotMatch(html, /cw502-selected-shot/);
+});
+
+test('Round 51.2 Shots view keeps shot map/list but removes general statistics', () => {
+  const html = enhanceRound512MatchCenterView(statsHtml, state, { activeUserView:'shots' });
+  assert.match(html, />Удары<\/button>/);
+  assert.match(html, /data-cw512-user-view="shots"[^>]*aria-selected="true"/);
+  assert.doesNotMatch(html, /data-cw233-mc-stats-section/);
+  assert.doesNotMatch(html, /data-cw250-mc-pressure/);
+  assert.match(html, /data-cw233-mc-shotmap/);
+  assert.match(html, /data-cw233-mc-shot-list/);
+  assert.match(html, /Paulo Dybala/);
 });
