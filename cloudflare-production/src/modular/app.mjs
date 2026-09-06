@@ -1,4 +1,5 @@
 import { createLegacySurfaceAdapter } from './core/legacy-surface-adapter.mjs';
+import { createLiveEngine } from './core/live-engine.mjs';
 import { createRouter } from './core/router.mjs';
 import { renderModularRoute } from './core/route-renderer.mjs';
 import { createApiClient } from './data/api-client.mjs';
@@ -48,6 +49,7 @@ export function createModularApplication({
   dataService = null,
   adapterFactory = createLegacySurfaceAdapter,
   routeRenderer = renderModularRoute,
+  liveEngineFactory = createLiveEngine,
 } = {}) {
   const service = dataService || createDataService({
     apiClient:createApiClient(),
@@ -59,6 +61,8 @@ export function createModularApplication({
   let renderGeneration = 0;
   let renderTask = Promise.resolve();
   let adapter = null;
+  let liveEngine = null;
+  let unsubscribeLive = null;
 
   const router = createRouter({
     history:windowRef?.history,
@@ -71,22 +75,49 @@ export function createModularApplication({
     fallbackRoute:{ screen:'home' },
   });
 
+  function ensureLiveEngine() {
+    if (liveEngine) return liveEngine;
+    liveEngine = liveEngineFactory({
+      refresh:context => routeRenderer(
+        context?.screen ? context : DEFAULT_ROUTES.home,
+        { dataService:service, now:new Date() },
+      ),
+    });
+    unsubscribeLive = liveEngine?.subscribe?.(snapshot => {
+      if (!started) return;
+      const current = router.current();
+      if (current?.screen !== 'home' || snapshot?.context?.screen !== 'home') return;
+      if (snapshot?.error) {
+        adapter?.hideHomeCompanion?.({ restore:true });
+        return;
+      }
+      if (snapshot?.data != null) adapter?.showHomeCompanion?.(String(snapshot.data));
+    }) || null;
+    return liveEngine;
+  }
+
+  function stopLiveEngine() {
+    if (liveEngine?.state?.().running) liveEngine.stop?.();
+  }
+
   function scheduleRender(route) {
     const generation = ++renderGeneration;
     renderTask = Promise.resolve().then(async () => {
       if (route?.screen === 'home') {
         if (generation === renderGeneration) adapter?.hideModular?.();
         try {
-          const html = await routeRenderer(route, { dataService:service, now:new Date() });
-          if (generation !== renderGeneration) return html;
-          adapter?.showHomeCompanion?.(html);
-          return html;
+          const engine = ensureLiveEngine();
+          const snapshot = await engine.start(route);
+          if (generation !== renderGeneration) return snapshot?.data || '';
+          if (snapshot?.error) adapter?.hideHomeCompanion?.({ restore:true });
+          return snapshot?.data || '';
         } catch (_error) {
           if (generation === renderGeneration) adapter?.hideHomeCompanion?.({ restore:true });
           return '';
         }
       }
 
+      stopLiveEngine();
       if (generation === renderGeneration) adapter?.showModular?.(loadingHtml());
       try {
         const html = await routeRenderer(route, { dataService:service, now:new Date() });
@@ -200,6 +231,10 @@ export function createModularApplication({
   function stop() {
     if (!started) return false;
     renderGeneration += 1;
+    stopLiveEngine();
+    unsubscribeLive?.();
+    unsubscribeLive = null;
+    liveEngine = null;
     root?.removeEventListener?.('click', delegatedClick);
     windowRef?.removeEventListener?.('popstate', popstate);
     adapter?.stop?.();
