@@ -4,7 +4,7 @@
 
 **Goal:** Replace the legacy-overlaid TEST frontend with a genuinely standalone Telegram Mini App v23 that owns its HTML, DOM, router, state, localization, live updates and all five product sections.
 
-**Architecture:** New code lives under `cloudflare-production/src/v23/` and is the only source copied into TEST `dist`. It uses vanilla ES modules and CSS, one router/state owner, one Telegram bridge, one API client and one live controller. The existing `src/modular/` code remains in Git history during implementation but is never imported by the new build.
+**Architecture:** New code lives under `cloudflare-production/src/v23/` and is the only source copied into TEST `dist`. It uses vanilla ES modules and CSS, one router/state owner, one Telegram bridge, one API client and one live controller. The existing `src/modular/` code remains in Git history during implementation but is never imported by the new build. Environment-specific API origin is injected only into the built `index.html` meta configuration; business/UI JavaScript remains byte-identical between TEST and production.
 
 **Tech Stack:** HTML5, CSS, JavaScript ES modules, Telegram Mini Apps WebApp API, Node 22 `node:test`, Cloudflare Workers Static Assets / Wrangler.
 
@@ -25,6 +25,7 @@
 - Coppa Italia match surfaces start at 1/8 final; Coppa Italia has no Tables screen.
 - Match Center tabs are exactly `Обзор / Статистика / События / Составы / Игроки`.
 - Last-good data stays visible on transient refresh failure.
+- History API failure inside Telegram WebView must degrade to in-memory navigation, never a blank route.
 - Production remains v22.5 throughout this plan.
 
 ---
@@ -75,11 +76,11 @@ screens/
 
 Tests under `cloudflare-production/test/` use prefix `v23-standalone-`.
 
-The build writes only `src/v23/**` into `dist/**`.
+The build writes only `src/v23/**` into `dist/**`, plus the environment-specific API URL injected into `dist/index.html`.
 
 ---
 
-### Task 1: Replace build pipeline with standalone artifact
+### Task 1: Replace build pipeline with standalone artifact and environment config
 
 **Files:**
 - Modify: `cloudflare-production/scripts/build.mjs`
@@ -91,7 +92,9 @@ The build writes only `src/v23/**` into `dist/**`.
 - Create: `cloudflare-production/src/v23/styles/base.css`
 
 **Interfaces:**
-- `build()` produces `dist/index.html` and static `/v23/*` assets without network-fetching a release artifact.
+- `build({apiUrl})` produces `dist/index.html` and static `/v23/*` assets without network-fetching a release artifact.
+- TEST default API URL is `https://lcnwccnkkxaosxnfvjvr.supabase.co/functions/v1/ciao-v23-api`.
+- Production release must pass its own `CIAO_API_URL` explicitly; no production URL is committed into TEST source.
 
 - [ ] **Step 1: Write a failing build test**
 
@@ -101,8 +104,11 @@ Test source and built HTML for these requirements:
 assert.doesNotMatch(buildSource, /RELEASE_SOURCE_URL|v22-5|injectModularAssets|legacy-surface-adapter/);
 assert.match(indexHtml, /data-ciao-app="v23"/);
 assert.match(indexHtml, /src="\/v23\/app\.mjs"/);
+assert.match(indexHtml, /meta name="ciao-api-url"/);
 assert.doesNotMatch(indexHtml, /releases\/v22-5|data-ciao-modular/);
 ```
+
+Build once with the TEST URL and assert the meta value is the TEST endpoint. Build in a temporary output directory with a fake production-like URL `https://example.invalid/functions/v1/ciao-v23-api` and assert only the meta value changes; `v23/app.mjs` hash remains identical.
 
 - [ ] **Step 2: Run RED**
 
@@ -123,6 +129,7 @@ Use this structure:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="color-scheme" content="dark">
+  <meta name="ciao-api-url" content="">
   <title>Ciao, Web!</title>
   <link rel="stylesheet" href="/v23/styles/tokens.css">
   <link rel="stylesheet" href="/v23/styles/base.css">
@@ -140,11 +147,11 @@ Use this structure:
 
 - [ ] **Step 4: Rewrite `build.mjs`**
 
-Copy `src/v23/index.html` to `dist/index.html` and `src/v23` subdirectories to `dist/v23`; reject any built file containing production Supabase ref `dkefzepiiudehhzbbrjn` or `v22-5`.
+Copy `src/v23/index.html` to `dist/index.html`, inject the escaped `apiUrl` into the `ciao-api-url` meta tag, and copy `src/v23` modules/styles to `dist/v23`. In TEST mode reject any built file containing production Supabase ref `dkefzepiiudehhzbbrjn` or `v22-5`.
 
 - [ ] **Step 5: Update build probe**
 
-Probe asserts standalone marker, TEST Worker name, no legacy markers, no production Supabase ref.
+Probe asserts standalone marker, TEST Worker name, TEST API meta endpoint, no legacy markers, no production Supabase ref.
 
 - [ ] **Step 6: Verify**
 
@@ -198,6 +205,7 @@ Cover exact routes:
 
 ```text
 /home
+/settings
 /predictions
 /predictions/mine
 /ranking/all
@@ -229,17 +237,21 @@ Simulate:
 
 Assert returned route is `/matches/ucl` and `restoreScroll(730)` runs after render.
 
-- [ ] **Step 3: Run RED**
+- [ ] **Step 3: Write History API failure test**
+
+Use a fake history object whose `pushState()` and `replaceState()` throw `SecurityError`. Assert `navigate({screen:'ranking',subview:'europe'})` still renders the ranking route using router-owned in-memory history, and `back()` restores the prior route rather than leaving an empty screen.
+
+- [ ] **Step 4: Run RED**
 
 ```bash
 node --test test/v23-standalone-router.test.mjs
 ```
 
-- [ ] **Step 4: Implement one `popstate` owner**
+- [ ] **Step 5: Implement one `popstate` owner with safe history wrappers**
 
-Never call `history.pushState` from screen modules. Router is the only module permitted to mutate history.
+Never call `history.pushState` from screen modules. Router is the only module permitted to mutate browser history. Browser-history exceptions are caught inside router; the logical navigation stack remains authoritative.
 
-- [ ] **Step 5: Verify + commit**
+- [ ] **Step 6: Verify + commit**
 
 ```bash
 node --test test/v23-standalone-router.test.mjs
@@ -303,13 +315,14 @@ git commit -m "feat: add v23 Telegram shell bridge"
 **Interfaces:**
 - `createStore(initial)` -> `get()`, `set(updater)`, `subscribe(listener)`.
 - `createLastGoodCache()` -> `put(key,data,at)`, `get(key)`, `markError(key,error)`.
+- `readApiUrl(documentRef)` -> absolute HTTPS URL from `<meta name="ciao-api-url">`.
 - `createApiClient({fetchImpl,endpoint,getInitData})` -> `call(action,payload,{signal})`.
 
 - [ ] **Step 1: Write tests**
 
-API client must POST JSON to TEST `ciao-v23-api`, set `x-telegram-init-data`, accept only `{ok:true,data,meta}`, normalize errors to `{code,message,status}` and never include raw HTML/body dumps.
+API client must POST JSON to the URL returned by `readApiUrl()`, set `x-telegram-init-data`, accept only `{ok:true,data,meta}`, normalize errors to `{code,message,status}` and never include raw HTML/body dumps.
 
-Cache test: after success `A`, failed refresh leaves `A` available with error metadata.
+`readApiUrl()` rejects missing/non-HTTPS/malformed values. Cache test: after success `A`, failed refresh leaves `A` available with error metadata.
 
 - [ ] **Step 2: Run RED**
 
@@ -319,13 +332,7 @@ node --test test/v23-standalone-data.test.mjs
 
 - [ ] **Step 3: Implement**
 
-Keep endpoint in `contracts.mjs`:
-
-```js
-export const V23_API_URL = 'https://lcnwccnkkxaosxnfvjvr.supabase.co/functions/v1/ciao-v23-api';
-```
-
-Build probe already rejects production ref.
+Do not hardcode TEST or production Supabase origin inside JavaScript modules. Endpoint configuration exists only in built HTML meta.
 
 - [ ] **Step 4: Verify + commit**
 
@@ -338,7 +345,7 @@ git commit -m "feat: add v23 state and API data layer"
 
 ---
 
-### Task 5: Russian grammar and local timezone formatters
+### Task 5: Russian grammar, team cases and local timezone formatters
 
 **Files:**
 - Create: `cloudflare-production/src/v23/locale/ru.mjs`
@@ -348,7 +355,8 @@ git commit -m "feat: add v23 state and API data layer"
 **Interfaces:**
 - `pluralRu(n, one, few, many)`
 - `pointsLabel(n)`, `matchesLabel(n)`, `predictionsLabel(n)`, `goalsLabel(n)`
-- `competitionPhrase(id, form)` where form supports `name|in|genitive` for known competition phrases.
+- `competitionPhrase(id, form)` where form supports `name|in|genitive`.
+- `teamPhrase(team, form)` where form supports `name|genitive|dative|prepositional`; if the requested backend-provided case is missing, returns `nameRu` and caller must use a neutral sentence construction.
 - `formatKickoff(utcIso, {now,timeZone,locale='ru-RU'})`
 - `formatMatchDate(utcIso, options)`.
 
@@ -364,6 +372,20 @@ For each of 1,2,5,11,21,22,25 assert correct forms:
 ```
 
 Competition phrase assertions include `в Серии А`, `в Кубке Италии`, `в Лиге чемпионов`, `в Лиге Европы`, `в Лиге конференций`.
+
+Team case fixture:
+
+```js
+const inter = {
+  nameRu:'Интер',
+  genitiveRu:'Интера',
+  dativeRu:'Интеру',
+  prepositionalRu:'Интере',
+};
+assert.equal(teamPhrase(inter, 'genitive'), 'Интера');
+assert.equal(teamPhrase(inter, 'dative'), 'Интеру');
+assert.equal(teamPhrase({nameRu:'ПСЖ'}, 'genitive'), 'ПСЖ');
+```
 
 - [ ] **Step 2: Write timezone test**
 
@@ -441,7 +463,7 @@ git commit -m "feat: add standalone v23 design system"
 - Test: `cloudflare-production/test/v23-standalone-home.test.mjs`
 
 **Interfaces:**
-- `loadHome(api, cache, clock)` combines `bootstrap`, `favorite_next_match`, `calcio_today`.
+- `loadHome(api, cache, clock, timeZone)` combines `bootstrap`, `favorite_next_match`, `calcio_today`.
 - `renderHome(model)`.
 
 - [ ] **Step 1: Write Home model/render tests**
@@ -455,19 +477,23 @@ Assert blocks:
 - live first;
 - no predictions block.
 
-Empty today copy must be exactly `Кальчо сегодня нет :(`.
+Empty today copy must be exactly `Кальчо сегодня нет :(`. Avatar/profile control must carry `data-action="open-settings"` and route to `/settings`.
 
-- [ ] **Step 2: Run RED**
+- [ ] **Step 2: Write local-day boundary test**
+
+For a supplied device timezone, `loadHome()` converts the user's local midnight-to-midnight interval into UTC ISO boundaries and passes them to `calcio_today`; it does not ask the backend to guess timezone from IP.
+
+- [ ] **Step 3: Run RED**
 
 ```bash
 node --test test/v23-standalone-home.test.mjs
 ```
 
-- [ ] **Step 3: Implement Home**
+- [ ] **Step 4: Implement Home**
 
 Nearest and today cards carry routes to Match Center. Failed refresh retains cache and displays inline `Не удалось обновить` without replacing content.
 
-- [ ] **Step 4: Verify + commit**
+- [ ] **Step 5: Verify + commit**
 
 ```bash
 node --test test/v23-standalone-home.test.mjs
@@ -535,7 +561,7 @@ Labels exactly `Все / Италия / Еврокубки`; current user visual
 
 - [ ] **Step 2: Write Matches tests**
 
-Tournament cards exactly five. Serie A groups by round. Coppa begins at `1/8 финала`. European fixtures fixture data contains only Italian-relevant matches and renderer never inserts hidden/noneligible fallback.
+Tournament cards exactly five. Serie A groups by round. Coppa begins at `1/8 финала`. European fixture data contains only Italian-relevant matches and renderer never inserts hidden/noneligible fallback.
 
 - [ ] **Step 3: Write Tables tests**
 
@@ -657,6 +683,7 @@ Assert `createApp().start()`:
 - starts one router;
 - wires one Telegram Back callback;
 - renders `/home` fallback;
+- opens `/settings` from profile/avatar action;
 - updates bottom nav active state on route change;
 - restores last route for each bottom-nav section;
 - never imports legacy modules.
@@ -700,7 +727,46 @@ git commit -m "feat: compose standalone Ciao v23 app"
 
 ---
 
-### Task 13: Deploy to isolated TEST Worker and real Telegram smoke
+### Task 13: Remove remaining legacy backend compatibility from TEST
+
+**Files:**
+- Modify: `supabase/functions/ciao-v23-api/index.ts`
+- Modify/Delete when unused: `supabase/functions/ciao-v23-api/modular-actions.mjs`
+- Modify/Delete when unused: `supabase/functions/ciao-v23-api/modular-runtime.mjs`
+- Test: `cloudflare-production/test/v23-standalone-no-legacy.test.mjs`
+
+- [ ] **Step 1: Write static no-legacy test**
+
+Assert `ciao-v23-api/index.ts` and `router.mjs` do not contain `legacyState`, `legacyAction`, `modular_` public action names, or imports of `modular-actions.mjs` / `modular-runtime.mjs`.
+
+- [ ] **Step 2: Run RED if compatibility still exists**
+
+```bash
+node --test test/v23-standalone-no-legacy.test.mjs
+```
+
+- [ ] **Step 3: Remove compatibility branch after standalone frontend integration is green**
+
+Retain the canonical domain/service files created by Plan 1; delete only unreferenced legacy compatibility modules.
+
+- [ ] **Step 4: Verify**
+
+```bash
+node --test test/v23-standalone-no-legacy.test.mjs
+npm test
+npm run probe:api
+```
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add supabase/functions/ciao-v23-api cloudflare-production/test/v23-standalone-no-legacy.test.mjs
+git commit -m "refactor: remove v23 legacy compatibility"
+```
+
+---
+
+### Task 14: Deploy to isolated TEST Worker and real Telegram smoke
 
 **Files:**
 - Modify only if necessary: `.github/workflows/main-modular-check.yml` (rename display name is optional; do not alter production deployment).
@@ -728,6 +794,7 @@ Real-device/WebView checklist:
 ```text
 Home loads as new design, not v22.5.
 No legacy bottom bar/header appears.
+Profile/avatar opens Settings and Back returns Home.
 Favorite nearest match opens Match Center and Back returns Home.
 Calcio Today card opens Match Center and Back returns exact scroll.
 Predictions / Mine switch correctly.
@@ -754,11 +821,13 @@ Frontend plan is complete only when:
 - `dist/index.html` is standalone and contains no v22.5/legacy markers.
 - All automated tests pass.
 - One router/Back owner and one live controller are verified by tests.
-- Five bottom sections and unified Match Center work in real Telegram TEST.
+- History API failure cannot produce an empty route.
+- Five bottom sections, Settings and unified Match Center work in real Telegram TEST.
 - User-visible football names/stages/tournaments are Russian only.
-- Russian grammar matrix passes.
+- Russian grammar/case matrix passes.
 - User-local time is correct while deadlines stay server UTC-based.
 - European match screens contain only Italian-relevant fixtures; European standings are complete.
+- TEST backend has no legacy/modular public compatibility actions.
 - The user explicitly accepts the TEST behavior before any production-release work starts.
 
 The next plan is `docs/superpowers/plans/2026-09-06-v23-notifications-release.md`.
