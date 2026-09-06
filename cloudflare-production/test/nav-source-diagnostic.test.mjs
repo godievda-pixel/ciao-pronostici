@@ -2,23 +2,25 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { RELEASE_SOURCE_URL } from '../scripts/build.mjs';
 
-function clip(value, limit=700) {
-  return String(value || '').replace(/\s+/g, ' ').slice(0, limit);
+function snippets(source, regex, limit=8, radius=320) {
+  const out=[];
+  for (const match of source.matchAll(regex)) {
+    const index=match.index ?? 0;
+    out.push(source.slice(Math.max(0,index-radius), Math.min(source.length,index+match[0].length+radius)).replace(/\s+/g,' '));
+    if(out.length>=limit) break;
+  }
+  return out;
 }
 
-function matches(source, regex, limit=8) {
-  return Array.from(source.matchAll(regex), m => clip(m[0])).slice(0, limit);
-}
-
-test('diagnostic: report exact legacy bottom-nav listener code', async () => {
+test('diagnostic: report click capture and savebar/nav stacking contract', async () => {
   const response = await fetch(RELEASE_SOURCE_URL, { headers:{ 'cache-control':'no-cache' } });
   assert.equal(response.ok, true, `release source HTTP ${response.status}`);
   const html = await response.text();
   const report = {
-    navForEach: matches(html, /querySelectorAll\(\s*['"]\.nav button['"]\s*\)[\s\S]{0,700}?addEventListener\([\s\S]{0,450}/gi, 4),
-    buttonClick: matches(html, /(?:\b\w+|\))\.addEventListener\(\s*['"]click['"][\s\S]{0,600}/gi, 12),
-    dataTabHandlers: matches(html, /(?:dataset\.tab|\[data-tab\])[\s\S]{0,520}?(?:addEventListener|onclick|render\()/gi, 8),
-    stopImmediate: matches(html, /[\s\S]{0,180}stopImmediatePropagation\s*\([\s\S]{0,240}/gi, 8),
+    captureClick: snippets(html, /addEventListener\s*\(\s*['"]click['"][\s\S]{0,180}(?:true|capture)/gi, 3, 500),
+    savebarCss: snippets(html, /(?:#ciao-miniapp-root\s+)?\.savebar\s*\{[^}]*\}/gi, 10, 80),
+    navCss: snippets(html, /(?:#ciao-miniapp-root\s+)?\.nav\s*\{[^}]*\}/gi, 10, 80),
+    savebarMarkup: snippets(html, /<[^>]+class=["'][^"']*savebar[^"']*["'][^>]*>/gi, 5, 360),
   };
-  assert.fail(`NAVDIAG ${JSON.stringify(report)}`);
+  assert.fail(`STACKDIAG ${JSON.stringify(report)}`);
 });
