@@ -1,0 +1,36 @@
+name: main-modular-preview-artifact
+
+on:
+  push:
+    branches:
+      - feature/main-modular-app-rework
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: cloudflare-production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+      - run: npm run build
+      - run: npm run probe:api
+      - run: npm run probe:build
+      - run: npx wrangler deploy --dry-run
+      - name: Upload local preview artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ciao-main-modular-preview
+          path: cloudflare-production/dist
+          if-no-files-found: error
+          retention-days: 1
