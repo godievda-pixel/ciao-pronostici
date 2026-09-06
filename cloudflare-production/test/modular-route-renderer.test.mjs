@@ -63,7 +63,7 @@ test('Home renders Favorite and Calcio from one shared five-tournament match loa
     { dataService, now:new Date('2026-09-20T12:00:00Z') },
   );
 
-  assert.match(html, /data-ciao-favorite-club/);
+  assert.match(html, /ciao-match-card--favorite/);
   assert.match(html, /Кальчо сегодня/);
   assert.match(html, /Inter/);
   assert.match(html, /Arsenal/);
