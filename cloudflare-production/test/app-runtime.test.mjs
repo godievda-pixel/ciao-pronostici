@@ -19,6 +19,9 @@ function appHarness() {
   const shown = [];
   const homeShown = [];
   const renderedRoutes = [];
+  const liveStarts = [];
+  let liveFactoryCalls = 0;
+  let liveStops = 0;
   let hidden = 0;
   let navigateFromLegacy = null;
   const root = {
@@ -33,6 +36,7 @@ function appHarness() {
     showModular(html){ shown.push(String(html)); return {}; },
     hideModular(){ hidden += 1; return true; },
     showHomeCompanion(html){ homeShown.push(String(html)); return {}; },
+    hideHomeCompanion(){ return true; },
   };
   const adapterFactory = options => { navigateFromLegacy = options.onNavigate; return adapter; };
   const windowRef = {
@@ -45,12 +49,30 @@ function appHarness() {
     renderedRoutes.push({ ...route });
     return `<main data-screen="${route.screen}" data-subview="${route.subview||''}"></main>`;
   };
+  const liveEngineFactory = ({ refresh }) => {
+    liveFactoryCalls += 1;
+    let listener = null;
+    return {
+      subscribe(fn){ listener = fn; return () => { if (listener === fn) listener = null; }; },
+      async start(context){
+        liveStarts.push({ ...context });
+        listener?.({ running:true, context, data:null, error:null, updatedAt:null });
+        const data = await refresh(context);
+        const snapshot = { running:true, context, data, error:null, updatedAt:Date.now() };
+        listener?.(snapshot);
+        return snapshot;
+      },
+      stop(){ liveStops += 1; listener?.({ running:false, context:null, data:null, error:null, updatedAt:null }); },
+      state(){ return { running:liveStarts.length > liveStops }; },
+    };
+  };
   const app = createModularApplication({
-    documentRef:{ documentElement:{ dataset:{} } }, windowRef, dataService:{}, adapterFactory, routeRenderer,
+    documentRef:{ documentElement:{ dataset:{} } }, windowRef, dataService:{}, adapterFactory, routeRenderer, liveEngineFactory,
   });
   return {
-    app, shown, homeShown, renderedRoutes, rootListeners, windowListeners,
+    app, shown, homeShown, renderedRoutes, rootListeners, windowListeners, liveStarts,
     navigate:screen=>navigateFromLegacy(screen), hidden:()=>hidden,
+    liveFactoryCalls:()=>liveFactoryCalls, liveStops:()=>liveStops,
   };
 }
 
@@ -88,6 +110,26 @@ test('stable v22.5 Home tab keeps legacy ownership while mounting the modular Ho
   assert.equal(h.renderedRoutes.at(-1).screen, 'home');
   assert.match(h.homeShown.at(-1), /data-screen="home"/);
   assert.doesNotMatch(h.shown.at(-1), /data-screen="home"/);
+});
+
+test('runtime owns one Live Engine, starts it on Home and stops it off Home', async () => {
+  const h = appHarness();
+  h.app.start();
+
+  h.navigate('ranking');
+  await h.app.flush();
+  h.navigate('home');
+  await h.app.flush();
+  h.navigate('tables');
+  await h.app.flush();
+  h.navigate('home');
+  await h.app.flush();
+
+  assert.equal(h.liveFactoryCalls(), 1);
+  assert.deepEqual(h.liveStarts.map(x=>x.screen), ['home','home']);
+  assert.equal(h.liveStops(), 1);
+  h.app.stop();
+  assert.equal(h.liveStops(), 2);
 });
 
 test('modular delegated clicks preserve inner prediction/ranking/tournament state', async () => {
