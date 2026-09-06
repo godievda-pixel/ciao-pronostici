@@ -60,6 +60,40 @@ function enrichLineups(lineups, players) {
   });
 }
 
+function goals(match) {
+  return [...list(match?.goals?.home), ...list(match?.goals?.away)];
+}
+
+function scoredGoals(match) {
+  const home = Number(match?.score?.home ?? match?.homeScore ?? match?.home_score);
+  const away = Number(match?.score?.away ?? match?.awayScore ?? match?.away_score);
+  return (Number.isFinite(home) ? home : 0) + (Number.isFinite(away) ? away : 0);
+}
+
+function goalQuality(match) {
+  const rows = goals(match);
+  return {
+    total:rows.length,
+    named:rows.filter(goal => text(goal?.player)).length,
+  };
+}
+
+export function round512NeedsCanonicalBaseRecovery(match) {
+  const status = text(match?.status).toLowerCase();
+  if (status !== 'live' && status !== 'finished') return false;
+  const rows = goals(match);
+  return rows.some(goal => !text(goal?.player)) || scoredGoals(match) > rows.length;
+}
+
+export function applyRound512RecoveredBase(current, recovered) {
+  if (!current || !recovered) return current;
+  const before = goalQuality(current);
+  const after = goalQuality(recovered);
+  const improves = after.total > before.total
+    || (after.total >= before.total && after.named > before.named);
+  return improves ? Object.freeze({ ...current, goals:recovered.goals }) : current;
+}
+
 export function round512NeedsCanonicalSectionRecovery(sectionPayload, section) {
   if (section === 'lineups') {
     const homeStarters = list(sectionPayload?.data?.home?.starters).length;
@@ -74,6 +108,42 @@ export function round512NeedsCanonicalSectionRecovery(sectionPayload, section) {
   return false;
 }
 
+async function postRecovery({ request, env, initData, matchId, sections }) {
+  if (!env?.CIAO_WEB_API?.fetch || !request?.url) return null;
+  const id = numericMatchId(matchId);
+  if (!id) return null;
+  const upstream = await env.CIAO_WEB_API.fetch(new Request(new URL(SERIE_A_MATCH_CENTER_PATH, request.url), {
+    method:'POST',
+    headers:{
+      'content-type':'application/json',
+      'x-telegram-init-data':text(initData),
+    },
+    body:JSON.stringify({ match_id:id, sections, include_split:false }),
+  }));
+  if (!upstream.ok) return null;
+  let payload;
+  try {
+    payload = await upstream.json();
+  } catch {
+    return null;
+  }
+  return payload?.ok === false ? null : unwrapSerieAMatchCenterPayload(payload);
+}
+
+export async function recoverRound512SerieABase({ request, env, initData, matchId } = {}) {
+  const recoveredRaw = await postRecovery({
+    request,
+    env,
+    initData,
+    matchId,
+    sections:['incidents','player_stats'],
+  });
+  if (!recoveredRaw) return null;
+  const raw = normalizeRound512SerieARaw(recoveredRaw);
+  const adapted = adaptSerieALegacyMatchCenter(normalizeSerieALegacyMatchCenter(raw));
+  return goals(adapted?.base).length ? adapted.base : null;
+}
+
 function recoverySections(section) {
   if (section === 'lineups') return ['lineups','player_stats'];
   if (section === 'stats') return ['stats','overview_meta','player_stats'];
@@ -82,33 +152,11 @@ function recoverySections(section) {
 
 export async function recoverRound512SerieASection({ request, env, initData, matchId, section } = {}) {
   const sections = recoverySections(section);
-  if (!sections || !env?.CIAO_WEB_API?.fetch || !request?.url) return null;
-  const id = numericMatchId(matchId);
-  if (!id) return null;
+  if (!sections) return null;
+  const recoveredRaw = await postRecovery({ request, env, initData, matchId, sections });
+  if (!recoveredRaw) return null;
 
-  const upstream = await env.CIAO_WEB_API.fetch(new Request(new URL(SERIE_A_MATCH_CENTER_PATH, request.url), {
-    method:'POST',
-    headers:{
-      'content-type':'application/json',
-      'x-telegram-init-data':text(initData),
-    },
-    body:JSON.stringify({
-      match_id:id,
-      sections,
-      include_split:false,
-    }),
-  }));
-  if (!upstream.ok) return null;
-
-  let payload;
-  try {
-    payload = await upstream.json();
-  } catch {
-    return null;
-  }
-  if (payload?.ok === false) return null;
-
-  const raw = normalizeRound512SerieARaw(unwrapSerieAMatchCenterPayload(payload));
+  const raw = normalizeRound512SerieARaw(recoveredRaw);
   const adapted = adaptSerieALegacyMatchCenter(normalizeSerieALegacyMatchCenter(raw));
 
   if (section === 'lineups') {
