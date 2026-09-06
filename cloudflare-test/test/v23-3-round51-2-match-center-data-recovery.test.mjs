@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import worker from '../src/worker.js';
 import {
   recoverRound512SerieASection,
   round512NeedsCanonicalSectionRecovery,
@@ -77,4 +78,55 @@ test('Round 51.2 recovery maps the second Serie A payload to substitutes with ra
   assert.equal(result.data.home.substitutes[0].rating, 6.9);
   assert.equal(result.data.away.substitutes[0].name, 'Away Bench');
   assert.equal(result.data.away.substitutes[0].rating, 7.2);
+});
+
+test('Round 51.2 Worker recovers substitutes and ratings when the lazy Serie A payload contains only 11+11 starters', async () => {
+  const calls = [];
+  const env = {
+    CIAO_WEB_API:{
+      fetch:async request => {
+        const url = new URL(request.url);
+        const body = await request.clone().json();
+        calls.push({ path:url.pathname, body });
+        if (calls.length === 1) {
+          return Response.json({
+            ok:true,
+            match:{ id:900, status:'finished', home:{ id:10, name:'Рома' }, away:{ id:20, name:'Аталанта' } },
+            lineups:{ lineups:{
+              home:lineupSide('Home', 1),
+              away:lineupSide('Away', 101),
+            } },
+            player_stats:{ player_stats:[] },
+          });
+        }
+        return Response.json({
+          ok:true,
+          match:{ id:900, status:'finished', home:{ id:10, name:'Рома' }, away:{ id:20, name:'Аталанта' } },
+          lineups:{ lineups:{
+            home:{ ...lineupSide('Home', 1), substitutes:[player(30, 'Home Bench', false)] },
+            away:{ ...lineupSide('Away', 101), substitutes:[player(130, 'Away Bench', false)] },
+          } },
+          player_stats:{ player_stats:[
+            { player_id:30, name:'Home Bench', rating:6.9 },
+            { player_id:130, name:'Away Bench', rating:7.2 },
+          ] },
+        });
+      },
+    },
+  };
+
+  const response = await worker.fetch(new Request(
+    'https://test.local/api/v23.3/match-center?competition=serie_a&match_id=serie_a%3A900&section=lineups',
+    { headers:{ 'x-telegram-init-data':'signed-user' } },
+  ), env, {});
+
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls[0].body.sections, ['lineups','player_stats']);
+  assert.deepEqual(calls[1].body.sections, ['lineups','player_stats']);
+  assert.equal(payload.data.data.home.substitutes[0].name, 'Home Bench');
+  assert.equal(payload.data.data.home.substitutes[0].rating, 6.9);
+  assert.equal(payload.data.data.away.substitutes[0].name, 'Away Bench');
+  assert.equal(payload.data.data.away.substitutes[0].rating, 7.2);
 });
