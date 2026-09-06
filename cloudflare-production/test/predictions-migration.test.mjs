@@ -13,6 +13,52 @@ test('predictions move off Home and default to Прогнозы with two inner c
   assert.match(html, /data-prediction-mode="predictions"[^>]*class="[^"]*is-active/);
 });
 
+test('available prediction cards expose editable score, tournament identity and deadline', () => {
+  const html = renderPredictionsScreen({
+    mode:'predictions',
+    data:{
+      rules:{ exact_score:5, correct_goal_difference:3, correct_outcome:2, miss:0, deadline_minutes:15 },
+      items:[{
+        id:'ucl:601024', match_id:'ucl:601024', competition:'ucl',
+        kickoff_at:'2026-09-20T19:00:00Z', deadline_at:'2026-09-20T18:45:00Z',
+        prediction:{ home_score:2, away_score:1 },
+        match:{
+          id:'ucl:601024', competition:'ucl', kickoffAt:'2026-09-20T19:00:00Z', round:'1',
+          home:{ id:1, name:'Milan' }, away:{ id:2, name:'Real Madrid' },
+        },
+      }],
+    },
+  });
+
+  assert.match(html, /data-prediction-card/);
+  assert.match(html, /data-prediction-competition="ucl"/);
+  assert.match(html, /data-prediction-match-id="ucl:601024"/);
+  assert.match(html, /data-prediction-home[^>]*value="2"/);
+  assert.match(html, /data-prediction-away[^>]*value="1"/);
+  assert.match(html, /Milan/);
+  assert.match(html, /Real Madrid/);
+  assert.match(html, /18:45|20 сент/i);
+  assert.match(html, /data-prediction-save[^>]*>Сохранить/);
+  assert.match(html, /5 \/ 3 \/ 2 \/ 0/);
+});
+
+test('mine prediction cards show saved score and points without edit controls', () => {
+  const html = renderPredictionsScreen({
+    mode:'mine',
+    data:{ items:[{
+      competition:'serie_a', match_id:'serie_a:77', title:'Inter — Milan',
+      home_score:1, away_score:2, points:5,
+      match:{ home:{name:'Inter'}, away:{name:'Milan'}, kickoffAt:'2026-09-06T18:45:00Z' },
+    }] },
+  });
+
+  assert.match(html, /Inter — Milan|Inter/);
+  assert.match(html, /1\s*:\s*2/);
+  assert.match(html, /\+5/);
+  assert.doesNotMatch(html, /data-prediction-save/);
+  assert.doesNotMatch(html, /data-prediction-home/);
+});
+
 test('prediction bridge passes persistence payload, deadline and scoring fields through unchanged', async () => {
   const calls = [];
   const payload = {
