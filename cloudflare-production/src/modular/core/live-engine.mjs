@@ -8,6 +8,17 @@ function cloneState(state) {
   });
 }
 
+function contextKey(context) {
+  if (!context || typeof context !== 'object') return String(context ?? '');
+  return [
+    context.screen,
+    context.tournament,
+    context.competition,
+    context.matchId,
+    context.subview,
+  ].map(value => String(value ?? '')).join('|');
+}
+
 export function createLiveEngine({
   refresh,
   intervalMs = 30000,
@@ -68,9 +79,14 @@ export function createLiveEngine({
     async start(context) {
       generation += 1;
       clearScheduled();
+      const changed = contextKey(state.context) !== contextKey(context);
       state.running = true;
       state.context = context;
       state.error = null;
+      if (changed) {
+        state.data = null;
+        state.updatedAt = null;
+      }
       emit();
       return run(generation);
     },
