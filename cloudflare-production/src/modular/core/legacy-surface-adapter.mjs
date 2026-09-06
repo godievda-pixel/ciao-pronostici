@@ -87,6 +87,11 @@ export function createLegacySurfaceAdapter({
   let root = null;
   let listener = null;
   let modularHost = null;
+  let modularObserver = null;
+  let modularObservedParent = null;
+  let modularHtml = '';
+  let modularActive = false;
+  let modularRepairQueued = false;
   let homeHost = null;
   let homeObserver = null;
   let homeObservedParent = null;
@@ -101,7 +106,7 @@ export function createLegacySurfaceAdapter({
   }
 
   function ensureHost() {
-    if (modularHost?.isConnected !== false) return modularHost;
+    if (modularHost && modularHost.isConnected !== false) return modularHost;
     const parent = content();
     if (!parent || !documentRef?.createElement) return null;
     const existing = parent.querySelector?.('[data-ciao-modular-host]');
@@ -150,6 +155,48 @@ export function createLegacySurfaceAdapter({
   function restoreLegacyChildren() {
     for (const [child, wasHidden] of hiddenSnapshot) child.hidden = wasHidden;
     hiddenSnapshot = [];
+  }
+
+  function disconnectModularObserver() {
+    modularObserver?.disconnect?.();
+    modularObserver = null;
+    modularObservedParent = null;
+    modularRepairQueued = false;
+  }
+
+  function mountModular() {
+    if (!modularActive) return null;
+    const parent = content();
+    const host = ensureHost();
+    if (!parent || !host) return null;
+    restoreLegacyChildren();
+    hideLegacyChildren(parent, host);
+    host.hidden = false;
+    host.innerHTML = modularHtml;
+    return host;
+  }
+
+  function queueModularRepair() {
+    if (!modularActive || modularRepairQueued) return;
+    modularRepairQueued = true;
+    queueMicrotask(() => {
+      modularRepairQueued = false;
+      if (!modularActive) return;
+      const parent = content();
+      if (!parent) return;
+      if (parent !== modularObservedParent) observeModularParent(parent);
+      mountModular();
+    });
+  }
+
+  function observeModularParent(parent) {
+    if (!parent || typeof mutationObserverFactory !== 'function') return;
+    if (!modularObserver) modularObserver = mutationObserverFactory(queueModularRepair) || null;
+    if (!modularObserver?.observe) return;
+    if (modularObservedParent === parent) return;
+    if (modularObservedParent) modularObserver.disconnect?.();
+    modularObserver.observe(parent, { childList:true });
+    modularObservedParent = parent;
   }
 
   function rememberHomeHidden(node) {
@@ -237,6 +284,8 @@ export function createLegacySurfaceAdapter({
     stop() {
       if (root?.removeEventListener && listener) root.removeEventListener('click', listener, true);
       listener = null;
+      modularActive = false;
+      disconnectModularObserver();
       homeActive = false;
       disconnectHomeObserver();
       if (modularHost) modularHost.hidden = true;
@@ -248,15 +297,16 @@ export function createLegacySurfaceAdapter({
     showModular(html = '') {
       if (!root) root = documentRef?.querySelector?.(LEGACY_ROOT_SELECTOR) || null;
       const parent = content();
-      const host = ensureHost();
-      if (!parent || !host) return null;
-      restoreLegacyChildren();
-      hideLegacyChildren(parent, host);
-      host.hidden = false;
-      host.innerHTML = String(html ?? '');
+      if (!parent) return null;
+      modularHtml = String(html ?? '');
+      modularActive = true;
+      const host = mountModular();
+      observeModularParent(parent);
       return host;
     },
     hideModular() {
+      modularActive = false;
+      disconnectModularObserver();
       if (!modularHost) return false;
       modularHost.hidden = true;
       restoreLegacyChildren();
