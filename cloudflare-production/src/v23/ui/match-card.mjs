@@ -6,6 +6,12 @@ function teamName(team, side) {
   return value;
 }
 
+function scoreValue(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export function renderMatchCard(match = {}, { timeLabel = '' } = {}) {
   const id = String(match?.id ?? '').trim();
   if (!id) throw new Error('match_id_missing');
@@ -14,8 +20,8 @@ export function renderMatchCard(match = {}, { timeLabel = '' } = {}) {
   const competition = String(match?.competitionNameRu ?? '').trim();
   const stage = String(match?.stageNameRu ?? '').trim();
   const status = String(match?.statusRu ?? '').trim();
-  const homeScore = Number.isFinite(Number(match?.score?.home)) ? Number(match.score.home) : null;
-  const awayScore = Number.isFinite(Number(match?.score?.away)) ? Number(match.score.away) : null;
+  const homeScore = scoreValue(match?.score?.home);
+  const awayScore = scoreValue(match?.score?.away);
   const score = homeScore !== null && awayScore !== null
     ? `<span class="match-card__score" aria-label="Счёт ${homeScore}:${awayScore}">${homeScore} — ${awayScore}</span>`
     : '<span class="match-card__score match-card__score--pending">—</span>';
