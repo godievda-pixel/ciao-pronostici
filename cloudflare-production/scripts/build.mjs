@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -9,9 +9,29 @@ export const NO_X2_MARKER = 'ciao-prod-no-x2-20260903';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const distDir = resolve(root, 'dist');
 const releaseOut = resolve(distDir, 'releases/v22-5.html');
+const modularSourceDir = resolve(root, 'src/modular');
+const modularDistDir = resolve(distDir, 'modular');
 
 export function rootHtmlFor({ release }) {
   return String(release || '');
+}
+
+export function injectModularAssets(input) {
+  const html = String(input || '');
+  if (!html) return html;
+  if (html.includes('data-ciao-modular="main-v1"')) return html;
+  const assets = '<link rel="stylesheet" href="/modular/app.css" data-ciao-modular="main-v1">\n<script type="module" src="/modular/app.mjs" data-ciao-modular="main-v1"></script>';
+  if (/<\/head>/i.test(html)) return html.replace(/<\/head>/i, `${assets}\n</head>`);
+  return `${assets}\n${html}`;
+}
+
+export async function copyModularAssets({ sourceDir = modularSourceDir, distDir: targetDir = modularDistDir } = {}) {
+  const sourcePath = sourceDir instanceof URL ? fileURLToPath(sourceDir) : String(sourceDir);
+  await mkdir(targetDir, { recursive: true });
+  for (const name of ['app.mjs', 'app.css']) {
+    const content = await readFile(resolve(sourcePath, name), 'utf8');
+    await writeFile(resolve(targetDir, name), content, 'utf8');
+  }
 }
 
 export function validateReleaseHtml(input) {
@@ -36,11 +56,12 @@ export async function build() {
   if (!releaseResponse.ok) throw new Error(`release source HTTP ${releaseResponse.status}`);
   const release = await releaseResponse.text();
   validateReleaseHtml(release);
-  const rootHtml = rootHtmlFor({ release });
+  const rootHtml = injectModularAssets(rootHtmlFor({ release }));
   await mkdir(resolve(distDir, 'releases'), { recursive: true });
   await writeFile(resolve(distDir, 'index.html'), rootHtml, 'utf8');
-  await writeFile(releaseOut, release, 'utf8');
-  return { ok: true, entry: 'dist/index.html', release: 'dist/releases/v22-5.html', bytes: Buffer.byteLength(release) };
+  await writeFile(releaseOut, rootHtml, 'utf8');
+  await copyModularAssets();
+  return { ok: true, entry: 'dist/index.html', release: 'dist/releases/v22-5.html', bytes: Buffer.byteLength(rootHtml) };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
