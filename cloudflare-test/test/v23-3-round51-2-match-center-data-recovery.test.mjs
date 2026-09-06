@@ -176,3 +176,64 @@ test('Round 51.2 Worker restores a shot author from player_id and player_stats',
   assert.deepEqual(calls[1].sections, ['stats','overview_meta','player_stats']);
   assert.equal(payload.data.data.shots[0].player, 'Paulo Dybala');
 });
+
+test('Round 51.2 Worker restores a missing goal scorer name from player_id after stable hero enrichment', async () => {
+  const calls = [];
+  const incidents = [
+    { type:'goal', minute:14, is_home:true, player:{ name:'Known Home' }, home_score:1, away_score:0 },
+    { type:'goal', minute:51, is_home:true, player_id:88, home_score:2, away_score:0 },
+    { type:'goal', minute:76, is_home:false, player:{ name:'Known Away' }, home_score:2, away_score:1 },
+  ];
+  const env = {
+    CIAO_WEB_API:{
+      fetch:async request => {
+        const url = new URL(request.url);
+        const body = await request.clone().json();
+        calls.push({ path:url.pathname, body });
+        if (url.pathname === '/api/ciao-match-summary-fast-v2') {
+          return Response.json({
+            ok:true,
+            match:{
+              id:902,
+              status:'finished',
+              home_score:2,
+              away_score:1,
+              home:{ id:10, name:'Рома' },
+              away:{ id:20, name:'Аталанта' },
+            },
+          });
+        }
+        if (calls.length === 2) {
+          return Response.json({
+            ok:true,
+            match:{ id:902, status:'finished', home_score:2, away_score:1, home:{ id:10, name:'Рома' }, away:{ id:20, name:'Аталанта' } },
+            incidents:{ incidents },
+          });
+        }
+        return Response.json({
+          ok:true,
+          match:{ id:902, status:'finished', home_score:2, away_score:1, home:{ id:10, name:'Рома' }, away:{ id:20, name:'Аталанта' } },
+          incidents:{ incidents },
+          player_stats:{ player_stats:[
+            { player_id:88, short_name:'Recovered Scorer', team_id:10, rating:8.0 },
+          ] },
+        });
+      },
+    },
+  };
+
+  const response = await worker.fetch(new Request(
+    'https://test.local/api/v23.3/match-center?competition=serie_a&match_id=serie_a%3A902',
+    { headers:{ 'x-telegram-init-data':'signed-user' } },
+  ), env, {});
+
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.equal(calls.length, 3);
+  assert.equal(calls[0].path, '/api/ciao-match-summary-fast-v2');
+  assert.deepEqual(calls[1].body.sections, ['incidents']);
+  assert.deepEqual(calls[2].body.sections, ['incidents','player_stats']);
+  assert.equal(payload.data.match.goals.home[0].player, 'Known Home');
+  assert.equal(payload.data.match.goals.home[1].player, 'Recovered Scorer');
+  assert.equal(payload.data.match.goals.away[0].player, 'Known Away');
+});
