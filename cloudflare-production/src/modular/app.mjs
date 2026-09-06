@@ -43,6 +43,19 @@ function closest(target, selector) {
   return target?.closest?.(selector) || null;
 }
 
+function predictionScore(value) {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 0 || n > 20) throw new Error('invalid_prediction_score');
+  return n;
+}
+
+function serieAMatchId(value) {
+  const raw = text(value).replace(/^serie_a:/i, '');
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n <= 0) throw new Error('invalid_serie_a_match_id');
+  return n;
+}
+
 export function createModularApplication({
   documentRef = globalThis.document,
   windowRef = globalThis,
@@ -143,13 +156,43 @@ export function createModularApplication({
     return true;
   }
 
-  function delegatedClick(event) {
+  async function savePrediction(saveControl) {
+    const card = closest(saveControl, '[data-prediction-card]');
+    if (!card || typeof service.savePredictions !== 'function') return false;
+    const competition = text(card.dataset?.predictionCompetition).toLowerCase();
+    const matchId = text(card.dataset?.predictionMatchId);
+    const homeScore = predictionScore(card.querySelector?.('[data-prediction-home]')?.value);
+    const awayScore = predictionScore(card.querySelector?.('[data-prediction-away]')?.value);
+    const prediction = {
+      match_id:competition === 'serie_a' ? serieAMatchId(matchId) : matchId,
+      home_score:homeScore,
+      away_score:awayScore,
+    };
+    const payload = { competition, predictions:[prediction] };
+    if (competition === 'serie_a') {
+      const round = Number(card.dataset?.predictionRound);
+      if (Number.isInteger(round) && round > 0) payload.round = round;
+    }
+    await service.savePredictions(payload);
+    const current = router.current();
+    if (current?.screen === 'predictions') await scheduleRender(current);
+    return true;
+  }
+
+  async function delegatedClick(event) {
     const target = event?.target;
 
     const back = closest(target, '[data-ciao-mc-back]');
     if (back) {
       event?.preventDefault?.();
       router.back();
+      return;
+    }
+
+    const predictionSave = closest(target, '[data-prediction-save]');
+    if (predictionSave) {
+      event?.preventDefault?.();
+      await savePrediction(predictionSave);
       return;
     }
 
