@@ -1,14 +1,15 @@
-const PROJECT_ORIGIN = 'https://dkefzepiiudehhzbbrjn.supabase.co';
+const PROJECT_ORIGIN = 'https://lcnwccnkkxaosxnfvjvr.supabase.co';
 const FUNCTIONS = `${PROJECT_ORIGIN}/functions/v1`;
+const V23_API = `${FUNCTIONS}/ciao-v23-api`;
 
 export const CURRENT_API = Object.freeze({
   origin: PROJECT_ORIGIN,
-  core: `${FUNCTIONS}/ciao-core-api-fast-v6`,
-  matchCenter: `${FUNCTIONS}/ciao-match-center-fast-v3`,
-  clubProfile: `${FUNCTIONS}/ciao-club-profile-fast`,
-  live: `${FUNCTIONS}/ciao-live-snapshot-v1`,
-  schedule: `${FUNCTIONS}/ciao-schedule-fast-v1`,
-  predictionInsights: `${FUNCTIONS}/ciao-prediction-insights-v1`,
+  core: V23_API,
+  matchCenter: V23_API,
+  clubProfile: V23_API,
+  live: V23_API,
+  schedule: V23_API,
+  predictionInsights: V23_API,
   competitions: Object.freeze(['serie_a','coppa_italia','ucl','uel','uecl']),
   capabilities: Object.freeze({
     serieA: true,
