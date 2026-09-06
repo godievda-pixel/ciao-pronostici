@@ -23,6 +23,78 @@ function clickable({ text='', aria='', screen='', tab='' } = {}) {
   };
 }
 
+function element(className='') {
+  const attrs = new Map();
+  return {
+    className,
+    hidden:false,
+    children:[],
+    parentElement:null,
+    previousElementSibling:null,
+    nextElementSibling:null,
+    innerHTML:'',
+    isConnected:true,
+    classList:{ contains(name){ return className.split(/\s+/).includes(name); } },
+    setAttribute(name,value){ attrs.set(name,String(value)); },
+    getAttribute(name){ return attrs.get(name) || null; },
+  };
+}
+
+function legacyHomeHarness() {
+  const classes = [
+    'cw18-favorite-home cw211-home-shell',
+    'cw211-today',
+    'cw18-round-summary',
+    'cw18-rules-button',
+    'hero',
+    'rounds',
+    'section-title',
+    'matches',
+    'savebar',
+  ];
+  const nodes = classes.map(element);
+  const content = element('content');
+  content.children = nodes;
+  content.insertBefore = (node, before) => {
+    const index = content.children.indexOf(before);
+    if (index < 0) content.children.push(node);
+    else content.children.splice(index, 0, node);
+    node.parentElement = content;
+  };
+  content.appendChild = node => { content.children.push(node); node.parentElement = content; };
+  nodes.forEach((node,index) => {
+    node.parentElement = content;
+    node.previousElementSibling = nodes[index - 1] || null;
+    node.nextElementSibling = nodes[index + 1] || null;
+  });
+
+  const all = () => content.children;
+  const matchesSimple = (node, selector) => {
+    const s = selector.trim();
+    if (s === '[data-ciao-home-companion]') return node.getAttribute?.('data-ciao-home-companion') != null;
+    if (s === '[data-ciao-modular-host]') return node.getAttribute?.('data-ciao-modular-host') != null;
+    if (s.startsWith('.')) return node.className.split(/\s+/).includes(s.slice(1));
+    return false;
+  };
+  content.querySelectorAll = selector => all().filter(node => selector.split(',').some(part => matchesSimple(node,part)));
+  content.querySelector = selector => content.querySelectorAll(selector)[0] || null;
+
+  const root = {
+    addEventListener(){}, removeEventListener(){},
+    querySelector(selector){
+      if (selector === '.content') return content;
+      if (selector.startsWith('[data-tab=')) return null;
+      return content.querySelector(selector);
+    },
+    querySelectorAll(selector){ return content.querySelectorAll(selector); },
+  };
+  const documentRef = {
+    querySelector(selector){ return selector === LEGACY_ROOT_SELECTOR ? root : null; },
+    createElement(){ return element(''); },
+  };
+  return { root, content, nodes, documentRef };
+}
+
 test('legacy adapter is anchored only to the stable production root', () => {
   assert.equal(LEGACY_ROOT_SELECTOR, '#ciao-miniapp-root');
 });
@@ -140,6 +212,28 @@ test('Home navigation notifies modular router but continues to the original v22.
   assert.deepEqual(navigated, ['home']);
   assert.equal(prevented, 0);
   assert.equal(stopped, 0);
+});
+
+test('Home companion replaces favorite/today and prediction controls while preserving legacy summary content', () => {
+  const h = legacyHomeHarness();
+  const adapter = createLegacySurfaceAdapter({ documentRef:h.documentRef });
+  adapter.start();
+
+  assert.equal(typeof adapter.showHomeCompanion, 'function');
+  const host = adapter.showHomeCompanion?.('<section data-new-home>NEW HOME</section>');
+  assert.ok(host);
+  assert.equal(host.getAttribute('data-ciao-home-companion'), 'main-v1');
+  assert.equal(host.innerHTML, '<section data-new-home>NEW HOME</section>');
+  assert.equal(host.hidden, false);
+
+  const byClass = name => h.content.children.find(node => node.className.split(/\s+/).includes(name));
+  for (const name of ['cw18-favorite-home','cw211-today','rounds','section-title','matches','savebar']) {
+    assert.equal(byClass(name).hidden, true, `${name} should be hidden on Home`);
+  }
+  for (const name of ['cw18-round-summary','cw18-rules-button','hero']) {
+    assert.equal(byClass(name).hidden, false, `${name} should remain visible on Home`);
+  }
+  assert.ok(h.content.children.indexOf(host) < h.content.children.indexOf(byClass('cw18-favorite-home')));
 });
 
 test('adapter fails closed when the legacy host disappears', () => {
