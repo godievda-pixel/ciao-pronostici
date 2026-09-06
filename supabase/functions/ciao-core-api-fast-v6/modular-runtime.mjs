@@ -45,6 +45,21 @@ export function normalizeSerieAMatch(row={}){
 function titleForMatch(match){const home=text(match?.home?.name||match?.home_team?.name||match?.homeTeam?.name),away=text(match?.away?.name||match?.away_team?.name||match?.awayTeam?.name);return home&&away?`${home} — ${away}`:'Матч'}
 function sectionEnvelope(section,payload,match=null){return{title:titleForMatch(match||payload?.match||payload),note:section==='overview'?text(payload?.status||payload?.detail?.status):'',data:payload}}
 
+export function enrichSavedPredictions({items=[],matches=[]}={}){
+  const byId=new Map((Array.isArray(matches)?matches:[]).map(match=>[text(match?.id||match?.match_id),match]).filter(([id])=>id));
+  return (Array.isArray(items)?items:[]).map(item=>{
+    const match=byId.get(text(item?.match_id||item?.matchId));
+    if(!match)return item;
+    return{
+      ...item,
+      title:titleForMatch(match),
+      match,
+      kickoff_at:text(match.kickoffAt||match.kickoff_at),
+      round:text(match.round||match.round_number),
+    };
+  });
+}
+
 export function createModularRuntime({db,provider,legacyPost,matchCenterPost,now=()=>Date.now()}={}){
   if(!db?.from)throw new Error('db_required');
   if(!provider?.loadMatches||!provider?.loadStandings||!provider?.loadMatchCenter)throw new Error('provider_required');
@@ -106,7 +121,9 @@ export function createModularRuntime({db,provider,legacyPost,matchCenterPost,now
     if(payload.mode==='mine'){
       const legacy=[...maps.legacy.entries()].map(([matchId,row])=>({competition:'serie_a',match_id:matchId,home_score:row.home_score,away_score:row.away_score,points:row.points}));
       const external=[...maps.external.values()].map(row=>({competition:row.competition,match_id:row.match_id,home_score:row.predicted_home,away_score:row.predicted_away,points:row.points,deadline_at:row.locked_at}));
-      return{items:[...legacy,...external]};
+      const items=[...legacy,...external];
+      const matches=await allMatchesForPredictions(payload.competition);
+      return{items:enrichSavedPredictions({items,matches})};
     }
     const matches=await allMatchesForPredictions(payload.competition);
     const items=matches.filter(match=>{
