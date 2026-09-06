@@ -103,29 +103,31 @@ export function createModularApplication({
   function scheduleRender(route) {
     const generation = ++renderGeneration;
     renderTask = Promise.resolve().then(async () => {
+      if (!started || generation !== renderGeneration) return '';
+
       if (route?.screen === 'home') {
-        if (generation === renderGeneration) adapter?.hideModular?.();
+        adapter?.hideModular?.();
         try {
           const engine = ensureLiveEngine();
           const snapshot = await engine.start(route);
-          if (generation !== renderGeneration) return snapshot?.data || '';
+          if (!started || generation !== renderGeneration) return snapshot?.data || '';
           if (snapshot?.error) adapter?.hideHomeCompanion?.({ restore:true });
           return snapshot?.data || '';
         } catch (_error) {
-          if (generation === renderGeneration) adapter?.hideHomeCompanion?.({ restore:true });
+          if (started && generation === renderGeneration) adapter?.hideHomeCompanion?.({ restore:true });
           return '';
         }
       }
 
       stopLiveEngine();
-      if (generation === renderGeneration) adapter?.showModular?.(loadingHtml());
+      adapter?.showModular?.(loadingHtml());
       try {
         const html = await routeRenderer(route, { dataService:service, now:new Date() });
-        if (generation !== renderGeneration) return html;
+        if (!started || generation !== renderGeneration) return html;
         adapter?.showModular?.(html || errorHtml({ code:'empty_modular_screen' }));
         return html;
       } catch (error) {
-        if (generation === renderGeneration) adapter?.showModular?.(errorHtml(error));
+        if (started && generation === renderGeneration) adapter?.showModular?.(errorHtml(error));
         return '';
       }
     });
@@ -225,6 +227,7 @@ export function createModularApplication({
     root?.addEventListener?.('click', delegatedClick);
     windowRef?.addEventListener?.('popstate', popstate);
     started = true;
+    scheduleRender(DEFAULT_ROUTES.home);
     return true;
   }
 
