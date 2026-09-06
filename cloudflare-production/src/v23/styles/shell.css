@@ -1,0 +1,14 @@
+.app-shell {
+  width: min(100%, 760px);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: calc(var(--safe-top) + var(--space-5)) var(--space-4) calc(var(--safe-bottom) + var(--space-6));
+}
+
+.boot-card {
+  margin-top: 22vh;
+  padding: var(--space-6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
