@@ -44,9 +44,21 @@ function closest(target, selector) {
 }
 
 function predictionScore(value) {
-  const n = Number(value);
-  if (!Number.isInteger(n) || n < 0 || n > 20) throw new Error('invalid_prediction_score');
-  return n;
+  const raw = text(value);
+  if (!raw) return null;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 0 && n <= 20 ? n : null;
+}
+
+function setInputInvalid(input, invalid) {
+  if (!input) return;
+  if (invalid) input.setAttribute?.('aria-invalid', 'true');
+  else input.removeAttribute?.('aria-invalid');
+}
+
+function setPredictionFeedback(card, message) {
+  const feedback = card?.querySelector?.('[data-prediction-feedback]');
+  if (feedback) feedback.textContent = text(message);
 }
 
 function serieAMatchId(value) {
@@ -161,8 +173,19 @@ export function createModularApplication({
     if (!card || typeof service.savePredictions !== 'function') return false;
     const competition = text(card.dataset?.predictionCompetition).toLowerCase();
     const matchId = text(card.dataset?.predictionMatchId);
-    const homeScore = predictionScore(card.querySelector?.('[data-prediction-home]')?.value);
-    const awayScore = predictionScore(card.querySelector?.('[data-prediction-away]')?.value);
+    const homeInput = card.querySelector?.('[data-prediction-home]');
+    const awayInput = card.querySelector?.('[data-prediction-away]');
+    const homeScore = predictionScore(homeInput?.value);
+    const awayScore = predictionScore(awayInput?.value);
+    const homeInvalid = homeScore === null;
+    const awayInvalid = awayScore === null;
+    setInputInvalid(homeInput, homeInvalid);
+    setInputInvalid(awayInput, awayInvalid);
+    if (homeInvalid || awayInvalid) {
+      setPredictionFeedback(card, 'Введите счёт от 0 до 20');
+      return false;
+    }
+    setPredictionFeedback(card, '');
     const prediction = {
       match_id:competition === 'serie_a' ? serieAMatchId(matchId) : matchId,
       home_score:homeScore,
