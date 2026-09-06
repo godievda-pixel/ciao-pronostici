@@ -77,7 +77,7 @@ export function createModularRuntime({db,provider,legacyPost,matchCenterPost,now
     if(direct)return team(direct);
     const userId=Number(context?.userId||context?.state?.user?.id||context?.user?.id);
     if(!userId)return null;
-    const uq=await db.from('cp_users').select('favorite_team:cp_teams!cp_users_favorite_team_id_fkey(id,name,short_name,custom_emoji_id)').eq('id',userId).maybeSingle();
+    const uq=await db.from('cp_users').select('favorite_team:cp_teams!cp_users_favorite_team_fk(id,name,short_name,custom_emoji_id)').eq('id',userId).maybeSingle();
     if(uq.error)return null;
     return team(uq.data?.favorite_team);
   }
@@ -146,7 +146,7 @@ export function createModularRuntime({db,provider,legacyPost,matchCenterPost,now
   async function loadRanking(payload={},context={}){
     const competitions=rankingCompetitions(payload.scope||'all');
     const [usersQ,legacyQ,externalQ]=await Promise.all([
-      db.from('cp_users').select('id,display_name,username,favorite_team:cp_teams!cp_users_favorite_team_id_fkey(id,name,short_name,custom_emoji_id)').eq('is_active',true),
+      db.from('cp_users').select('id,display_name,username,favorite_team:cp_teams!cp_users_favorite_team_fk(id,name,short_name,custom_emoji_id)').eq('is_active',true),
       competitions.includes('serie_a')?db.from('cp_predictions').select('user_id,points').not('points','is',null):Promise.resolve({data:[],error:null}),
       competitions.some(id=>id!=='serie_a')?db.from('cp_competition_predictions').select('user_id,competition,points').in('competition',competitions.filter(id=>id!=='serie_a')).not('points','is',null):Promise.resolve({data:[],error:null}),
     ]);
