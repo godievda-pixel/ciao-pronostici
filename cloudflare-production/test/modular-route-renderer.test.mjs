@@ -55,3 +55,19 @@ test('favorite, calcio and Match Center all render from the same five-tournament
   assert.match(matchCenter, /Статистика/);
   assert.match(matchCenter, /data-ciao-mc-section="stats"/);
 });
+
+test('Home renders Favorite and Calcio from one shared five-tournament match load', async () => {
+  const dataService = service();
+  const html = await renderModularRoute(
+    { screen:'home' },
+    { dataService, now:new Date('2026-09-20T12:00:00Z') },
+  );
+
+  assert.match(html, /data-ciao-favorite-club/);
+  assert.match(html, /Кальчо сегодня/);
+  assert.match(html, /Inter/);
+  assert.match(html, /Arsenal/);
+  assert.equal(dataService.calls.filter(call => call[0] === 'favorite').length, 1);
+  assert.equal(dataService.calls.filter(call => call[0] === 'all-matches').length, 1);
+  assert.equal(dataService.calls.filter(call => call[0] === 'standings' && call[1] === 'serie_a').length, 1);
+});
