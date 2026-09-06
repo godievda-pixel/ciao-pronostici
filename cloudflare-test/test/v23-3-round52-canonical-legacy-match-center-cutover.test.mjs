@@ -93,6 +93,15 @@ test('Round 52 never hijacks prediction controls', () => {
   }
 });
 
+test('Round 52 canonical boundary dispatches Serie A and external data into v23.1 legacy events only', async () => {
+  const source = await read('../src/v23.3/match-center.mjs');
+  assert.doesNotMatch(source, /installCanonicalMatchCenter\s*\(/);
+  assert.doesNotMatch(source, /match-center-core\.mjs/);
+  assert.doesNotMatch(source, /match-center-runtime\.mjs/);
+  assert.match(source, /ciao-v233-open-serie-a-match/);
+  assert.match(source, /ciao-v233-open-external-legacy-match/);
+});
+
 test('v23.1 source patch remains the only rendered Match Center shell', () => {
   const fixture = `
 const __cw231HomeHtml = () => '';
