@@ -105,6 +105,16 @@ export function createLegacySurfaceAdapter({
     return root?.querySelector?.('.content') || root || null;
   }
 
+  function activateLegacyNavigation(screen) {
+    const entry = Object.entries(LEGACY_TAB_ROUTES).find(([, route]) => route === screen);
+    const activeTab = entry?.[0] || '';
+    if (!activeTab) return false;
+    for (const button of Array.from(root?.querySelectorAll?.('.nav button') || [])) {
+      button?.classList?.toggle?.('active', normalized(button?.dataset?.tab) === activeTab);
+    }
+    return true;
+  }
+
   function ensureHost() {
     if (modularHost && modularHost.isConnected !== false) return modularHost;
     const parent = content();
@@ -271,12 +281,15 @@ export function createLegacySurfaceAdapter({
         const screen = resolveLegacyScreen(event?.target);
         if (!screen) return;
         if (screen === 'home') {
-          onNavigate(screen, event);
+          try { onNavigate(screen, event); } catch (_error) {}
           return;
         }
+        let handedOff = false;
+        try { handedOff = onNavigate(screen, event) !== false; } catch (_error) { handedOff = false; }
+        if (!handedOff) return;
         event?.preventDefault?.();
         event?.stopImmediatePropagation?.();
-        onNavigate(screen, event);
+        activateLegacyNavigation(screen);
       };
       root.addEventListener('click', listener, true);
       return true;
