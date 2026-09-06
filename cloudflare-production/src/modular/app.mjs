@@ -196,7 +196,12 @@ export function createModularApplication({
       const round = Number(card.dataset?.predictionRound);
       if (Number.isInteger(round) && round > 0) payload.round = round;
     }
-    await service.savePredictions(payload);
+    try {
+      await service.savePredictions(payload);
+    } catch (_error) {
+      setPredictionFeedback(card, 'Не удалось сохранить прогноз');
+      return false;
+    }
     const current = router.current();
     if (current?.screen === 'predictions') await scheduleRender(current);
     return true;
