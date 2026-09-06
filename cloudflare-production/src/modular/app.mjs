@@ -15,6 +15,7 @@ export const MODULAR_FEATURES = Object.freeze({
 });
 
 const DEFAULT_ROUTES = Object.freeze({
+  home:Object.freeze({ screen:'home' }),
   predictions:Object.freeze({ screen:'predictions', subview:'predictions' }),
   ranking:Object.freeze({ screen:'ranking', subview:'all' }),
   matches:Object.freeze({ screen:'matches' }),
