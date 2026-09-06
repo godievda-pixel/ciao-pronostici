@@ -29,6 +29,8 @@ export const MIGRATED_NAV_LABELS = Object.freeze({
 
 const MIGRATED_SCREENS = new Set(Object.values(MIGRATED_NAV_LABELS));
 const CLICKABLE_SELECTOR = 'button,a,[role="button"],[data-screen],[data-view],[data-tab]';
+const HOME_REPLACED_SELECTOR = '.cw18-favorite-home,.cw2017-favorite-reminder,.cw211-today,.rounds,.matches,.savebar';
+const HOME_ANCHOR_SELECTOR = '.cw18-favorite-home,.cw2017-favorite-reminder,.cw211-today';
 
 function text(value) {
   return String(value ?? '').replace(/\s+/g, ' ').trim();
@@ -81,7 +83,9 @@ export function createLegacySurfaceAdapter({
   let root = null;
   let listener = null;
   let modularHost = null;
+  let homeHost = null;
   let hiddenSnapshot = [];
+  const homeHiddenSnapshot = new Map();
 
   function content() {
     return root?.querySelector?.('.content') || root || null;
@@ -105,6 +109,25 @@ export function createLegacySurfaceAdapter({
     return modularHost;
   }
 
+  function ensureHomeHost(parent) {
+    if (homeHost?.isConnected !== false && homeHost?.parentElement === parent) return homeHost;
+    const existing = parent?.querySelector?.('[data-ciao-home-companion]');
+    if (existing) {
+      homeHost = existing;
+      return homeHost;
+    }
+    if (!parent || !documentRef?.createElement) return null;
+    const host = documentRef.createElement('div');
+    host.setAttribute?.('data-ciao-home-companion', 'main-v1');
+    host.className = 'ciao-home-companion ciao-modular-host';
+    host.hidden = true;
+    const anchor = parent.querySelector?.(HOME_ANCHOR_SELECTOR) || null;
+    if (anchor && parent.insertBefore) parent.insertBefore(host, anchor);
+    else parent.appendChild?.(host);
+    homeHost = host;
+    return homeHost;
+  }
+
   function hideLegacyChildren(parent, host) {
     hiddenSnapshot = [];
     const children = Array.from(parent?.children || []);
@@ -118,6 +141,26 @@ export function createLegacySurfaceAdapter({
   function restoreLegacyChildren() {
     for (const [child, wasHidden] of hiddenSnapshot) child.hidden = wasHidden;
     hiddenSnapshot = [];
+  }
+
+  function rememberHomeHidden(node) {
+    if (!node || node === homeHost) return;
+    if (!homeHiddenSnapshot.has(node)) homeHiddenSnapshot.set(node, !!node.hidden);
+    node.hidden = true;
+  }
+
+  function hideReplacedHomeContent(parent) {
+    for (const node of Array.from(parent?.querySelectorAll?.(HOME_REPLACED_SELECTOR) || [])) {
+      rememberHomeHidden(node);
+    }
+    const matches = parent?.querySelector?.('.matches');
+    const title = matches?.previousElementSibling;
+    if (title?.classList?.contains?.('section-title')) rememberHomeHidden(title);
+  }
+
+  function restoreHomeContent() {
+    for (const [node, wasHidden] of homeHiddenSnapshot) node.hidden = wasHidden;
+    homeHiddenSnapshot.clear();
   }
 
   return Object.freeze({
@@ -144,7 +187,9 @@ export function createLegacySurfaceAdapter({
       if (root?.removeEventListener && listener) root.removeEventListener('click', listener, true);
       listener = null;
       if (modularHost) modularHost.hidden = true;
+      if (homeHost) homeHost.hidden = true;
       restoreLegacyChildren();
+      restoreHomeContent();
       root = null;
     },
     showModular(html = '') {
@@ -164,7 +209,24 @@ export function createLegacySurfaceAdapter({
       restoreLegacyChildren();
       return true;
     },
+    showHomeCompanion(html = '') {
+      if (!root) root = documentRef?.querySelector?.(LEGACY_ROOT_SELECTOR) || null;
+      const parent = content();
+      if (!parent) return null;
+      const host = ensureHomeHost(parent);
+      if (!host) return null;
+      hideReplacedHomeContent(parent);
+      host.hidden = false;
+      host.innerHTML = String(html ?? '');
+      return host;
+    },
+    hideHomeCompanion({ restore = false } = {}) {
+      if (homeHost) homeHost.hidden = true;
+      if (restore) restoreHomeContent();
+      return !!homeHost;
+    },
     host() { return modularHost; },
+    homeHost() { return homeHost; },
     root() { return root; },
   });
 }
