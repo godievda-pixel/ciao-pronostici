@@ -41,11 +41,11 @@ function element(className='') {
 }
 
 function linkChildren(content, nodes) {
-  content.children = nodes;
-  nodes.forEach((node,index) => {
+  content.children = [...nodes];
+  content.children.forEach((node,index) => {
     node.parentElement = content;
-    node.previousElementSibling = nodes[index - 1] || null;
-    node.nextElementSibling = nodes[index + 1] || null;
+    node.previousElementSibling = content.children[index - 1] || null;
+    node.nextElementSibling = content.children[index + 1] || null;
   });
 }
 
