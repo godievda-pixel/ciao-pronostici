@@ -38,21 +38,25 @@ async function loadLocalizationIds({supabaseUrl, serviceRoleKey}) {
   return new Set((Array.isArray(rows) ? rows : []).map(row => String(row?.provider_team_id ?? '')).filter(Boolean));
 }
 
+async function rememberStandings(provider, competition, teams) {
+  const standings = await provider.loadStandings({competition});
+  for (const row of standings?.rows ?? []) remember(teams, row?.team, `${competition}:standings`);
+}
+
 async function discover(provider) {
   const teams = new Map();
 
-  for (const competition of ['serie_a','coppa_italia']) {
-    const matches = await provider.loadMatches({competition});
-    for (const match of matches) {
-      remember(teams, match?.home, `${competition}:matches`);
-      remember(teams, match?.away, `${competition}:matches`);
-    }
+  // Current Serie A membership is authoritative even when the provider returns
+  // no event rows for an unbounded match query.
+  await rememberStandings(provider, 'serie_a', teams);
+
+  const coppaMatches = await provider.loadMatches({competition:'coppa_italia'});
+  for (const match of coppaMatches) {
+    remember(teams, match?.home, 'coppa_italia:matches');
+    remember(teams, match?.away, 'coppa_italia:matches');
   }
 
-  for (const competition of EUROPE) {
-    const standings = await provider.loadStandings({competition});
-    for (const row of standings?.rows ?? []) remember(teams, row?.team, `${competition}:standings`);
-  }
+  for (const competition of EUROPE) await rememberStandings(provider, competition, teams);
 
   return teams;
 }
