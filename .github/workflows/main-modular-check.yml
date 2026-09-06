@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/main-modular-app-rework
+      - v23-test
   workflow_dispatch:
 
 permissions:
