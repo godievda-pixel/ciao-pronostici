@@ -129,6 +129,10 @@ export function createLegacySurfaceAdapter({
       listener = event => {
         const screen = resolveLegacyScreen(event?.target);
         if (!screen) return;
+        if (screen === 'home') {
+          onNavigate(screen, event);
+          return;
+        }
         event?.preventDefault?.();
         event?.stopImmediatePropagation?.();
         onNavigate(screen, event);
