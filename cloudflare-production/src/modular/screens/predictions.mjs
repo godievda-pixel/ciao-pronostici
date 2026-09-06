@@ -52,6 +52,7 @@ function availableCard(item = {}, index) {
       <label><span>${esc(names.away)}</span><input type="number" inputmode="numeric" min="0" max="20" step="1" data-prediction-away value="${scoreValue(prediction.away_score)}" aria-label="Счёт ${esc(names.away)}"></label>
     </div>
     ${deadline ? `<div class="ciao-predictions-deadline">Дедлайн: ${esc(deadline)}</div>` : ''}
+    <div class="ciao-predictions-feedback" data-prediction-feedback aria-live="polite"></div>
     <button type="button" class="ciao-predictions-save" data-prediction-save>Сохранить</button>
   </article>`;
 }
