@@ -28,8 +28,11 @@
 .ciao-predictions-score-editor input{box-sizing:border-box;width:100%;min-width:0;height:48px;padding:0 6px;border:1px solid rgba(132,153,255,.19);border-radius:13px;outline:0;background:rgba(3,10,29,.76);color:#fff;font:950 21px/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;text-align:center;appearance:textfield;-moz-appearance:textfield;transition:border-color .16s ease,box-shadow .16s ease,background .16s ease}
 .ciao-predictions-score-editor input::-webkit-outer-spin-button,.ciao-predictions-score-editor input::-webkit-inner-spin-button{margin:0;-webkit-appearance:none}
 .ciao-predictions-score-editor input:focus{border-color:rgba(103,130,255,.78);background:rgba(8,19,51,.92);box-shadow:0 0 0 3px rgba(64,94,255,.14)}
+.ciao-predictions-score-editor input[aria-invalid="true"]{border-color:rgba(255,91,121,.78);background:rgba(53,10,24,.74);box-shadow:0 0 0 3px rgba(255,74,108,.12)}
 .ciao-predictions-score-separator{padding-bottom:13px;color:#7184b4;font-size:18px;font-weight:950;line-height:1}
 .ciao-predictions-deadline{margin-top:9px;color:#7f91ba;font-size:8px;font-weight:750;text-align:center}
+.ciao-predictions-feedback{min-height:14px;margin-top:7px;color:#ff9cab;font-size:8px;font-weight:850;line-height:1.35;text-align:center}
+.ciao-predictions-feedback:empty{min-height:0;margin-top:0}
 .ciao-predictions-save{width:100%;min-height:42px;margin-top:10px;padding:0 14px;border:0;border-radius:12px;background:linear-gradient(135deg,#315aff,#1735c9);box-shadow:0 8px 20px rgba(25,58,213,.24),inset 0 1px 0 rgba(255,255,255,.12);color:#fff;font-size:10px;font-weight:950;letter-spacing:.01em;cursor:pointer}
 .ciao-predictions-save:active{transform:translateY(1px)}
 .ciao-predictions-card--mine{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:12px;row-gap:5px}
