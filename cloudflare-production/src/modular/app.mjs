@@ -120,6 +120,7 @@ export function createModularApplication({
       }
 
       stopLiveEngine();
+      adapter?.hideHomeCompanion?.({ restore:true });
       adapter?.showModular?.(loadingHtml());
       try {
         const html = await routeRenderer(route, { dataService:service, now:new Date() });
