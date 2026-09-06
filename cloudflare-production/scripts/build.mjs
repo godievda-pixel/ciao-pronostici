@@ -1,17 +1,14 @@
-import { copyFile, mkdir, readdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const RELEASE_SOURCE_URL = 'https://dkefzepiiudehhzbbrjn.supabase.co/storage/v1/object/public/ciao-miniapp/migration/v22-5-resolved-no-x2.html';
 export const RELEASE_PATH = '/releases/v22-5.html';
 export const NO_X2_MARKER = 'ciao-prod-no-x2-20260903';
-export const MODULAR_MARKER = 'main-v1';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const distDir = resolve(root, 'dist');
 const releaseOut = resolve(distDir, 'releases/v22-5.html');
-const modularSourceDir = resolve(root, 'src/modular');
-const modularDistDir = resolve(distDir, 'modular');
 
 export function rootHtmlFor({ release }) {
   return String(release || '');
@@ -34,42 +31,16 @@ export function validateReleaseHtml(input) {
   return true;
 }
 
-export function injectModularAssets(input) {
-  const html = String(input || '')
-    .replace(/<link\b[^>]*data-ciao-modular=["']main-v1["'][^>]*>\s*/gi, '')
-    .replace(/<script\b[^>]*data-ciao-modular=["']main-v1["'][^>]*>\s*<\/script>\s*/gi, '');
-  const assets = `<link rel="stylesheet" href="/modular/app.css" data-ciao-modular="${MODULAR_MARKER}">\n<script type="module" src="/modular/app.mjs" data-ciao-modular="${MODULAR_MARKER}"></script>\n`;
-  return html.includes('</head>') ? html.replace('</head>', `${assets}</head>`) : `${assets}${html}`;
-}
-
-async function copyTree(source, target) {
-  await mkdir(target, { recursive:true });
-  for (const entry of await readdir(source, { withFileTypes:true })) {
-    const from = resolve(source, entry.name);
-    const to = resolve(target, entry.name);
-    if (entry.isDirectory()) await copyTree(from, to);
-    else if (entry.isFile()) await copyFile(from, to);
-  }
-}
-
-export async function copyModularAssets({ sourceDir = modularSourceDir, distDir: targetDir = modularDistDir } = {}) {
-  const source = sourceDir instanceof URL ? fileURLToPath(sourceDir) : resolve(String(sourceDir));
-  const target = targetDir instanceof URL ? fileURLToPath(targetDir) : resolve(String(targetDir));
-  await copyTree(source, target);
-}
-
 export async function build() {
   const releaseResponse = await fetch(RELEASE_SOURCE_URL, { headers: { 'cache-control': 'no-cache' } });
   if (!releaseResponse.ok) throw new Error(`release source HTTP ${releaseResponse.status}`);
   const release = await releaseResponse.text();
   validateReleaseHtml(release);
-  const modularRelease = injectModularAssets(release);
-  const rootHtml = rootHtmlFor({ release: modularRelease });
+  const rootHtml = rootHtmlFor({ release });
   await mkdir(resolve(distDir, 'releases'), { recursive: true });
-  await copyModularAssets();
   await writeFile(resolve(distDir, 'index.html'), rootHtml, 'utf8');
-  await writeFile(releaseOut, modularRelease, 'utf8');
-  return { ok: true, entry: 'dist/index.html', release: 'dist/releases/v22-5.html', bytes: Buffer.byteLength(modularRelease) };
+  await writeFile(releaseOut, release, 'utf8');
+  return { ok: true, entry: 'dist/index.html', release: 'dist/releases/v22-5.html', bytes: Buffer.byteLength(release) };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
