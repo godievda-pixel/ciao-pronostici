@@ -92,7 +92,9 @@ test('Round 19 installs only the canonical match-link router, never the second M
   assert.match(homeSource, /installCanonicalMatchLinks\(globalThis\.document\)/);
 
   const matchCenterSource = await readFile(new URL('../src/v23.3/match-center.mjs', import.meta.url), 'utf8');
-  assert.match(matchCenterSource, /if \(payload\?\.competition === 'serie_a'\) return Core\.openCanonicalMatchCenter\(payload\)/);
+  assert.doesNotMatch(matchCenterSource, /match-center-core\.mjs|Core\./);
+  assert.match(matchCenterSource, /ciao-v233-open-serie-a-match/);
+  assert.match(matchCenterSource, /return openSerieALegacyMatchCenter\(payload\)/);
   assert.match(matchCenterSource, /return openExternalLegacyMatchCenter\(payload\)/);
 });
 
