@@ -14,6 +14,12 @@ function list(value) {
   return Array.isArray(value) ? value : [];
 }
 
+function finiteRating(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const rating = Number(value);
+  return Number.isFinite(rating) ? rating : null;
+}
+
 function numericMatchId(matchId) {
   const value = Number(text(matchId).replace(/^serie_a:/, ''));
   return Number.isFinite(value) && value > 0 ? value : null;
@@ -23,8 +29,8 @@ function ratingIndex(players) {
   const byId = new Map();
   const byName = new Map();
   for (const player of list(players)) {
-    const rating = Number(player?.rating);
-    if (!Number.isFinite(rating)) continue;
+    const rating = finiteRating(player?.rating);
+    if (rating === null) continue;
     const id = text(player?.playerId ?? player?.player_id ?? player?.id);
     const name = text(player?.name ?? player?.shortName ?? player?.short_name).toLocaleLowerCase('ru-RU');
     if (id) byId.set(id, rating);
@@ -34,11 +40,11 @@ function ratingIndex(players) {
 }
 
 function enrichPlayer(player, index) {
-  if (Number.isFinite(Number(player?.rating))) return player;
+  if (finiteRating(player?.rating) !== null) return player;
   const id = text(player?.playerId ?? player?.player_id ?? player?.id);
   const name = text(player?.name ?? player?.shortName ?? player?.short_name).toLocaleLowerCase('ru-RU');
   const rating = (id && index.byId.get(id)) ?? (name && index.byName.get(name));
-  return Number.isFinite(Number(rating)) ? Object.freeze({ ...player, rating:Number(rating) }) : player;
+  return finiteRating(rating) !== null ? Object.freeze({ ...player, rating:finiteRating(rating) }) : player;
 }
 
 function enrichLineups(lineups, players) {
