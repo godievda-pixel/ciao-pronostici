@@ -1,4 +1,3 @@
-import { openRound512MatchCenter } from './round51-2-match-center-runtime.mjs';
 import { getMatchBootstrap } from './match-bootstrap-cache.mjs';
 
 const PREDICTION_CONTROL_SELECTOR = '[data-cw233-delta],[data-cw233-save-all],[data-cw231-action="predict"]';
@@ -7,6 +6,11 @@ const MATCH_CENTER_BUTTON_SELECTOR = '[data-cw231-action="match-center"]';
 
 function text(value) {
   return String(value ?? '').trim();
+}
+
+async function openRound512MatchCenterLazy(payload) {
+  const { openRound512MatchCenter } = await import('./round51-2-match-center-runtime.mjs');
+  return openRound512MatchCenter(payload);
 }
 
 function sourceForTarget(target, competition = '') {
@@ -88,7 +92,7 @@ export function resolveRound512MatchTarget(target) {
 
 export function installRound512MatchLinks(
   documentRef = globalThis.document,
-  { open = openRound512MatchCenter } = {},
+  { open = openRound512MatchCenterLazy } = {},
 ) {
   if (!documentRef?.addEventListener || typeof open !== 'function') return null;
 
