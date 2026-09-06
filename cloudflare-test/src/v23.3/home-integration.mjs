@@ -5,7 +5,7 @@ import {
   loadAllCompetitionMatches,
   selectHomeMatches,
 } from './competition-data.mjs';
-import { installRound512MatchLinks as installCanonicalMatchLinks } from './round51-2-match-center-links.mjs';
+import { installCanonicalMatchLinks } from './match-center-links.mjs';
 import { rememberMatchBootstrap } from './match-bootstrap-cache.mjs';
 
 const DEFAULT_TTL_MS = 60_000;
