@@ -20,12 +20,15 @@ export function normalizeRoute(route, { allowMatchCenter = true } = {}) {
   if (!route || !isValidScreen(route.screen)) return null;
   const screen = text(route.screen);
   if (!allowMatchCenter && screen === 'match-center') return null;
+  const tournament = text(route.tournament || route.competition);
+  const matchId = text(route.matchId || route.match_id);
+  if (screen === 'match-center' && (!tournament || !matchId)) return null;
   const origin = route.origin ? normalizeRoute(route.origin, { allowMatchCenter:false }) : null;
   return Object.freeze({
     screen,
     subview: text(route.subview),
-    tournament: text(route.tournament || route.competition),
-    matchId: text(route.matchId || route.match_id),
+    tournament,
+    matchId,
     scrollY: number(route.scrollY),
     origin,
   });
