@@ -5,7 +5,7 @@ import {
   loadAllCompetitionMatches,
   selectHomeMatches,
 } from './competition-data.mjs';
-import { installCanonicalMatchLinks } from './match-center-links.mjs';
+import { installRound51MatchLinks } from './round51-match-center-links.mjs';
 import { rememberMatchBootstrap } from './match-bootstrap-cache.mjs';
 
 const DEFAULT_TTL_MS = 60_000;
@@ -223,7 +223,7 @@ export function createHomeRuntime({
 const runtime = createHomeRuntime();
 globalThis.CiaoV233Home = Object.freeze({ ensure:runtime.ensure, html:runtime.html, state:runtime.state });
 
-if (typeof globalThis.document !== 'undefined') installCanonicalMatchLinks(globalThis.document);
+if (typeof globalThis.document !== 'undefined') installRound51MatchLinks(globalThis.document);
 
 try {
   if (typeof globalThis.dispatchEvent === 'function' && typeof globalThis.Event === 'function') globalThis.dispatchEvent(new globalThis.Event('ciao-v233-home-ready'));
