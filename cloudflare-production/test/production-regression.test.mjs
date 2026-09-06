@@ -16,7 +16,7 @@ async function sourceTree(dir){
     for(const entry of await readdir(path,{withFileTypes:true})){
       const next=resolve(path,entry.name);
       if(entry.isDirectory())await walk(next);
-      else if(entry.isFile()&&/\.(mjs|css)$/.test(entry.name))out.push(await readFile(next,'utf8'));
+      else if(entry.isFile()&&/\.(mjs|css|html)$/.test(entry.name))out.push(await readFile(next,'utf8'));
     }
   }
   await walk(base);
@@ -33,20 +33,16 @@ test('production readiness includes an executable build probe and package script
   assert.equal(pkg.scripts['probe:build'],'node scripts/probe-production-build.mjs');
 });
 
-test('modular production sources contain no TEST/Round runtime dependency',async()=>{
-  const source=await sourceTree('src/modular');
-  assert.doesNotMatch(source,/cloudflare-test|ciao-web-test|Round\d+|ROUND\d+|TEST_HOST|TEST_RUNTIME/);
+test('standalone v23 sources contain no legacy adapter or TEST runtime hostname',async()=>{
+  const source=await sourceTree('src/v23');
+  assert.doesNotMatch(source,/legacy-surface-adapter|data-ciao-modular|\/modular\//i);
+  assert.doesNotMatch(source,/ciao-web-v23-test|lcnwccnkkxaosxnfvjvr|dkefzepiiudehhzbbrjn/);
 });
 
-test('production shell still preserves stable v22.5/no-x2 and modular ownership markers',async()=>{
-  const [build,app,adapter]=await Promise.all([
-    text('scripts/build.mjs'),
-    text('src/modular/app.mjs'),
-    text('src/modular/core/legacy-surface-adapter.mjs'),
-  ]);
-  assert.match(build,/v22-5-resolved-no-x2\.html/);
-  assert.match(build,/ciao-prod-no-x2-20260903/);
-  assert.match(app,/main-modular-v1/);
-  assert.match(adapter,/LEGACY_ROOT_SELECTOR\s*=\s*'#ciao-miniapp-root'/);
-  assert.doesNotMatch(adapter,/profile|settings|rules|admin/i);
+test('build owns only the standalone v23 source and environment meta contract',async()=>{
+  const build=await text('scripts/build.mjs');
+  assert.match(build,/src\/v23/);
+  assert.match(build,/ciao-api-url/);
+  assert.doesNotMatch(build,/RELEASE_SOURCE_URL|injectModularAssets|legacy-surface-adapter/);
+  assert.doesNotMatch(build,/v22-5-resolved-no-x2\.html/);
 });
