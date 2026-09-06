@@ -79,3 +79,24 @@ test('invalid popstate never renders an empty shell and falls back to last valid
   assert.equal(h.rendered.at(-1).screen, 'tables');
   assert.ok(h.rendered.every(route => route && route.screen));
 });
+
+test('History API write failures never block a modular navigation render', () => {
+  const rendered = [];
+  const history = {
+    length:1,
+    replaceState(){ throw new Error('telegram_history_blocked'); },
+    pushState(){ throw new Error('telegram_history_blocked'); },
+  };
+  const router = createRouter({
+    history,
+    renderRoute:route => rendered.push(route),
+    readScroll:() => 64,
+    restoreScroll:() => {},
+    afterRender:fn => fn(),
+    fallbackRoute:{ screen:'home' },
+  });
+
+  assert.doesNotThrow(() => router.navigate({ screen:'predictions', subview:'predictions' }));
+  assert.equal(router.current().screen, 'predictions');
+  assert.equal(rendered.at(-1).screen, 'predictions');
+});
