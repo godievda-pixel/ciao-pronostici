@@ -14,11 +14,15 @@ function competitionMeta(id) {
   try { return getTournament(id); }
   catch { return { id:text(id), label:text(id) || 'Турнир', shortLabel:text(id) || 'Турнир', theme:'default' }; }
 }
+function userTimeZone() {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Rome'; }
+  catch { return 'Europe/Rome'; }
+}
 function dateTime(value) {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return '';
   return new Intl.DateTimeFormat('ru-RU', {
-    day:'numeric', month:'short', hour:'2-digit', minute:'2-digit', hour12:false, timeZone:'UTC',
+    timeZone:userTimeZone(), day:'numeric', month:'short', hour:'2-digit', minute:'2-digit', hour12:false,
   }).format(date);
 }
 function matchNames(item = {}) {
