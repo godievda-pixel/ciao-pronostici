@@ -1,1 +1,42 @@
-/* Ciao, Web! main modular shell v1. Intentionally visually inert. */
+@import './ui/home-matches.css';
+@import './ui/match-center.css';
+@import './ui/matches.css';
+@import './ui/predictions.css';
+@import './ui/ranking.css';
+@import './ui/tables.css';
+
+.ciao-modular-host {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  color: inherit;
+  font: inherit;
+}
+
+.ciao-modular-host *,
+.ciao-modular-host *::before,
+.ciao-modular-host *::after {
+  box-sizing: border-box;
+}
+
+.ciao-modular-status {
+  display: grid;
+  gap: 6px;
+  place-items: center;
+  min-height: 180px;
+  padding: 24px 16px;
+  color: #b7c3df;
+  text-align: center;
+}
+
+.ciao-modular-status b {
+  color: #fff;
+  font-size: 13px;
+}
+
+.ciao-modular-status span {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: 10px;
+  opacity: .72;
+}
