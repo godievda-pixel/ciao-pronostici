@@ -2,45 +2,206 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.4";
 import { createBsdModularProvider } from './bsd-modular-provider.mjs';
-import { createModularActionRouter, isModularAction, MODULAR_ACTION_NAMES } from './modular-actions.mjs';
-import { createModularRuntime } from './modular-runtime.mjs';
+import { createMatchService } from './services/matches.mjs';
+import { createPredictionRepository } from './repositories/predictions.mjs';
+import { createPredictionService } from './services/predictions.mjs';
+import { createRankingService } from './services/ranking.mjs';
+import { createUserRepository } from './repositories/users.mjs';
+import { createProfileService } from './services/profile.mjs';
+import {
+  createV23Router,
+  corsHeaders,
+  errorEnvelope,
+  serviceMetadata,
+  successEnvelope,
+} from './router.mjs';
 
-const PUBLIC_ACTIONS = [
-  'modular_matches',
-  'modular_standings',
-  'modular_favorite',
-  'modular_predictions',
-  'modular_save_predictions',
-  'modular_ranking',
-  'modular_match_center',
-];
-const SB_URL=Deno.env.get('SUPABASE_URL')??'';
-const TOKEN=Deno.env.get('TELEGRAM_BOT_TOKEN')??'';
-const BSD_KEY=Deno.env.get('BSD_API_KEY')??'';
-const CHANNEL='@CiaoCalcio';
-const TEST_ORIGIN='https://ciao-web-v23-test.ciao-web.workers.dev';
-const ALLOWED_ORIGINS=new Set([TEST_ORIGIN,'https://godievda-pixel.github.io']);
-const memberCache=new Map();
+const SB_URL = Deno.env.get('SUPABASE_URL') ?? '';
+const TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN') ?? '';
+const BSD_KEY = Deno.env.get('BSD_API_KEY') ?? '';
+const ENVIRONMENT = Deno.env.get('CIAO_ENVIRONMENT') ?? '';
+const ALLOWED_ORIGINS = Deno.env.get('CIAO_ALLOWED_ORIGINS') ?? '';
+const CHANNEL = '@CiaoCalcio';
+const memberCache = new Map();
+const BUNDLE_TTL_MS = 5 * 60 * 1000;
+let bundleCache = null;
 
-function serviceKey(){const s=Deno.env.get('SUPABASE_SECRET_KEYS');if(s){try{const j=JSON.parse(s);if(typeof j?.default==='string')return j.default;const x=Object.values(j??{}).find(v=>typeof v==='string');if(x)return String(x)}catch{}}return Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')??''}
-const db=createClient(SB_URL,serviceKey(),{auth:{persistSession:false}});
-function cors(req,extra={}){const h=new Headers(extra),origin=req.headers.get('origin')??'';if(ALLOWED_ORIGINS.has(origin))h.set('access-control-allow-origin',origin);h.set('vary','Origin');h.set('access-control-allow-methods','GET,POST,OPTIONS');h.set('access-control-allow-headers',req.headers.get('access-control-request-headers')||'content-type,x-telegram-init-data');h.set('access-control-max-age','86400');return h}
-function out(req,data,status=200){return new Response(JSON.stringify(data),{status,headers:cors(req,{'content-type':'application/json; charset=utf-8','cache-control':'no-store'})})}
-function safeEq(a,b){if(a.length!==b.length)return false;let d=0;for(let i=0;i<a.length;i++)d|=a.charCodeAt(i)^b.charCodeAt(i);return d===0}
-async function hmac(k,m){const key=await crypto.subtle.importKey('raw',k,{name:'HMAC',hash:'SHA-256'},false,['sign']);return new Uint8Array(await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(m)))}
-function hex(b){return[...b].map(x=>x.toString(16).padStart(2,'0')).join('')}
-function checkString(p){const a=[];for(const[k,v]of p.entries())a.push(`${k}=${v}`);a.sort();return a.join('\n')}
-async function validateInitData(raw){if(!TOKEN||!raw)throw Object.assign(new Error('telegram_auth_required'),{status:401});const p=new URLSearchParams(raw),got=p.get('hash')??'';if(!got)throw Object.assign(new Error('telegram_hash_missing'),{status:401});p.delete('hash');const secret=await hmac(new TextEncoder().encode('WebAppData'),TOKEN);let ok=safeEq(hex(await hmac(secret,checkString(p))),got);if(!ok&&p.has('signature')){const legacy=new URLSearchParams(p);legacy.delete('signature');ok=safeEq(hex(await hmac(secret,checkString(legacy))),got)}if(!ok)throw Object.assign(new Error('invalid_telegram_signature'),{status:401});const authDate=Number(p.get('auth_date')??0);if(!authDate||Math.abs(Date.now()/1000-authDate)>86400)throw Object.assign(new Error('telegram_auth_expired'),{status:401});const user=JSON.parse(p.get('user')??'null');if(!user?.id)throw Object.assign(new Error('telegram_user_invalid'),{status:401});return user}
-async function tg(method,body={}){const response=await fetch(`https://api.telegram.org/bot${TOKEN}/${method}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});return await response.json().catch(()=>({ok:false}))}
-async function requireMembership(userId){const cached=memberCache.get(userId);if(cached&&cached.expires>Date.now())return cached.allowed;const result=await tg('getChatMember',{chat_id:CHANNEL,user_id:userId}),status=String(result?.result?.status??'').toLowerCase(),allowed=!!result?.ok&&['member','administrator','creator'].includes(status);memberCache.set(userId,{allowed,expires:Date.now()+(allowed?30*60*1000:5000)});return allowed}
-function displayName(tgUser){return [tgUser?.first_name,tgUser?.last_name].filter(Boolean).join(' ').trim()||String(tgUser?.username??'').replace(/^@/,'')||String(tgUser?.id??'')}
-async function ensureUser(tgUser){const telegramId=Number(tgUser.id),username=String(tgUser?.username??'').replace(/^@/,'')||null,name=displayName(tgUser);let query=await db.from('cp_users').select('id,telegram_id,username,display_name,is_active,is_admin,deadline_reminders_enabled,favorite_team_id').eq('telegram_id',telegramId).maybeSingle();if(query.error)throw query.error;let row=query.data;if(!row){const ins=await db.from('cp_users').insert({telegram_id:telegramId,username,display_name:name,is_active:true}).select('id,telegram_id,username,display_name,is_active,is_admin,deadline_reminders_enabled,favorite_team_id').single();if(ins.error)throw ins.error;row=ins.data}else if(row.username!==username||row.display_name!==name){const up=await db.from('cp_users').update({username,display_name:name,updated_at:new Date().toISOString()}).eq('id',row.id).select('id,telegram_id,username,display_name,is_active,is_admin,deadline_reminders_enabled,favorite_team_id').single();if(up.error)throw up.error;row=up.data}return row}
-async function authorize(req){const tgUser=await validateInitData(req.headers.get('x-telegram-init-data')??''),telegramId=Number(tgUser.id);if(!await requireMembership(telegramId))throw Object.assign(new Error('subscription_required'),{status:403});const user=await ensureUser(tgUser);return{tgUser,user,userId:Number(user.id),state:{user}}}
-function provider(){return createBsdModularProvider({apiKey:BSD_KEY,fetchImpl:fetch})}
-function runtime(){return createModularRuntime({db,provider:provider()})}
+function serviceKey() {
+  const source = Deno.env.get('SUPABASE_SECRET_KEYS');
+  if (source) {
+    try {
+      const parsed = JSON.parse(source);
+      if (typeof parsed?.default === 'string') return parsed.default;
+      const first = Object.values(parsed ?? {}).find(value => typeof value === 'string');
+      if (first) return String(first);
+    } catch {}
+  }
+  return Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+}
 
-async function userFavorite(user){if(!user?.favorite_team_id)return null;const q=await db.from('cp_teams').select('id,name,short_name,custom_emoji_id').eq('id',user.favorite_team_id).maybeSingle();if(q.error)throw q.error;return q.data}
-async function legacyState(context){const r=runtime();const matches=(await r.loadMatches({competition:'serie_a'})).matches||[],teamsQ=await db.from('cp_teams').select('id,name,short_name,custom_emoji_id,bsd_team_id').order('name'),roundsQ=await db.from('cp_rounds').select('id,number,nominal_date').order('number'),predQ=await db.from('cp_predictions').select('match_id,home_score,away_score,points').eq('user_id',context.userId);for(const q of [teamsQ,roundsQ,predQ])if(q.error)throw q.error;const predictions=new Map((predQ.data||[]).map(x=>[String(x.match_id),x])),rounds=roundsQ.data||[],latest=[...rounds].sort((a,b)=>b.number-a.number)[0]?.number??1,selected=latest,round=rounds.find(x=>x.number===selected)||null,roundMatches=matches.filter(x=>Number(x.round)===Number(selected)).map(x=>({...x,prediction:predictions.get(String(x.sourceId))||predictions.get(String(x.id).replace('serie_a:',''))||null})),ranking=await r.loadRanking({scope:'all'},context),favorite=await userFavorite(context.user),standings=await r.loadStandings({competition:'serie_a'});return{ok:true,user:{...context.user,photo_url:context.tgUser?.photo_url??null,reminders:context.user.deadline_reminders_enabled!==false,favorite_team:favorite},teams:teamsQ.data||[],subscription:{required:true,channel:CHANNEL,verified:true},rounds:rounds.map(x=>({...x,unlocked:true})),selected_round:selected,round:{round,matches:roundMatches},standings:ranking.rows||[],serie_a_table:standings,stats:{points:0,exact:0,successful:0,calculated:0,rank:(ranking.rows||[]).find(x=>Number(x.id)===context.userId)?.rank??1},deadline_minutes:15,has_live:matches.some(x=>x.status==='live'),server_time:new Date().toISOString()}}
-async function legacyAction(action,body,context){const r=runtime();if(action==='state')return await legacyState(context);if(action==='serie_a_table')return{ok:true,serie_a_table:await r.loadStandings({competition:'serie_a'},context)};if(action==='save_predictions')return{ok:true,...await r.saveSerieAPredictions(body,context)};if(action==='prediction_rules')return{ok:true,rules:{exact_score:5,correct_goal_difference:3,correct_outcome:2,miss:0,bonus_multiplier:1,bonus_enabled:false,deadline_minutes:15}};if(action==='set_favorite_team'){const teamId=body?.team_id==null?null:Number(body.team_id);if(teamId!==null){const tq=await db.from('cp_teams').select('id').eq('id',teamId).maybeSingle();if(tq.error)throw tq.error;if(!tq.data)throw Object.assign(new Error('team_not_found'),{status:404})}const q=await db.from('cp_users').update({favorite_team_id:teamId,updated_at:new Date().toISOString()}).eq('id',context.userId);if(q.error)throw q.error;return{ok:true,favorite_team_id:teamId}}if(action==='toggle_reminders'){const enabled=!!body.enabled,q=await db.from('cp_users').update({deadline_reminders_enabled:enabled,updated_at:new Date().toISOString()}).eq('id',context.userId);if(q.error)throw q.error;return{ok:true,enabled}}throw Object.assign(new Error(`unknown_action:${action}`),{status:400})}
+const db = createClient(SB_URL, serviceKey(), {auth:{persistSession:false}});
+const rawProvider = createBsdModularProvider({apiKey:BSD_KEY,fetchImpl:fetch});
 
-Deno.serve(async req=>{try{if(req.method==='OPTIONS')return new Response('ok',{headers:cors(req)});if(req.method==='GET')return out(req,{ok:true,service:'Ciao v23 API',version:23,environment:'test',modular_actions:MODULAR_ACTION_NAMES,public_actions:PUBLIC_ACTIONS,supabase_ref:'lcnwccnkkxaosxnfvjvr'});if(req.method!=='POST')return out(req,{ok:false,error:'method_not_allowed'},405);const body=await req.json().catch(()=>({})),action=String(body.action??'state'),context=await authorize(req);if(isModularAction(action)){const data=await createModularActionRouter(runtime())(action,body,context);return out(req,{ok:true,data})}return out(req,await legacyAction(action,body,context));}catch(error){console.error('ciao_v23_api_error',error);const status=Number(error?.status);return out(req,{ok:false,error:error instanceof Error?error.message:String(error),code:error?.message||'api_error'},Number.isInteger(status)&&status>=400&&status<600?status:500)}});
+function responseHeaders(req, extra = {}) {
+  const headers = corsHeaders(req.headers.get('origin') ?? '', ALLOWED_ORIGINS);
+  for (const [key,value] of Object.entries(extra)) headers.set(key,value);
+  return headers;
+}
+
+function json(req, data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers:responseHeaders(req, {
+      'content-type':'application/json; charset=utf-8',
+      'cache-control':'no-store',
+    }),
+  });
+}
+
+function safeEq(a,b) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let index=0; index<a.length; index++) diff |= a.charCodeAt(index) ^ b.charCodeAt(index);
+  return diff === 0;
+}
+
+async function hmac(keyBytes,message) {
+  const key = await crypto.subtle.importKey('raw', keyBytes, {name:'HMAC',hash:'SHA-256'}, false, ['sign']);
+  return new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(message)));
+}
+
+function hex(bytes) {
+  return [...bytes].map(value => value.toString(16).padStart(2,'0')).join('');
+}
+
+function checkString(params) {
+  const values = [];
+  for (const [key,value] of params.entries()) values.push(`${key}=${value}`);
+  values.sort();
+  return values.join('\n');
+}
+
+async function validateInitData(raw) {
+  if (!TOKEN || !raw) throw Object.assign(new Error('telegram_auth_required'), {status:401});
+  const params = new URLSearchParams(raw);
+  const expected = params.get('hash') ?? '';
+  if (!expected) throw Object.assign(new Error('telegram_hash_missing'), {status:401});
+  params.delete('hash');
+
+  const secret = await hmac(new TextEncoder().encode('WebAppData'), TOKEN);
+  let valid = safeEq(hex(await hmac(secret, checkString(params))), expected);
+  if (!valid && params.has('signature')) {
+    const legacy = new URLSearchParams(params);
+    legacy.delete('signature');
+    valid = safeEq(hex(await hmac(secret, checkString(legacy))), expected);
+  }
+  if (!valid) throw Object.assign(new Error('invalid_telegram_signature'), {status:401});
+
+  const authDate = Number(params.get('auth_date') ?? 0);
+  if (!authDate || Math.abs(Date.now()/1000 - authDate) > 86400) {
+    throw Object.assign(new Error('telegram_auth_expired'), {status:401});
+  }
+
+  const user = JSON.parse(params.get('user') ?? 'null');
+  if (!user?.id) throw Object.assign(new Error('telegram_user_invalid'), {status:401});
+  return user;
+}
+
+async function telegram(method, body = {}) {
+  const response = await fetch(`https://api.telegram.org/bot${TOKEN}/${method}`, {
+    method:'POST',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify(body),
+  });
+  return await response.json().catch(() => ({ok:false}));
+}
+
+async function requireMembership(telegramId) {
+  const cached = memberCache.get(telegramId);
+  if (cached && cached.expires > Date.now()) return cached.allowed;
+  const result = await telegram('getChatMember', {chat_id:CHANNEL,user_id:telegramId});
+  const status = String(result?.result?.status ?? '').toLowerCase();
+  const allowed = !!result?.ok && ['member','administrator','creator'].includes(status);
+  memberCache.set(telegramId, {allowed,expires:Date.now() + (allowed ? 30*60*1000 : 5000)});
+  return allowed;
+}
+
+async function requireTestAccess(telegramId) {
+  if (ENVIRONMENT === 'production') return;
+  const query = await db.from('cp_test_access')
+    .select('telegram_id')
+    .eq('telegram_id', telegramId)
+    .maybeSingle();
+  if (query.error) throw query.error;
+  if (!query.data) throw Object.assign(new Error('test_access_required'), {status:403});
+}
+
+async function localizationLookup() {
+  const query = await db.from('cp_team_localizations')
+    .select('provider_team_id,name_ru,genitive_ru,dative_ru,prepositional_ru,aliases_ru');
+  if (query.error) throw query.error;
+  return new Map((query.data ?? []).map(row => [String(row.provider_team_id), row]));
+}
+
+async function dependencies() {
+  if (bundleCache && bundleCache.expires > Date.now()) return bundleCache.value;
+  const lookup = await localizationLookup();
+  const matchService = createMatchService({provider:rawProvider,localizationLookup:lookup});
+  const predictionRepository = createPredictionRepository({db});
+  const predictionService = createPredictionService({matchService,predictionRepository});
+  const rankingService = createRankingService({db,predictionRepository});
+  const userRepository = createUserRepository({db});
+  const profileService = createProfileService({
+    userRepository,
+    matchService,
+    predictionRepository,
+    rankingService,
+  });
+  const router = createV23Router({matchService,predictionService,rankingService,profileService});
+  const value = {router,userRepository};
+  bundleCache = {value,expires:Date.now()+BUNDLE_TTL_MS};
+  return value;
+}
+
+async function authorize(req) {
+  const tgUser = await validateInitData(req.headers.get('x-telegram-init-data') ?? '');
+  const telegramId = Number(tgUser.id);
+  await requireTestAccess(telegramId);
+  if (!await requireMembership(telegramId)) {
+    throw Object.assign(new Error('subscription_required'), {status:403});
+  }
+  const {userRepository} = await dependencies();
+  const user = await userRepository.syncTelegramProfile(tgUser);
+  return {tgUser,userId:Number(user.id)};
+}
+
+Deno.serve(async req => {
+  try {
+    if (req.method === 'OPTIONS') {
+      return new Response(null, {status:204,headers:responseHeaders(req)});
+    }
+
+    if (req.method === 'GET') {
+      return json(req, serviceMetadata({CIAO_ENVIRONMENT:ENVIRONMENT}));
+    }
+
+    if (req.method !== 'POST') {
+      return json(req, errorEnvelope(Object.assign(new Error('method_not_allowed'),{status:405})), 405);
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const action = String(body?.action ?? '');
+    const context = await authorize(req);
+    const {router} = await dependencies();
+    const data = await router.dispatch(action, body, context);
+    return json(req, successEnvelope(data));
+  } catch (error) {
+    console.error('ciao_v23_api_error', error);
+    const status = Number(error?.status);
+    return json(
+      req,
+      errorEnvelope(error),
+      Number.isInteger(status) && status >= 400 && status < 600 ? status : 500,
+    );
+  }
+});
