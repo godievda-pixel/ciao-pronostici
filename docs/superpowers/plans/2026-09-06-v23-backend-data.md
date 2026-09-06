@@ -4,7 +4,7 @@
 
 **Goal:** Build a standalone v23 backend contract on TEST that normalizes all supported football data, enforces Italian-club-only European match rules, preserves existing user/prediction data, and exposes one consistent API to the new frontend.
 
-**Architecture:** `ciao-v23-api` remains the only public backend entry point. Internally it is split into focused domain/services/provider modules; the frontend never talks to BSD or legacy APIs. Existing production-shaped tables remain intact and are wrapped by compatibility repositories so v22.5 rollback stays possible; new schema is additive only.
+**Architecture:** `ciao-v23-api` remains the only public backend entry point. Internally it is split into focused domain/services/provider modules; the frontend never talks to BSD or legacy APIs. Existing production-shaped tables remain intact and are wrapped by compatibility repositories so v22.5 rollback stays possible; new schema is additive only. Environment-specific CORS/origin behavior comes from runtime environment variables so the same backend code can be deployed to TEST and later to production without source edits.
 
 **Tech Stack:** Supabase Edge Functions (Deno), JavaScript ES modules, Supabase Postgres, BSD Football API v2, Node 22 `node:test` for contract/domain tests.
 
@@ -24,6 +24,7 @@
 - Existing `cp_users`, `cp_predictions`, `cp_competition_predictions`, `cp_matches`, `cp_teams`, `cp_rounds` data must not be deleted or rewritten destructively.
 - Telegram ID remains the stable user identity; mutable Telegram profile fields sync on authenticated requests.
 - Any schema migration in this plan must be additive and idempotent.
+- Russian team localization data is versioned and promoted with the application; provider team IDs are operational identifiers, not secrets.
 
 ---
 
@@ -40,15 +41,16 @@ Create focused modules under `supabase/functions/ciao-v23-api/`:
 - `services/matches.mjs` — match list, today, favorite-next-match, standings and Match Center orchestration.
 - `services/predictions.mjs` — available predictions, mine, save and eligibility enforcement.
 - `services/ranking.mjs` — `all`, `italy`, `europe` aggregation.
-- `services/profile.mjs` — profile sync and settings.
+- `services/profile.mjs` — profile sync, bootstrap summary, favorite/options and settings.
 - `router.mjs` — request action validation and dispatch.
 - `index.ts` — auth/CORS/environment composition only.
 
-Keep `bsd-modular-provider.mjs` temporarily as the provider implementation, but refactor its public shape to the interfaces below. Remove old `modular-actions.mjs` / `modular-runtime.mjs` only after the new API tests pass and no imports remain.
+Keep `bsd-modular-provider.mjs` temporarily as the provider implementation, but refactor its public shape to the interfaces below. Remove old `modular-actions.mjs` / `modular-runtime.mjs` only after the new standalone frontend is integrated and no imports remain.
 
 New migrations:
 
 - `supabase/migrations/20260906220000_v23_localization.sql`
+- `supabase/migrations/20260906220500_v23_team_localization_seed.sql`
 - `supabase/migrations/20260906221000_v23_profile_settings.sql`
 
 New tests under `cloudflare-production/test/`:
@@ -57,7 +59,10 @@ New tests under `cloudflare-production/test/`:
 - `v23-domain-match.test.mjs`
 - `v23-domain-scoring.test.mjs`
 - `v23-localization-contract.test.mjs`
+- `v23-provider-contract.test.mjs`
+- `v23-match-service.test.mjs`
 - `v23-prediction-repository.test.mjs`
+- `v23-prediction-service.test.mjs`
 - `v23-ranking-service.test.mjs`
 - `v23-api-router.test.mjs`
 - `v23-profile-service.test.mjs`
@@ -167,8 +172,20 @@ Canonical match shape:
   kickoffAt: '2026-09-12T18:45:00Z',
   status: 'scheduled',
   minute: null,
-  home: { id:'10', nameProvider:'Inter', nameRu:'Интер', countryCode:'IT', crestUrl:'...' },
-  away: { id:'20', nameProvider:'Liverpool', nameRu:'Ливерпуль', countryCode:'GB', crestUrl:'...' },
+  home: {
+    id:'10',
+    nameProvider:'Inter',
+    nameRu:'Интер',
+    countryCode:'IT',
+    crestUrl:'https://sports.bzzoiro.com/img/team/10/?bg=transparent'
+  },
+  away: {
+    id:'20',
+    nameProvider:'Liverpool',
+    nameRu:'Ливерпуль',
+    countryCode:'GB',
+    crestUrl:'https://sports.bzzoiro.com/img/team/20/?bg=transparent'
+  },
   score: { home:null, away:null },
   isItalianRelevant: true,
   isQualification: false,
@@ -275,10 +292,11 @@ git commit -m "feat: centralize v23 prediction scoring"
 
 ---
 
-### Task 4: Russian localization registry and grammatical forms
+### Task 4: Russian localization registry and versioned team names
 
 **Files:**
 - Create: `supabase/migrations/20260906220000_v23_localization.sql`
+- Create: `supabase/migrations/20260906220500_v23_team_localization_seed.sql`
 - Create: `supabase/functions/ciao-v23-api/domain/localization.mjs`
 - Create: `supabase/functions/ciao-v23-api/scripts/audit-team-localizations.mjs`
 - Test: `cloudflare-production/test/v23-localization-contract.test.mjs`
@@ -287,7 +305,7 @@ git commit -m "feat: centralize v23 prediction scoring"
 - Produces DB table `cp_team_localizations(provider_team_id, name_ru, genitive_ru, dative_ru, prepositional_ru, aliases_ru, updated_at)`.
 - Produces `localizeTeam(team, lookup)`, `localizeStage(stage)`, `localizeCompetition(id)`.
 
-Migration must be additive:
+Schema migration:
 
 ```sql
 create table if not exists public.cp_team_localizations (
@@ -329,30 +347,30 @@ For teams, assert missing localization throws `team_localization_missing:<id>` i
 node --test test/v23-localization-contract.test.mjs
 ```
 
-- [ ] **Step 3: Implement localization module and migration**
+- [ ] **Step 3: Implement localization module and schema migration**
 
-`localizeTeam()` must prefer DB values and return `{id,nameRu,genitiveRu,dativeRu,prepositionalRu,crestUrl,countryCode}`. Never expose `nameProvider` to user-facing API fields.
+`localizeTeam()` returns `{id,nameRu,genitiveRu,dativeRu,prepositionalRu,crestUrl,countryCode}`. Never expose `nameProvider` to user-facing API fields.
 
-- [ ] **Step 4: Add audit script**
+- [ ] **Step 4: Add current-season discovery/audit script**
 
-The audit script accepts normalized provider teams plus localization rows and exits non-zero if any supported-current-season team lacks `name_ru`. Its output must print only team IDs/provider names, never credentials.
+The script queries provider data using server-side credentials, builds the set of team IDs from current Serie A/Coppa match participants plus every team appearing in full UCL/UEL/UECL standings, compares them with localization rows, and exits non-zero if any team lacks `name_ru`. Output prints only team IDs/provider names, never credentials.
 
-- [ ] **Step 5: Populate TEST localization data from current provider discovery**
+- [ ] **Step 5: Generate and manually review the versioned localization seed migration**
 
-Run the audit against all teams appearing in current Serie A/Coppa and all teams in full UCL/UEL/UECL standings. Add reviewed Russian names and grammatical forms to TEST DB. For indeclinable or awkward names, leave optional case columns null and use UI phrasings that do not require a case form.
+Create `20260906220500_v23_team_localization_seed.sql` with one reviewed `insert ... on conflict (provider_team_id) do update` row per discovered team. Every row includes at least `provider_team_id` and canonical `name_ru`; add grammatical case columns where Russian usage requires them. Team IDs and Russian names are committed because production must receive the same reviewed mapping as TEST.
 
-- [ ] **Step 6: Verify audit returns zero missing teams**
+- [ ] **Step 6: Apply schema + seed to TEST and verify zero missing teams**
 
-Expected output ends with:
+Expected audit output ends with:
 
 ```text
 missing_localizations=0
 ```
 
-- [ ] **Step 7: Commit code + migration (not TEST data values if they contain operational IDs that should remain environment data)**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add supabase/migrations/20260906220000_v23_localization.sql supabase/functions/ciao-v23-api/domain/localization.mjs supabase/functions/ciao-v23-api/scripts/audit-team-localizations.mjs cloudflare-production/test/v23-localization-contract.test.mjs
+git add supabase/migrations/20260906220000_v23_localization.sql supabase/migrations/20260906220500_v23_team_localization_seed.sql supabase/functions/ciao-v23-api/domain/localization.mjs supabase/functions/ciao-v23-api/scripts/audit-team-localizations.mjs cloudflare-production/test/v23-localization-contract.test.mjs
 git commit -m "feat: add Russian v23 localization layer"
 ```
 
@@ -362,7 +380,7 @@ git commit -m "feat: add Russian v23 localization layer"
 
 **Files:**
 - Modify: `supabase/functions/ciao-v23-api/bsd-modular-provider.mjs`
-- Test: extend `cloudflare-production/test/provider-adapter.test.mjs` or create `v23-provider-contract.test.mjs`.
+- Test: `cloudflare-production/test/v23-provider-contract.test.mjs`
 
 **Interfaces:**
 - Produces provider methods:
@@ -413,6 +431,7 @@ git commit -m "refactor: narrow BSD provider contract"
   - `listMatches({competition,from,to})`
   - `listCalcioToday({localDateStartUtc,localDateEndUtc})`
   - `getFavoriteNextMatch({favoriteTeamProviderId,nowIso})`
+  - `listFavoriteItalianTeams()`
   - `getStandings({competition})`
   - `getMatchCenter({competition,matchId,section})`
 
@@ -427,6 +446,7 @@ Fixtures must include:
 - UCL standings containing Real Madrid, Liverpool, Inter -> all three rows present.
 - Coppa Round of 32 -> absent.
 - Coppa Round of 16 -> present.
+- Favorite-team candidate list contains only Italian clubs and Russian names.
 
 Match Center must reject an ineligible European match ID with `match_not_eligible` even if provider returns it.
 
@@ -441,6 +461,8 @@ node --test test/v23-match-service.test.mjs
 For standings: localize every row but do not apply Italian-only match filtering.
 
 For Match Center: load overview first, normalize eligibility, reject if invalid, then load requested section.
+
+For `listCalcioToday`: trust explicit UTC boundaries supplied by the frontend for the user's local day; never infer timezone from request IP.
 
 - [ ] **Step 4: Verify focused/full suite**
 
@@ -484,6 +506,7 @@ Methods:
 - `listByUser(userId, competition?)`
 - `save({userId, match, predictedHome, predictedAway, nowMs})`
 - `pointsForCompetitions(competitionIds)`
+- `statsForUser(userId)` returning `{points,exact,successful,calculated}` across supported stores.
 
 - [ ] **Step 1: Write fake-DB tests**
 
@@ -494,6 +517,7 @@ Verify:
 - Returned shape is identical across both stores.
 - Save at deadline or later returns `prediction_closed` without DB write.
 - External match save requires an eligible canonical Match object; `isItalianRelevant:false` is rejected.
+- `statsForUser()` counts exact as `points === 5`, successful as `points > 0`, calculated as non-null points, and sums all supported points.
 
 - [ ] **Step 2: Run RED**
 
@@ -531,7 +555,7 @@ git commit -m "feat: unify v23 prediction repository"
 
 **Interfaces:**
 - Predictions: `available({userId,competition,nowMs})`, `mine({userId,competition})`, `save({userId,competition,matchId,home,away,nowMs})`.
-- Ranking: `load({scope,currentUserId}) -> {rows:[{rank,userId,displayName,username,favoriteTeam,points,isCurrent}]}`.
+- Ranking: `load({scope,currentUserId}) -> {rows:[{rank,userId,displayName,username,favoriteTeam,points,isCurrent}]}` and `rankForUser({scope,userId})`.
 
 - [ ] **Step 1: Write prediction service tests**
 
@@ -578,7 +602,7 @@ git commit -m "feat: add v23 prediction and ranking services"
 
 ---
 
-### Task 9: Profile, favorite club and settings persistence
+### Task 9: Profile, bootstrap, favorite club and settings persistence
 
 **Files:**
 - Create: `supabase/migrations/20260906221000_v23_profile_settings.sql`
@@ -589,14 +613,38 @@ git commit -m "feat: add v23 prediction and ranking services"
 **Interfaces:**
 - `syncTelegramProfile(tgUser)` keeps `telegram_id` immutable while updating `username`/`display_name`.
 - `getProfile(userId)`.
+- `getBootstrap({userId,tgUser}) -> {user,stats,favoriteTeam,favoriteChoices,settings}`.
 - `setFavoriteTeam(userId, teamId)` only accepts Italian clubs.
 - `updateNotificationSettings(userId, patch)` for `deadline_reminders_enabled`, `lineup_notifications_enabled`, `kickoff_notifications_enabled`, `result_notifications_enabled`.
+
+Bootstrap shape includes:
+
+```js
+{
+  user: {
+    id: 7,
+    telegramId: 446763142,
+    displayName: 'Даниил',
+    username: 'username',
+    photoUrl: 'https://t.me/i/userpic/320/example.jpg'
+  },
+  stats: { points:10, rank:2, exact:1, successful:3, calculated:4 },
+  favoriteTeam: null,
+  favoriteChoices: [],
+  settings: {
+    deadlineReminders:true,
+    lineupNotifications:false,
+    kickoffNotifications:false,
+    resultNotifications:false
+  }
+}
+```
 
 Migration may only add missing columns with defaults; use `ADD COLUMN IF NOT EXISTS`. Existing values remain unchanged.
 
 - [ ] **Step 1: Write tests**
 
-Verify changing Telegram first/last/username updates mutable fields but never `telegram_id`. Favorite foreign club is rejected. Partial settings patch updates only supplied flags.
+Verify changing Telegram first/last/username updates mutable fields but never `telegram_id`. `photoUrl` comes from the current authenticated Telegram user payload and need not be persisted. Favorite foreign club is rejected. Partial settings patch updates only supplied flags. Bootstrap stats combine prediction repository totals and `rankForUser({scope:'all'})`.
 
 - [ ] **Step 2: Run RED**
 
@@ -655,7 +703,7 @@ settings_update
 Canonical envelope:
 
 ```js
-{ ok:true, data:{...}, meta:{ serverTime:'2026-09-06T18:00:00.000Z', apiVersion:23 } }
+{ ok:true, data:{value:true}, meta:{ serverTime:'2026-09-06T18:00:00.000Z', apiVersion:23 } }
 ```
 
 Errors:
@@ -664,17 +712,30 @@ Errors:
 { ok:false, error:{ code:'prediction_closed', message:'Прогноз уже закрыт' } }
 ```
 
+Runtime environment variables:
+
+```text
+CIAO_ENVIRONMENT=v23-test
+CIAO_ALLOWED_ORIGINS=https://ciao-web-v23-test.ciao-web.workers.dev,https://godievda-pixel.github.io
+```
+
+Production later uses the same code with `CIAO_ENVIRONMENT=production` and its production frontend origin. `SUPABASE_URL`, bot token and BSD key remain Supabase-managed secrets/env.
+
 - [ ] **Step 1: Write router validation tests**
 
 Check required fields, competition IDs, Match Center section names `overview|stats|events|lineups|players`, ranking scopes, score bounds, and unknown action -> 400.
 
-- [ ] **Step 2: Run RED**
+- [ ] **Step 2: Write environment/CORS tests**
+
+Allowed origin receives `access-control-allow-origin`; unknown origin does not. Empty `CIAO_ALLOWED_ORIGINS` fails closed. Service metadata reports `CIAO_ENVIRONMENT` rather than a hardcoded string.
+
+- [ ] **Step 3: Run RED**
 
 ```bash
 node --test test/v23-api-router.test.mjs
 ```
 
-- [ ] **Step 3: Refactor `index.ts` to composition only**
+- [ ] **Step 4: Refactor `index.ts` to composition only**
 
 `index.ts` responsibilities are limited to:
 
@@ -686,13 +747,13 @@ node --test test/v23-api-router.test.mjs
 6. Router dispatch.
 7. JSON response.
 
-Remove `legacyState()` and `legacyAction()` after new frontend no longer depends on them. During backend-first implementation they may remain behind a non-public compatibility switch until frontend Plan 2 Task 12 removes the switch.
+During backend-first implementation, the existing legacy/modular action branch may remain behind a non-public compatibility path only until the standalone frontend integrates. Frontend Plan 2 includes an explicit task that removes it before TEST acceptance.
 
-- [ ] **Step 4: Update API probe**
+- [ ] **Step 5: Update API probe**
 
-Probe GET service metadata and authenticated contract shape without printing credentials. Assert `service === 'Ciao v23 API'`, `version === 23`, `environment === 'test'`.
+Probe GET service metadata and authenticated contract shape without printing credentials. Assert `service === 'Ciao v23 API'`, `version === 23`, `environment === 'v23-test'`.
 
-- [ ] **Step 5: Run tests/probes**
+- [ ] **Step 6: Run tests/probes**
 
 ```bash
 npm test
@@ -701,11 +762,11 @@ npm run probe:api
 
 Expected: all pass.
 
-- [ ] **Step 6: Deploy `ciao-v23-api` to TEST Supabase and smoke GET**
+- [ ] **Step 7: Deploy `ciao-v23-api` to TEST Supabase and smoke GET**
 
 Use the existing TEST project only. `verify_jwt` remains false because Telegram signature validation is implemented inside the function.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add supabase/functions/ciao-v23-api/index.ts supabase/functions/ciao-v23-api/router.mjs cloudflare-production/test/v23-api-router.test.mjs cloudflare-production/scripts/probe-current-api.mjs
@@ -719,13 +780,19 @@ git commit -m "feat: expose standalone v23 API contract"
 **Files:**
 - No new code beyond migrations already committed.
 
-- [ ] **Step 1: Apply the two new migrations to TEST Supabase**
+- [ ] **Step 1: Record pre-migration TEST counts**
 
-Apply in timestamp order.
+```sql
+select count(*) as users from public.cp_users;
+select count(*) as serie_a_predictions from public.cp_predictions;
+select count(*) as external_predictions from public.cp_competition_predictions;
+```
 
-- [ ] **Step 2: Run schema/data safety queries**
+- [ ] **Step 2: Apply all three new migrations to TEST Supabase**
 
-Verify:
+Apply in timestamp order: localization schema, localization seed, profile settings.
+
+- [ ] **Step 3: Run post-migration schema/data safety queries**
 
 ```sql
 select count(*) as users from public.cp_users;
@@ -734,9 +801,9 @@ select count(*) as external_predictions from public.cp_competition_predictions;
 select count(*) as localization_rows from public.cp_team_localizations;
 ```
 
-Record counts before and after migration; user/prediction counts must be unchanged.
+User/prediction counts must exactly equal Step 1 counts.
 
-- [ ] **Step 3: Verify TEST access guard remains present**
+- [ ] **Step 4: Verify TEST access guard remains present**
 
 ```sql
 select conname, pg_get_constraintdef(oid)
@@ -746,11 +813,11 @@ where conname = 'cp_users_test_access_fk';
 
 Expected: foreign key from `cp_users.telegram_id` to `cp_test_access.telegram_id`.
 
-- [ ] **Step 4: Run Supabase security advisor**
+- [ ] **Step 5: Run localization audit and Supabase security advisor**
 
-Review new warnings. `cp_team_localizations` having RLS enabled with no public policy is intentional because only service-role Edge Functions access it. Do not weaken RLS to silence the informational lint.
+Audit must return `missing_localizations=0`. Review new security warnings. `cp_team_localizations` having RLS enabled with no public policy is intentional because only service-role Edge Functions access it. Do not weaken RLS to silence the informational lint.
 
-- [ ] **Step 5: Execute authenticated TEST smoke from the hidden Telegram app**
+- [ ] **Step 6: Execute authenticated TEST smoke from the hidden Telegram app**
 
 Verify at minimum `bootstrap`, `matches` for each competition, `standings`, `predictions_available`, `ranking`, and one Match Center overview response.
 
@@ -765,9 +832,12 @@ This backend/data plan is complete only when all of the following are true:
 - `ciao-v23-api` is deployed only to TEST.
 - UCL/UEL/UECL match lists contain no non-Italian fixture and no qualification fixture.
 - Full European standings still include non-Italian teams.
+- Localization audit has zero missing current-season teams.
 - No API response exposes English team/tournament/stage labels in user-facing fields.
 - Prediction deadline is server-enforced at exactly -15 minutes.
+- Bootstrap supplies profile, favorite/settings and Home statistics without changing Telegram ID.
 - Existing TEST user/prediction row counts survive migrations unchanged.
+- Runtime CORS/environment config has no hardcoded production origin in TEST source.
 - `main` / production Worker / production Supabase remain untouched.
 
 The next plan is `docs/superpowers/plans/2026-09-06-v23-standalone-frontend.md`.
