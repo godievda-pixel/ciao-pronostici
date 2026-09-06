@@ -117,6 +117,31 @@ test('adapter is idempotent and never intercepts clicks from its own modular hos
   assert.equal(listeners.length, 0);
 });
 
+test('Home navigation notifies modular router but continues to the original v22.5 Home renderer', () => {
+  const listeners = [];
+  const root = {
+    addEventListener(type, listener, capture) { listeners.push({ type, listener, capture }); },
+    removeEventListener() {},
+    querySelector() { return null; },
+  };
+  const documentRef = { querySelector(selector) { return selector === LEGACY_ROOT_SELECTOR ? root : null; } };
+  const navigated = [];
+  const adapter = createLegacySurfaceAdapter({ documentRef, onNavigate:screen => navigated.push(screen) });
+  adapter.start();
+
+  let prevented = 0;
+  let stopped = 0;
+  listeners[0].listener({
+    target:clickable({ tab:'predict', text:'Главная' }),
+    preventDefault(){ prevented += 1; },
+    stopImmediatePropagation(){ stopped += 1; },
+  });
+
+  assert.deepEqual(navigated, ['home']);
+  assert.equal(prevented, 0);
+  assert.equal(stopped, 0);
+});
+
 test('adapter fails closed when the legacy host disappears', () => {
   const adapter = createLegacySurfaceAdapter({ documentRef:{ querySelector(){ return null; } }, onNavigate(){} });
   assert.equal(adapter.start(), false);
