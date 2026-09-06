@@ -1,14 +1,79 @@
+import { getTournament } from '../core/tournament-registry.mjs';
+
 export const DEFAULT_PREDICTION_MODE = 'predictions';
 const MODES = new Set(['predictions','mine']);
 
 function text(value) { return String(value ?? '').trim(); }
 function esc(value) { return text(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
+function scoreValue(value) { const n = Number(value); return Number.isInteger(n) && n >= 0 && n <= 20 ? String(n) : ''; }
+function competitionMeta(id) {
+  try { return getTournament(id); }
+  catch { return { id:text(id), label:text(id) || 'Турнир', shortLabel:text(id) || 'Турнир', theme:'default' }; }
+}
+function dateTime(value) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '';
+  return new Intl.DateTimeFormat('ru-RU', {
+    day:'numeric', month:'short', hour:'2-digit', minute:'2-digit', hour12:false, timeZone:'UTC',
+  }).format(date);
+}
+function matchNames(item = {}) {
+  const match = item.match || {};
+  const home = text(match?.home?.name || item.home_name || item.homeName);
+  const away = text(match?.away?.name || item.away_name || item.awayName);
+  const title = text(item.title || item.label || match.title);
+  if (home || away) return { home:home || 'Хозяева', away:away || 'Гости', title:title || `${home || 'Хозяева'} — ${away || 'Гости'}` };
+  const split = title.split(/\s+[—–-]\s+/);
+  return { home:split[0] || 'Хозяева', away:split[1] || 'Гости', title:title || 'Матч' };
+}
+function rulesHtml(rules = {}) {
+  const exact = Number(rules.exact_score);
+  const diff = Number(rules.correct_goal_difference);
+  const outcome = Number(rules.correct_outcome);
+  const miss = Number(rules.miss);
+  if (![exact,diff,outcome,miss].every(Number.isFinite)) return '';
+  return `<div class="ciao-predictions-rules">${exact} / ${diff} / ${outcome} / ${miss}</div>`;
+}
+function availableCard(item = {}, index) {
+  const names = matchNames(item);
+  const competition = text(item.competition || item?.match?.competition);
+  const tournament = competitionMeta(competition);
+  const matchId = text(item.match_id || item.id || item?.match?.id);
+  const prediction = item.prediction || {};
+  const deadline = dateTime(item.deadline_at || item.deadlineAt);
+  const kickoff = dateTime(item.kickoff_at || item.kickoffAt || item?.match?.kickoffAt);
+  return `<article class="ciao-predictions-card ciao-predictions-card--${esc(tournament.theme)}" data-prediction-card data-prediction-item="${index}" data-prediction-competition="${esc(competition)}" data-prediction-match-id="${esc(matchId)}">
+    <div class="ciao-predictions-card-meta"><span>${esc(tournament.label)}</span>${kickoff ? `<time>${esc(kickoff)}</time>` : ''}</div>
+    <div class="ciao-predictions-match-title">${esc(names.home)} <span>—</span> ${esc(names.away)}</div>
+    <div class="ciao-predictions-score-editor">
+      <label><span>${esc(names.home)}</span><input type="number" inputmode="numeric" min="0" max="20" step="1" data-prediction-home value="${scoreValue(prediction.home_score)}" aria-label="Счёт ${esc(names.home)}"></label>
+      <span class="ciao-predictions-score-separator">:</span>
+      <label><span>${esc(names.away)}</span><input type="number" inputmode="numeric" min="0" max="20" step="1" data-prediction-away value="${scoreValue(prediction.away_score)}" aria-label="Счёт ${esc(names.away)}"></label>
+    </div>
+    ${deadline ? `<div class="ciao-predictions-deadline">Дедлайн: ${esc(deadline)}</div>` : ''}
+    <button type="button" class="ciao-predictions-save" data-prediction-save>Сохранить</button>
+  </article>`;
+}
+function mineCard(item = {}, index) {
+  const names = matchNames(item);
+  const competition = text(item.competition || item?.match?.competition);
+  const tournament = competitionMeta(competition);
+  const home = scoreValue(item.home_score ?? item.prediction?.home_score);
+  const away = scoreValue(item.away_score ?? item.prediction?.away_score);
+  const points = Number(item.points);
+  return `<article class="ciao-predictions-card ciao-predictions-card--mine ciao-predictions-card--${esc(tournament.theme)}" data-prediction-card data-prediction-item="${index}" data-prediction-competition="${esc(competition)}">
+    <div class="ciao-predictions-card-meta"><span>${esc(tournament.label)}</span></div>
+    <div class="ciao-predictions-match-title">${esc(names.title)}</div>
+    <div class="ciao-predictions-saved-score">${home || '—'} : ${away || '—'}</div>
+    ${Number.isFinite(points) ? `<div class="ciao-predictions-points">${points >= 0 ? '+' : ''}${points}</div>` : ''}
+  </article>`;
+}
 function contentHtml(data, mode) {
   if (typeof data?.html === 'string') return data.html;
   const items = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
   if (!items.length) return `<div class="ciao-predictions-empty">${mode === 'mine' ? 'У вас пока нет сохранённых прогнозов' : 'Сейчас нет матчей для прогноза'}</div>`;
-  return `<div class="ciao-predictions-list">${items.map((item, index) => `<div class="ciao-predictions-item" data-prediction-item="${index}">${esc(item?.title || item?.label || item?.match?.title || 'Матч')}</div>`).join('')}</div>`;
+  const cards = items.map((item, index) => mode === 'mine' ? mineCard(item, index) : availableCard(item, index)).join('');
+  return `<div class="ciao-predictions-list">${cards}${mode === 'predictions' ? rulesHtml(data?.rules) : ''}</div>`;
 }
 
 export function renderPredictionsScreen({ mode = DEFAULT_PREDICTION_MODE, data = null, loading = false, error = null } = {}) {
