@@ -1,0 +1,20 @@
+:root {
+  --bg: #071126;
+  --surface: #0d1a35;
+  --surface-raised: #132244;
+  --text: #f7f9ff;
+  --text-muted: #91a0bd;
+  --accent: #2f6bff;
+  --border: rgba(255, 255, 255, 0.08);
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 24px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
