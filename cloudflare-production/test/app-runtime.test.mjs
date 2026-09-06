@@ -13,7 +13,7 @@ function historyHarness() {
   };
 }
 
-function appHarness() {
+function appHarness({ dataService = {} } = {}) {
   const rootListeners = [];
   const windowListeners = [];
   const shown = [];
@@ -69,13 +69,34 @@ function appHarness() {
     };
   };
   const app = createModularApplication({
-    documentRef:{ documentElement:{ dataset:{} } }, windowRef, dataService:{}, adapterFactory, routeRenderer, liveEngineFactory,
+    documentRef:{ documentElement:{ dataset:{} } }, windowRef, dataService, adapterFactory, routeRenderer, liveEngineFactory,
   });
   return {
     app, shown, homeShown, homeHidden, renderedRoutes, rootListeners, windowListeners, liveStarts,
     navigate:screen=>navigateFromLegacy(screen), hidden:()=>hidden,
     liveFactoryCalls:()=>liveFactoryCalls, liveStops:()=>liveStops, history,
   };
+}
+
+function predictionSaveTarget({ competition, matchId, round = '', home = '0', away = '0' }) {
+  const homeInput = { value:home };
+  const awayInput = { value:away };
+  const card = {
+    dataset:{ predictionCompetition:competition, predictionMatchId:matchId, predictionRound:String(round) },
+    querySelector(selector){
+      if (selector === '[data-prediction-home]') return homeInput;
+      if (selector === '[data-prediction-away]') return awayInput;
+      return null;
+    },
+  };
+  const button = {
+    closest(selector){
+      if (selector === '[data-prediction-save]') return button;
+      if (selector === '[data-prediction-card]') return card;
+      return null;
+    },
+  };
+  return button;
 }
 
 test('modular app starts idempotently and owns only one root/popstate listener', () => {
@@ -176,4 +197,35 @@ test('modular delegated clicks preserve inner prediction/ranking/tournament stat
   h.app.navigate({ screen:'tables', tournament:'uel' });
   await h.app.flush();
   assert.equal(h.app.router().current().tournament, 'uel');
+});
+
+test('prediction save click sends canonical external competition payload and refreshes predictions', async () => {
+  const saves = [];
+  const h = appHarness({ dataService:{ async savePredictions(payload){ saves.push(payload); return { saved:1 }; } } });
+  h.app.start();
+  h.navigate('predictions');
+  await h.app.flush();
+
+  const target = predictionSaveTarget({ competition:'ucl', matchId:'ucl:601024', home:'2', away:'1' });
+  const click = h.rootListeners.find(x=>x.type==='click').listener;
+  await click({ target, preventDefault(){} });
+  await h.app.flush();
+
+  assert.deepEqual(saves, [{ competition:'ucl', predictions:[{ match_id:'ucl:601024', home_score:2, away_score:1 }] }]);
+  assert.equal(h.app.router().current().screen, 'predictions');
+  assert.equal(h.renderedRoutes.at(-1).screen, 'predictions');
+});
+
+test('Serie A prediction save strips canonical prefix and preserves round for legacy writer', async () => {
+  const saves = [];
+  const h = appHarness({ dataService:{ async savePredictions(payload){ saves.push(payload); return { saved:1 }; } } });
+  h.app.start();
+  h.navigate('predictions');
+  await h.app.flush();
+
+  const target = predictionSaveTarget({ competition:'serie_a', matchId:'serie_a:77', round:4, home:'1', away:'0' });
+  const click = h.rootListeners.find(x=>x.type==='click').listener;
+  await click({ target, preventDefault(){} });
+
+  assert.deepEqual(saves, [{ competition:'serie_a', round:4, predictions:[{ match_id:77, home_score:1, away_score:0 }] }]);
 });
