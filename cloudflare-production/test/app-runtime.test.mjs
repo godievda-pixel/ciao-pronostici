@@ -78,18 +78,34 @@ function appHarness({ dataService = {} } = {}) {
   };
 }
 
+function testInput(value) {
+  const attributes = new Map();
+  return {
+    value,
+    setAttribute(name, next){ attributes.set(name, String(next)); },
+    removeAttribute(name){ attributes.delete(name); },
+    getAttribute(name){ return attributes.get(name) ?? null; },
+  };
+}
+
 function predictionSaveTarget({ competition, matchId, round = '', home = '0', away = '0' }) {
-  const homeInput = { value:home };
-  const awayInput = { value:away };
+  const homeInput = testInput(home);
+  const awayInput = testInput(away);
+  const feedback = { textContent:'' };
   const card = {
     dataset:{ predictionCompetition:competition, predictionMatchId:matchId, predictionRound:String(round) },
     querySelector(selector){
       if (selector === '[data-prediction-home]') return homeInput;
       if (selector === '[data-prediction-away]') return awayInput;
+      if (selector === '[data-prediction-feedback]') return feedback;
       return null;
     },
   };
   const button = {
+    homeInput,
+    awayInput,
+    feedback,
+    card,
     closest(selector){
       if (selector === '[data-prediction-save]') return button;
       if (selector === '[data-prediction-card]') return card;
@@ -228,4 +244,21 @@ test('Serie A prediction save strips canonical prefix and preserves round for le
   await click({ target, preventDefault(){} });
 
   assert.deepEqual(saves, [{ competition:'serie_a', round:4, predictions:[{ match_id:77, home_score:1, away_score:0 }] }]);
+});
+
+test('invalid prediction score is rejected locally without save or unhandled click failure', async () => {
+  const saves = [];
+  const h = appHarness({ dataService:{ async savePredictions(payload){ saves.push(payload); return { saved:1 }; } } });
+  h.app.start();
+  h.navigate('predictions');
+  await h.app.flush();
+
+  const target = predictionSaveTarget({ competition:'ucl', matchId:'ucl:601024', home:'', away:'21' });
+  const click = h.rootListeners.find(x=>x.type==='click').listener;
+  await assert.doesNotReject(() => click({ target, preventDefault(){} }));
+
+  assert.deepEqual(saves, []);
+  assert.equal(target.homeInput.getAttribute('aria-invalid'), 'true');
+  assert.equal(target.awayInput.getAttribute('aria-invalid'), 'true');
+  assert.match(target.feedback.textContent, /0 до 20/);
 });
