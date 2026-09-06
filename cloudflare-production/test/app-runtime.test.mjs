@@ -17,6 +17,8 @@ function appHarness() {
   const rootListeners = [];
   const windowListeners = [];
   const shown = [];
+  const homeShown = [];
+  const renderedRoutes = [];
   let hidden = 0;
   let navigateFromLegacy = null;
   const root = {
@@ -30,6 +32,7 @@ function appHarness() {
     host(){ return null; },
     showModular(html){ shown.push(String(html)); return {}; },
     hideModular(){ hidden += 1; return true; },
+    showHomeCompanion(html){ homeShown.push(String(html)); return {}; },
   };
   const adapterFactory = options => { navigateFromLegacy = options.onNavigate; return adapter; };
   const windowRef = {
@@ -38,11 +41,17 @@ function appHarness() {
     removeEventListener(type, listener){ const i=windowListeners.findIndex(x=>x.type===type&&x.listener===listener); if(i>=0)windowListeners.splice(i,1); },
     scrollTo(){}, requestAnimationFrame(fn){ fn(); },
   };
-  const routeRenderer = async route => `<main data-screen="${route.screen}" data-subview="${route.subview||''}"></main>`;
+  const routeRenderer = async route => {
+    renderedRoutes.push({ ...route });
+    return `<main data-screen="${route.screen}" data-subview="${route.subview||''}"></main>`;
+  };
   const app = createModularApplication({
     documentRef:{ documentElement:{ dataset:{} } }, windowRef, dataService:{}, adapterFactory, routeRenderer,
   });
-  return { app, shown, rootListeners, windowListeners, navigate:screen=>navigateFromLegacy(screen), hidden:()=>hidden };
+  return {
+    app, shown, homeShown, renderedRoutes, rootListeners, windowListeners,
+    navigate:screen=>navigateFromLegacy(screen), hidden:()=>hidden,
+  };
 }
 
 test('modular app starts idempotently and owns only one root/popstate listener', () => {
@@ -65,7 +74,7 @@ test('legacy migrated navigation is converted into router state and modular rend
   assert.match(h.shown.at(-1), /data-screen="ranking"/);
 });
 
-test('stable v22.5 Home tab leaves modular mode and restores legacy Home ownership', async () => {
+test('stable v22.5 Home tab keeps legacy ownership while mounting the modular Home companion', async () => {
   const h = appHarness();
   h.app.start();
   h.navigate('ranking');
@@ -76,6 +85,9 @@ test('stable v22.5 Home tab leaves modular mode and restores legacy Home ownersh
   await h.app.flush();
   assert.equal(h.app.router().current().screen, 'home');
   assert.equal(h.hidden(), 1);
+  assert.equal(h.renderedRoutes.at(-1).screen, 'home');
+  assert.match(h.homeShown.at(-1), /data-screen="home"/);
+  assert.doesNotMatch(h.shown.at(-1), /data-screen="home"/);
 });
 
 test('modular delegated clicks preserve inner prediction/ranking/tournament state', async () => {
