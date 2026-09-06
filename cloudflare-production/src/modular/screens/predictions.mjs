@@ -5,7 +5,11 @@ const MODES = new Set(['predictions','mine']);
 
 function text(value) { return String(value ?? '').trim(); }
 function esc(value) { return text(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function scoreValue(value) { const n = Number(value); return Number.isInteger(n) && n >= 0 && n <= 20 ? String(n) : ''; }
+function scoreValue(value) {
+  if (value === null || value === undefined || text(value) === '') return '';
+  const n = Number(value);
+  return Number.isInteger(n) && n >= 0 && n <= 20 ? String(n) : '';
+}
 function competitionMeta(id) {
   try { return getTournament(id); }
   catch { return { id:text(id), label:text(id) || 'Турнир', shortLabel:text(id) || 'Турнир', theme:'default' }; }
