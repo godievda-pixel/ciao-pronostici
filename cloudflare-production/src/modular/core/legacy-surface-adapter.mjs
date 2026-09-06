@@ -1,8 +1,27 @@
 export const LEGACY_ROOT_SELECTOR = '#ciao-miniapp-root';
 
+export const LEGACY_TAB_ROUTES = Object.freeze({
+  predict:'home',
+  mine:'predictions',
+  table:'ranking',
+  calendar:'matches',
+  seriea:'tables',
+});
+
+export const LEGACY_NAV_RENAMES = Object.freeze({
+  predict:'Главная',
+  mine:'Прогнозы',
+  table:'Рейтинг',
+  seriea:'Таблицы',
+});
+
 export const MIGRATED_NAV_LABELS = Object.freeze({
+  'главная':'home',
+  'прогноз':'home',
   'прогнозы':'predictions',
+  'мои прогнозы':'predictions',
   'рейтинг':'ranking',
+  'таблица':'ranking',
   'матчи':'matches',
   'таблицы':'tables',
   'серия а':'tables',
@@ -20,12 +39,28 @@ function normalized(value) {
 }
 
 function screenFromDataset(node) {
-  for (const value of [node?.dataset?.screen, node?.dataset?.view, node?.dataset?.tab]) {
+  const legacyTab = normalized(node?.dataset?.tab);
+  if (LEGACY_TAB_ROUTES[legacyTab]) return LEGACY_TAB_ROUTES[legacyTab];
+  for (const value of [node?.dataset?.screen, node?.dataset?.view]) {
     const key = normalized(value).replace(/_/g, '-');
     if (MIGRATED_SCREENS.has(key)) return key;
     if (key === 'serie-a' || key === 'serie_a') return 'tables';
   }
   return '';
+}
+
+export function renameLegacyNavigation(root) {
+  let changed = 0;
+  for (const [tab, label] of Object.entries(LEGACY_NAV_RENAMES)) {
+    const node = root?.querySelector?.(`[data-tab="${tab}"]`);
+    if (!node) continue;
+    const children = Array.from(node.children || []);
+    const labelNode = node.querySelector?.('span:last-child') || children.at(-1) || node;
+    labelNode.textContent = label;
+    node.setAttribute?.('aria-label', label);
+    changed += 1;
+  }
+  return changed;
 }
 
 export function resolveLegacyScreen(target) {
@@ -89,6 +124,7 @@ export function createLegacySurfaceAdapter({
     start() {
       root = documentRef?.querySelector?.(LEGACY_ROOT_SELECTOR) || null;
       if (!root?.addEventListener) return false;
+      renameLegacyNavigation(root);
       if (listener) return true;
       listener = event => {
         const screen = resolveLegacyScreen(event?.target);
