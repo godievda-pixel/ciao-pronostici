@@ -22,6 +22,7 @@ const DEFAULT_ROUTES = Object.freeze({
   matches:Object.freeze({ screen:'matches' }),
   tables:Object.freeze({ screen:'tables', tournament:'serie_a' }),
 });
+const LIVE_SCREENS = new Set(['home','matches']);
 
 function text(value) { return String(value ?? '').trim(); }
 function esc(value) {
@@ -144,9 +145,24 @@ export function createModularApplication({
         }
       }
 
-      stopLiveEngine();
       adapter?.hideHomeCompanion?.({ restore:true });
       adapter?.showModular?.(loadingHtml());
+
+      if (LIVE_SCREENS.has(route?.screen)) {
+        try {
+          const snapshot = await ensureLiveEngine().start(route);
+          const html = snapshot?.data || '';
+          if (!started || generation !== renderGeneration) return html;
+          if (snapshot?.error && !html) adapter?.showModular?.(errorHtml(snapshot.error));
+          else adapter?.showModular?.(html || errorHtml({ code:'empty_modular_screen' }));
+          return html;
+        } catch (error) {
+          if (started && generation === renderGeneration) adapter?.showModular?.(errorHtml(error));
+          return '';
+        }
+      }
+
+      stopLiveEngine();
       try {
         const html = await routeRenderer(route, { dataService:service, now:new Date() });
         if (!started || generation !== renderGeneration) return html;
