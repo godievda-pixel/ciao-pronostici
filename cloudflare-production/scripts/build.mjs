@@ -1,4 +1,4 @@
-import { copyFile, mkdir, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -42,14 +42,20 @@ export function injectModularAssets(input) {
   return html.includes('</head>') ? html.replace('</head>', `${assets}</head>`) : `${assets}${html}`;
 }
 
+async function copyTree(source, target) {
+  await mkdir(target, { recursive:true });
+  for (const entry of await readdir(source, { withFileTypes:true })) {
+    const from = resolve(source, entry.name);
+    const to = resolve(target, entry.name);
+    if (entry.isDirectory()) await copyTree(from, to);
+    else if (entry.isFile()) await copyFile(from, to);
+  }
+}
+
 export async function copyModularAssets({ sourceDir = modularSourceDir, distDir: targetDir = modularDistDir } = {}) {
   const source = sourceDir instanceof URL ? fileURLToPath(sourceDir) : resolve(String(sourceDir));
   const target = targetDir instanceof URL ? fileURLToPath(targetDir) : resolve(String(targetDir));
-  await mkdir(target, { recursive: true });
-  await Promise.all([
-    copyFile(resolve(source, 'app.mjs'), resolve(target, 'app.mjs')),
-    copyFile(resolve(source, 'app.css'), resolve(target, 'app.css')),
-  ]);
+  await copyTree(source, target);
 }
 
 export async function build() {
