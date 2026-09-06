@@ -362,18 +362,20 @@ Create `docs/superpowers/release/v23-production-rehearsal.md` with date, migrati
 **Interfaces:**
 - `createReleaseManifest({gitSha,files})` returns hashes for `dist/index.html` and all `dist/v23/**` assets.
 
-Manifest example:
+Manifest example with concrete example values:
 
 ```json
 {
   "version": "23",
-  "gitSha": "<commit sha>",
+  "gitSha": "4e678fc3ca64a43349ea4d906ff731c8aaa0d39b",
   "files": {
-    "index.html": "sha256:...",
-    "v23/app.mjs": "sha256:..."
+    "index.html": "sha256:894a8d9c8114d73ab9fc6b5f0dbf69e6da2aa126ab77f9af2f4db96b79638845",
+    "v23/app.mjs": "sha256:3cd5f36ddc8e87c7728220177e9bc4a5da1f0af39d141fe8f8a1f21b4f459f32"
   }
 }
 ```
+
+These hashes are format examples only; the implementation generates the actual hashes from the candidate artifact.
 
 - [ ] **Step 1: Write deterministic manifest test**
 
