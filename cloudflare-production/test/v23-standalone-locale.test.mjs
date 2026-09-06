@@ -77,7 +77,7 @@ test('same UTC kickoff renders in the user timezone without changing the underly
 });
 
 test('formatKickoff uses Сегодня, Завтра, then Russian calendar date in the supplied timezone', () => {
-  const now = '2026-09-07T21:30:00.000Z';
+  const now = '2026-09-07T22:00:00.000Z';
   assert.equal(
     formatKickoff('2026-09-07T22:15:00.000Z', { now, timeZone:'Europe/Berlin' }),
     'Сегодня · 00:15',
