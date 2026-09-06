@@ -2,15 +2,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   LEGACY_ROOT_SELECTOR,
+  LEGACY_TAB_ROUTES,
+  LEGACY_NAV_RENAMES,
   MIGRATED_NAV_LABELS,
   resolveLegacyScreen,
+  renameLegacyNavigation,
   createLegacySurfaceAdapter,
 } from '../src/modular/core/legacy-surface-adapter.mjs';
 
-function clickable({ text='', aria='', screen='' } = {}) {
+function clickable({ text='', aria='', screen='', tab='' } = {}) {
   return {
     textContent:text,
-    dataset:screen ? { screen } : {},
+    dataset:{ ...(screen ? { screen } : {}), ...(tab ? { tab } : {}) },
     getAttribute(name) { return name === 'aria-label' ? aria : null; },
     closest(selector) {
       if (selector === '[data-ciao-modular-host]') return null;
@@ -24,10 +27,29 @@ test('legacy adapter is anchored only to the stable production root', () => {
   assert.equal(LEGACY_ROOT_SELECTOR, '#ciao-miniapp-root');
 });
 
-test('legacy navigation maps only approved migrated surfaces', () => {
+test('stable v22.5 tab ids cut over to the approved modular routes including Home', () => {
+  assert.deepEqual(LEGACY_TAB_ROUTES, {
+    predict:'home',
+    mine:'predictions',
+    table:'ranking',
+    calendar:'matches',
+    seriea:'tables',
+  });
+  assert.equal(resolveLegacyScreen(clickable({ tab:'predict', text:'Прогноз' })), 'home');
+  assert.equal(resolveLegacyScreen(clickable({ tab:'mine', text:'Мои прогнозы' })), 'predictions');
+  assert.equal(resolveLegacyScreen(clickable({ tab:'table', text:'Таблица' })), 'ranking');
+  assert.equal(resolveLegacyScreen(clickable({ tab:'calendar', text:'Матчи' })), 'matches');
+  assert.equal(resolveLegacyScreen(clickable({ tab:'seriea', text:'Серия А' })), 'tables');
+});
+
+test('legacy navigation maps only approved migrated labels', () => {
   assert.deepEqual(MIGRATED_NAV_LABELS, {
+    'главная':'home',
+    'прогноз':'home',
     'прогнозы':'predictions',
+    'мои прогнозы':'predictions',
     'рейтинг':'ranking',
+    'таблица':'ranking',
     'матчи':'matches',
     'таблицы':'tables',
     'серия а':'tables',
@@ -36,6 +58,29 @@ test('legacy navigation maps only approved migrated surfaces', () => {
   assert.equal(resolveLegacyScreen(clickable({ aria:'Рейтинг' })), 'ranking');
   assert.equal(resolveLegacyScreen(clickable({ text:'Серия А' })), 'tables');
   assert.equal(resolveLegacyScreen(clickable({ text:'Настройки' })), '');
+});
+
+test('stable legacy bottom navigation is relabeled without destroying its icon node', () => {
+  assert.deepEqual(LEGACY_NAV_RENAMES, {
+    predict:'Главная',
+    mine:'Прогнозы',
+    table:'Рейтинг',
+    seriea:'Таблицы',
+  });
+  const nodes = new Map();
+  for (const [tab, oldLabel] of Object.entries({ predict:'Прогноз', mine:'Мои прогнозы', table:'Таблица', seriea:'Серия А' })) {
+    const icon = { textContent:'◉' };
+    const label = { textContent:oldLabel };
+    nodes.set(tab, { children:[icon,label], querySelector(selector){ return selector === 'span:last-child' ? label : null; } });
+  }
+  const root = { querySelector(selector){ const match=selector.match(/data-tab="([^"]+)"/); return match ? nodes.get(match[1]) || null : null; } };
+  const renamed = renameLegacyNavigation(root);
+  assert.equal(renamed, 4);
+  assert.equal(nodes.get('predict').children[0].textContent, '◉');
+  assert.equal(nodes.get('predict').children[1].textContent, 'Главная');
+  assert.equal(nodes.get('mine').children[1].textContent, 'Прогнозы');
+  assert.equal(nodes.get('table').children[1].textContent, 'Рейтинг');
+  assert.equal(nodes.get('seriea').children[1].textContent, 'Таблицы');
 });
 
 test('adapter is idempotent and never intercepts clicks from its own modular host', () => {
