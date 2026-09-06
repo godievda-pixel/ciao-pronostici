@@ -79,11 +79,20 @@ export function resolveLegacyScreen(target) {
 export function createLegacySurfaceAdapter({
   documentRef = globalThis.document,
   onNavigate = () => {},
+  mutationObserverFactory = callback => {
+    const Observer = globalThis.MutationObserver;
+    return typeof Observer === 'function' ? new Observer(callback) : null;
+  },
 } = {}) {
   let root = null;
   let listener = null;
   let modularHost = null;
   let homeHost = null;
+  let homeObserver = null;
+  let homeObservedParent = null;
+  let homeHtml = '';
+  let homeActive = false;
+  let homeRepairQueued = false;
   let hiddenSnapshot = [];
   const homeHiddenSnapshot = new Map();
 
@@ -163,6 +172,48 @@ export function createLegacySurfaceAdapter({
     homeHiddenSnapshot.clear();
   }
 
+  function disconnectHomeObserver() {
+    homeObserver?.disconnect?.();
+    homeObserver = null;
+    homeObservedParent = null;
+    homeRepairQueued = false;
+  }
+
+  function mountHomeCompanion() {
+    if (!homeActive) return null;
+    const parent = content();
+    if (!parent) return null;
+    const host = ensureHomeHost(parent);
+    if (!host) return null;
+    hideReplacedHomeContent(parent);
+    host.hidden = false;
+    host.innerHTML = homeHtml;
+    return host;
+  }
+
+  function queueHomeRepair() {
+    if (!homeActive || homeRepairQueued) return;
+    homeRepairQueued = true;
+    queueMicrotask(() => {
+      homeRepairQueued = false;
+      if (!homeActive) return;
+      const parent = content();
+      if (!parent) return;
+      if (parent !== homeObservedParent) observeHomeParent(parent);
+      mountHomeCompanion();
+    });
+  }
+
+  function observeHomeParent(parent) {
+    if (!parent || typeof mutationObserverFactory !== 'function') return;
+    if (!homeObserver) homeObserver = mutationObserverFactory(queueHomeRepair) || null;
+    if (!homeObserver?.observe) return;
+    if (homeObservedParent === parent) return;
+    homeObserver.disconnect?.();
+    homeObserver.observe(parent, { childList:true });
+    homeObservedParent = parent;
+  }
+
   return Object.freeze({
     start() {
       root = documentRef?.querySelector?.(LEGACY_ROOT_SELECTOR) || null;
@@ -186,6 +237,8 @@ export function createLegacySurfaceAdapter({
     stop() {
       if (root?.removeEventListener && listener) root.removeEventListener('click', listener, true);
       listener = null;
+      homeActive = false;
+      disconnectHomeObserver();
       if (modularHost) modularHost.hidden = true;
       if (homeHost) homeHost.hidden = true;
       restoreLegacyChildren();
@@ -213,14 +266,14 @@ export function createLegacySurfaceAdapter({
       if (!root) root = documentRef?.querySelector?.(LEGACY_ROOT_SELECTOR) || null;
       const parent = content();
       if (!parent) return null;
-      const host = ensureHomeHost(parent);
-      if (!host) return null;
-      hideReplacedHomeContent(parent);
-      host.hidden = false;
-      host.innerHTML = String(html ?? '');
-      return host;
+      homeHtml = String(html ?? '');
+      homeActive = true;
+      observeHomeParent(parent);
+      return mountHomeCompanion();
     },
     hideHomeCompanion({ restore = false } = {}) {
+      homeActive = false;
+      disconnectHomeObserver();
       if (homeHost) homeHost.hidden = true;
       if (restore) restoreHomeContent();
       return !!homeHost;
