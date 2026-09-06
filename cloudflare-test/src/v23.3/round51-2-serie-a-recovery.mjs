@@ -37,40 +37,54 @@ function rawPlayerNameIndex(playerStats) {
   return byId;
 }
 
-function normalizeShot(shot, namesById = new Map()) {
-  const source = object(shot);
-  if (!source) return shot;
-  const playerObject = object(source.player);
+function playerIdentityFromRaw(source, namesById, aliases = []) {
+  const playerObject = object(source?.player);
   const directName = text(
     playerObject?.name
     ?? playerObject?.full_name
     ?? playerObject?.fullName
     ?? playerObject?.short_name
     ?? playerObject?.shortName
-    ?? source.player_name
-    ?? source.playerName,
+    ?? source?.player_name
+    ?? source?.playerName,
   );
-  const aliasName = text(source.short_name ?? source.shortName ?? source.name ?? source.shooter_name ?? source.shooterName);
-  const playerId = source.player_id ?? source.playerId ?? source.pid ?? source.player?.id ?? source.shooter?.id;
+  const aliasName = text(aliases.map(key => source?.[key]).find(value => text(value)));
+  const playerId = source?.player_id ?? source?.playerId ?? source?.pid ?? source?.player?.id ?? source?.shooter?.id;
   const recoveredName = directName || aliasName || namesById.get(text(playerId)) || '';
+  return { playerObject, directName, playerId, recoveredName };
+}
+
+function normalizeShot(shot, namesById = new Map()) {
+  const source = object(shot);
+  if (!source) return shot;
+  const identity = playerIdentityFromRaw(source, namesById, [
+    'short_name','shortName','name','shooter_name','shooterName',
+  ]);
   return {
     ...source,
-    ...(playerObject && !directName && recoveredName ? { player:{ ...playerObject, name:recoveredName } } : {}),
-    ...(!playerObject && source.player === undefined && source.player_name === undefined && recoveredName ? { player_name:recoveredName } : {}),
-    ...(source.player_id === undefined && playerId !== undefined ? { player_id:playerId } : {}),
+    ...(identity.playerObject && !identity.directName && identity.recoveredName
+      ? { player:{ ...identity.playerObject, name:identity.recoveredName } }
+      : {}),
+    ...(!identity.playerObject && source.player === undefined && source.player_name === undefined && identity.recoveredName
+      ? { player_name:identity.recoveredName }
+      : {}),
+    ...(source.player_id === undefined && identity.playerId !== undefined ? { player_id:identity.playerId } : {}),
   };
 }
 
-function normalizeIncident(event) {
+function normalizeIncident(event, namesById = new Map()) {
   const source = object(event);
   if (!source) return event;
-  const directPlayer = source.player ?? source.player_name ?? source.playerName;
-  const aliasPlayer = source.short_name ?? source.shortName ?? source.name;
-  const playerId = source.player_id ?? source.playerId ?? source.pid ?? source.player?.id;
+  const identity = playerIdentityFromRaw(source, namesById, ['short_name','shortName','name']);
   return {
     ...source,
-    ...(directPlayer === undefined && aliasPlayer !== undefined ? { player_name:aliasPlayer } : {}),
-    ...(source.player_id === undefined && playerId !== undefined ? { player_id:playerId } : {}),
+    ...(identity.playerObject && !identity.directName && identity.recoveredName
+      ? { player:{ ...identity.playerObject, name:identity.recoveredName } }
+      : {}),
+    ...(!identity.playerObject && source.player === undefined && source.player_name === undefined && identity.recoveredName
+      ? { player_name:identity.recoveredName }
+      : {}),
+    ...(source.player_id === undefined && identity.playerId !== undefined ? { player_id:identity.playerId } : {}),
   };
 }
 
@@ -112,9 +126,9 @@ export function normalizeRound512SerieARaw(raw) {
   const topShotKey = ['shotmap','shot_map','shots'].find(name => Array.isArray(source[name]));
   const incidentsEnvelope = object(source.incidents);
   const incidents = incidentsEnvelope && Array.isArray(incidentsEnvelope.incidents)
-    ? { ...incidentsEnvelope, incidents:incidentsEnvelope.incidents.map(normalizeIncident) }
+    ? { ...incidentsEnvelope, incidents:incidentsEnvelope.incidents.map(event => normalizeIncident(event, namesById)) }
     : Array.isArray(source.incidents)
-      ? source.incidents.map(normalizeIncident)
+      ? source.incidents.map(event => normalizeIncident(event, namesById))
       : source.incidents;
   return {
     ...source,
