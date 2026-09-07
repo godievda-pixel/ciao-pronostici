@@ -114,6 +114,34 @@ test('matches API returns the canonical envelope with runtime revision and shiel
   assert.equal(calls, 1);
 });
 
+test('debug_stage returns only injected safe stage probe metadata', async () => {
+  const custom = createWorker({
+    fetchMatches: async () => [],
+    fetchStageProbe: async () => ({
+      event_id: '1',
+      round_name: 'Матчи',
+      stage: null,
+      phase: null,
+      group_name: null,
+      round_number: null,
+      round: 1,
+      matchday: null,
+      normalized_stage_key: 'league-1',
+      normalized_stage_label: 'Общий этап · 1 тур',
+      normalized_round: 1,
+    }),
+  });
+  const response = await custom.fetch(req('/api/cw22/matches?competition=ucl&from=2026-07-01&to=2027-06-30&debug_stage=1', {
+    headers: authHeaders(),
+  }), env());
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.data.stage_probe.round_name, 'Матчи');
+  assert.equal(body.data.stage_probe.round, 1);
+  assert.equal(body.data.stage_probe.normalized_stage_key, 'league-1');
+  assert.equal(JSON.stringify(body).includes('fake-bsd-key'), false);
+});
+
 test('BSD upstream errors expose safe diagnostics only', async () => {
   const custom = createWorker({
     fetchMatches: async () => { throw new BsdUpstreamError('events', 401, 'authentication_failed'); },
