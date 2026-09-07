@@ -24,6 +24,20 @@ function browserPrivate(response) {
   });
 }
 
+function noStoreHtml(response) {
+  const contentType = String(response?.headers?.get('content-type') || '').toLowerCase();
+  if (!contentType.includes('text/html')) return response;
+  const headers = new Headers(response.headers);
+  headers.set('cache-control', 'no-store, no-cache, must-revalidate, max-age=0');
+  headers.set('pragma', 'no-cache');
+  headers.set('expires', '0');
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 function cacheKeyFor(url) {
   return new Request(url.toString(), { method: 'GET' });
 }
@@ -51,7 +65,10 @@ export function createWorker({ fetchMatches = fetchBsdMatches, cache = null } = 
       }
 
       if (url.pathname !== API_PATH) {
-        if (env?.ASSETS?.fetch) return env.ASSETS.fetch(request);
+        if (env?.ASSETS?.fetch) {
+          const response = await env.ASSETS.fetch(request);
+          return noStoreHtml(response);
+        }
         return new Response('Not Found', { status: 404 });
       }
 
