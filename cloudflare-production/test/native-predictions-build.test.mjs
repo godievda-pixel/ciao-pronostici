@@ -21,9 +21,9 @@ test('production build ships native predictions as static module and css', async
   assert.equal(await exists(new URL('../dist/predictions/view.mjs', import.meta.url)), true);
 });
 
-test('native predictions module is canary-only before cutover', async () => {
+test('native predictions module installs by default after cutover', async () => {
   const source = await readFile(new URL('../src/predictions/predictions-screen.mjs', import.meta.url), 'utf8');
-  assert.match(source, /native_predictions/);
-  assert.match(source, /installPredictionsScreen\(document\)/);
-  assert.match(source, /nativePredictionsEnabled\(\)/);
+  assert.match(source, /if \(typeof document !== 'undefined'\) \{\s*globalThis\.CiaoPredictionsScreen = installPredictionsScreen\(document\);\s*\}/);
+  assert.doesNotMatch(source, /native_predictions/);
+  assert.doesNotMatch(source, /nativePredictionsEnabled/);
 });
