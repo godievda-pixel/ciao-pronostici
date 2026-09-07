@@ -31,6 +31,32 @@ test('legacy Home renderer is restored and unified prediction center lives only 
   assert.match(s,/__cwRefreshStart\(\)/);
 });
 
+test('hub has no edit/mine switch and mode switch is embedded into a chosen tournament',()=>{
+  const s=source();
+  assert.match(s,/__cwPredHubHtml=function\(\)\{return '<section class="cwpred-hub">/);
+  assert.match(s,/cwpred-tournament-controls/);
+  assert.match(s,/__cwPredModeHtml\(\)\+__cwPredStageBarHtml\(\)/);
+  assert.match(s,/__cwPredModeHtml\(\)\+\(typeof roundBar/);
+});
+
+test('future UEFA stages surface a visible sequential lock',()=>{
+  const s=source();
+  assert.match(s,/stage_locked/);
+  assert.match(s,/prediction_stage_key/);
+  assert.match(s,/cwpred-stage-locked/);
+  assert.match(s,/cwpred-stage-lock-note/);
+  assert.match(s,/Откроется после завершения/);
+});
+
+test('mine cards use symmetric team geometry and a separate result strip',()=>{
+  const s=source();
+  assert.match(s,/cwpred-mine-card--v2/);
+  assert.match(s,/cwpred-mine-matchline/);
+  assert.match(s,/cwpred-mine-primary/);
+  assert.match(s,/cwpred-mine-result-strip/);
+  assert.match(s,/grid-template-columns:minmax\(0,1fr\) 104px minmax\(0,1fr\)/);
+});
+
 test('prediction theme cannot leak onto Home',()=>{
   const s=source();
   assert.match(s,/tab==='mine'&&__cwPredCompetition/);
