@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { buildUnifiedStandings } from '../../supabase/functions/ciao-core-api-fast-v4/standings.mjs';
 
 const users=[
@@ -46,4 +47,12 @@ test('helper does not expose or require bonus/x2 fields',()=>{
     assert.equal('bonus' in row,false);
     assert.equal('multiplier' in row,false);
   }
+});
+
+test('tracked core api does not read bonus picks or advertise a multiplier',async()=>{
+  const source=await readFile(new URL('../../supabase/functions/ciao-core-api-fast-v4/index.ts',import.meta.url),'utf8');
+  assert.equal(source.includes('cp_round_bonus_picks'),false);
+  assert.equal(source.includes('bonus_multiplier'),false);
+  assert.ok(source.includes('if(a==="set_round_bonus")return out(req,{ok:false,error:"bonus_disabled"},410)'));
+  assert.ok(source.includes('cp_prediction_results_unified'));
 });
