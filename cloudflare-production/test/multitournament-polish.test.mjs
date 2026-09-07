@@ -28,8 +28,8 @@ test('external kickoff uses the device timezone instead of forcing Rome', () => 
 test('stage switcher uses compact single-line labels while the section keeps the full stage title', () => {
   const s = runtime();
   assert.match(s, /function __cwMtStageShortLabel\(/);
-  assert.match(s, /league-\\d/);
-  assert.match(s, /Стыки/);
+  assert.match(s, /return league\[1\]\+' тур'/);
+  assert.match(s, /if\(key==='playoff'\)return 'Стыки'/);
   assert.match(s, /white-space:nowrap/);
   assert.match(s, /data-cwmt-stage=/);
   assert.match(s, /cwmt-stage-title/);
