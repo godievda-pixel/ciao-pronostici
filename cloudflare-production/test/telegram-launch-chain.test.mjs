@@ -32,3 +32,11 @@ test('launcher health exposes safe registry diagnostics without secret values', 
   assert.match(s, /service_key_present/);
   assert.doesNotMatch(s, /service_key_value/);
 });
+
+test('launcher queries the actual frontend build registry schema', async () => {
+  const s = await source('supabase/functions/ciao-web-app/index.ts');
+  assert.match(s, /select=build_id,url,is_stable/);
+  assert.match(s, /b\?\.is_stable/);
+  assert.doesNotMatch(s, /select=build_id,url,enabled/);
+  assert.doesNotMatch(s, /b\?\.enabled/);
+});
