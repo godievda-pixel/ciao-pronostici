@@ -1,0 +1,50 @@
+name: One-off native predictions shell entry
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/oneoff-native-predictions-shell.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Add static native Predictions entries
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile, writeFile } from 'node:fs/promises';
+          const path = 'cloudflare-production/src/app-shell.html';
+          let html = await readFile(path, 'utf8');
+          const css = '<link rel="stylesheet" href="/predictions/predictions-screen.css">';
+          const module = '<script type="module" src="/predictions/predictions-screen.mjs"></script>';
+          if (!html.includes(css)) {
+            if (!html.includes('</head>')) throw new Error('tracked shell is missing </head>');
+            html = html.replace('</head>', `${css}\n</head>`);
+          }
+          if (!html.includes(module)) {
+            if (!html.includes('</body>')) throw new Error('tracked shell is missing </body>');
+            html = html.replace('</body>', `${module}\n</body>`);
+          }
+          await writeFile(path, html, 'utf8');
+          NODE
+      - name: Commit tracked shell edit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add cloudflare-production/src/app-shell.html
+          if git diff --cached --quiet; then
+            echo "Shell already contains native entries"
+            exit 0
+          fi
+          git commit -m "feat: add native predictions entries to tracked shell"
+          git push origin HEAD:main
