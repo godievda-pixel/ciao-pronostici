@@ -129,6 +129,42 @@ test('European competitions retain only Italian-club matches and order league ro
   assert.deepEqual(groups.map(group => group.label), ['Общий этап · 3 тур','Общий этап · 4 тур','Стыковые матчи','1/8 финала']);
 });
 
+test('BSD generic Матчи stage plus a European round number becomes a league-phase round', () => {
+  const match = normalizeBsdEvent(event({
+    id: 401,
+    round_name: 'Матчи',
+    round_number: 1,
+  }), 'ucl', { italianTeamIds: italian });
+
+  assert.equal(match.stageKey, 'league-1');
+  assert.equal(match.stageLabel, 'Общий этап · 1 тур');
+});
+
+test('European groups follow actual tournament chronology when a qualifying playoff precedes league phase', () => {
+  const matches = [
+    normalizeBsdEvent(event({
+      id: 501,
+      round_name: 'Knockout Phase Play-offs',
+      round_number: 636,
+      event_date: '2026-08-20T18:30:00Z',
+    }), 'uecl', { italianTeamIds: italian }),
+    normalizeBsdEvent(event({
+      id: 502,
+      round_name: 'Матчи',
+      round_number: 1,
+      event_date: '2026-10-15T19:00:00Z',
+    }), 'uecl', { italianTeamIds: italian }),
+    normalizeBsdEvent(event({
+      id: 503,
+      round_name: 'Матчи',
+      round_number: 2,
+      event_date: '2026-10-22T19:00:00Z',
+    }), 'uecl', { italianTeamIds: italian }),
+  ].filter(Boolean);
+
+  assert.deepEqual(groupMatches(matches, 'uecl').map(group => group.key), ['playoff','league-1','league-2']);
+});
+
 test('malformed events are isolated instead of throwing through the tournament', () => {
   assert.equal(normalizeBsdEvent(null, 'ucl', { italianTeamIds: italian }), null);
   assert.equal(normalizeBsdEvent(event({ id: null }), 'ucl', { italianTeamIds: italian }), null);
