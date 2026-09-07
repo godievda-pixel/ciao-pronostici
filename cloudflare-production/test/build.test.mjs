@@ -36,6 +36,16 @@ test('production build uses the tracked app shell instead of remote release HTML
   assert.match(shell, /ciao-prod-no-x2-20260903/);
 });
 
+test('native predictions build copies its browser import dependency', async () => {
+  assert.equal(typeof productionBuild.copyPredictionsAssets, 'function');
+  await productionBuild.copyPredictionsAssets();
+  const dependency = await readFile(new URL('../dist/matches/competition-config.mjs', import.meta.url), 'utf8');
+  assert.match(dependency, /coppa_italia/);
+  assert.match(dependency, /ucl/);
+  assert.match(dependency, /uel/);
+  assert.match(dependency, /uecl/);
+});
+
 test('production release accepts the real grouped no-x2 CSS patch', () => {
   assert.equal(validateReleaseHtml(fixtureRelease()), true);
 });
