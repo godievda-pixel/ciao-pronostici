@@ -17,6 +17,7 @@ import {
 import { loadRanking, renderRanking } from './screens/ranking.mjs';
 import { loadTable, renderTables } from './screens/tables.mjs';
 import { renderBottomNav } from './ui/bottom-nav.mjs';
+import { escapeHtml } from './ui/html.mjs';
 
 const TOP_LEVEL=new Set(['home','predictions','ranking','matches','tables']);
 const MATCH_COMPETITIONS=new Set(['serie_a','coppa_italia','ucl','uel','uecl']);
@@ -94,8 +95,11 @@ export function createApp({
     root.innerHTML=`<main class="app-shell" data-app-runtime="standalone-v23"><div class="app-content">${content}</div>${showNav?renderBottomNav(active):''}</main>`;
   }
 
-  function renderFatal(route){
-    renderShell('<section class="screen-stack"><div class="status-state status-state--error" data-state="error">Не удалось загрузить данные</div></section>',route??{screen:'home'});
+  function renderFatal(route,error){
+    const message=text(error?.message)||'Не удалось загрузить данные';
+    const code=text(error?.code);
+    const diagnostic=code?`<div class="status-state__detail">Код: ${escapeHtml(code)}</div>`:'';
+    renderShell(`<section class="screen-stack"><div class="status-state status-state--error" data-state="error">${escapeHtml(message)}${diagnostic}</div></section>`,route??{screen:'home'});
   }
 
   async function renderScreen(route,{manageLive=true}={}){
@@ -159,9 +163,9 @@ export function createApp({
       }else{
         live.stop();
       }
-    }catch{
+    }catch(error){
       if(manageLive)live.stop();
-      renderFatal(normalized);
+      renderFatal(normalized,error);
     }
   }
 
