@@ -7,6 +7,7 @@ const CORE_ALIASES = new Set([
 
 const STATIC_ROUTES = new Map([
   ['ciao-fast-api-v2', { kind:'live_updates', action:'live_updates' }],
+  ['ciao-match-center', { kind:'match_center', action:'load' }],
   ['ciao-match-center-fast-v3', { kind:'match_center', action:'load' }],
   ['ciao-match-summary-fast-v2', { kind:'match_summary', action:'load' }],
   ['ciao-club-profile-fast', { kind:'club_profile', action:'load' }],
