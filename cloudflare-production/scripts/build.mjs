@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { injectBsdCrestPatch, validateBsdCrestPatchedHtml } from './bsd-crests.mjs';
@@ -36,13 +36,17 @@ import {
   validatePredictionMineStagePolishPatchedHtml,
 } from './prediction-mine-stage-polish.mjs';
 
-export const RELEASE_SOURCE_URL = 'https://dkefzepiiudehhzbbrjn.supabase.co/storage/v1/object/public/ciao-miniapp/migration/v22-5-resolved-no-x2.html';
 export const RELEASE_PATH = '/releases/v22-5.html';
 export const NO_X2_MARKER = 'ciao-prod-no-x2-20260903';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+export const APP_SHELL_PATH = resolve(root, 'src/app-shell.html');
 const distDir = resolve(root, 'dist');
 const releaseOut = resolve(distDir, 'releases/v22-5.html');
+
+export async function loadAppShell() {
+  return readFile(APP_SHELL_PATH, 'utf8');
+}
 
 export function rootHtmlFor({ release }) {
   return String(release || '');
@@ -92,9 +96,7 @@ export function prepareReleaseHtml(input) {
 }
 
 export async function build() {
-  const releaseResponse = await fetch(RELEASE_SOURCE_URL, { headers: { 'cache-control': 'no-cache' } });
-  if (!releaseResponse.ok) throw new Error(`release source HTTP ${releaseResponse.status}`);
-  const source = await releaseResponse.text();
+  const source = await loadAppShell();
   const release = prepareReleaseHtml(source);
   const rootHtml = rootHtmlFor({ release });
   await mkdir(resolve(distDir, 'releases'), { recursive: true });
