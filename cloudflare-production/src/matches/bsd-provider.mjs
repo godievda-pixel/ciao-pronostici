@@ -2,6 +2,7 @@ import { getCompetitionConfig } from './competition-config.mjs';
 import { normalizeBsdEvent } from './normalizer.mjs';
 
 export const BSD_BASE = 'https://sports.bzzoiro.com/api/v2';
+export const BSD_PROVIDER_REVISION = 'stage-normalizer-v2';
 const MAX_RANGE_DAYS = 370;
 const EUROPEAN = new Set(['ucl', 'uel', 'uecl']);
 
@@ -187,6 +188,18 @@ async function resolveSeason(leagueId, apiKey, fetchImpl) {
 async function fetchItalianTeamIds(apiKey, fetchImpl) {
   const teams = await fetchAll('/teams/', { country_code: 'IT' }, apiKey, fetchImpl, 'teams');
   return new Set(teams.map(team => text(team?.id)).filter(Boolean));
+}
+
+export function providerNormalizerProbe() {
+  const match = normalizeBsdEvent({
+    id: 'probe',
+    status: 'upcoming',
+    round_name: 'Матчи',
+    round_number: 1,
+    home_team: { id: 77, name: 'Inter', country_code: 'IT' },
+    away_team: { id: 1, name: 'Liverpool', country_code: 'GB' },
+  }, 'ucl', { italianTeamIds: new Set(['77']) });
+  return String(match?.stageKey || '');
 }
 
 export async function fetchBsdMatches({
