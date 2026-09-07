@@ -190,6 +190,31 @@ async function fetchItalianTeamIds(apiKey, fetchImpl) {
   return new Set(teams.map(team => text(team?.id)).filter(Boolean));
 }
 
+function primitiveProbe(value) {
+  if (value === null || value === undefined) return null;
+  if (['string', 'number', 'boolean'].includes(typeof value)) return value;
+  if (Array.isArray(value)) return '[array]';
+  return '[object]';
+}
+
+async function fetchCompetitionContext({ competition, from, to, apiKey, fetchImpl }) {
+  const range = assertRange(from, to);
+  const league = await resolveLeague(competition, apiKey, fetchImpl);
+  const season = await resolveSeason(league.id, apiKey, fetchImpl);
+  const [events, italianTeamIds] = await Promise.all([
+    fetchAll('/events/', {
+      league_id: league.id,
+      season_id: season.id,
+      date_from: range.from,
+      date_to: range.to,
+    }, apiKey, fetchImpl, 'events'),
+    EUROPEAN.has(competition)
+      ? fetchItalianTeamIds(apiKey, fetchImpl)
+      : Promise.resolve(new Set()),
+  ]);
+  return { events, italianTeamIds };
+}
+
 export function providerNormalizerProbe() {
   const match = normalizeBsdEvent({
     id: 'probe',
@@ -202,6 +227,34 @@ export function providerNormalizerProbe() {
   return String(match?.stageKey || '');
 }
 
+export async function fetchBsdStageProbe({
+  competition,
+  from,
+  to,
+  apiKey,
+  fetchImpl = fetch,
+}) {
+  const { events, italianTeamIds } = await fetchCompetitionContext({ competition, from, to, apiKey, fetchImpl });
+  for (const event of events) {
+    const match = normalizeBsdEvent(event, competition, { italianTeamIds });
+    if (!match) continue;
+    return {
+      event_id: text(event?.id ?? event?.event_id ?? event?.match_id),
+      round_name: primitiveProbe(event?.round_name),
+      stage: primitiveProbe(event?.stage),
+      phase: primitiveProbe(event?.phase),
+      group_name: primitiveProbe(event?.group_name),
+      round_number: primitiveProbe(event?.round_number),
+      round: primitiveProbe(event?.round),
+      matchday: primitiveProbe(event?.matchday),
+      normalized_stage_key: match.stageKey,
+      normalized_stage_label: match.stageLabel,
+      normalized_round: match.round,
+    };
+  }
+  return null;
+}
+
 export async function fetchBsdMatches({
   competition,
   from,
@@ -209,21 +262,7 @@ export async function fetchBsdMatches({
   apiKey,
   fetchImpl = fetch,
 }) {
-  const range = assertRange(from, to);
-  const league = await resolveLeague(competition, apiKey, fetchImpl);
-  const season = await resolveSeason(league.id, apiKey, fetchImpl);
-
-  const [events, italianTeamIds] = await Promise.all([
-    fetchAll('/events/', {
-      league_id: league.id,
-      season_id: season.id,
-      date_from: range.from,
-      date_to: range.to,
-    }, apiKey, fetchImpl, 'events'),
-    EUROPEAN.has(competition)
-      ? fetchItalianTeamIds(apiKey, fetchImpl)
-      : Promise.resolve(new Set()),
-  ]);
+  const { events, italianTeamIds } = await fetchCompetitionContext({ competition, from, to, apiKey, fetchImpl });
 
   const matches = [];
   for (const event of events) {
