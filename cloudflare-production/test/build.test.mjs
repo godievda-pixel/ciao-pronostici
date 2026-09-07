@@ -31,9 +31,22 @@ test('production release accepts the real grouped no-x2 CSS patch', () => {
   assert.equal(validateReleaseHtml(fixtureRelease()), true);
 });
 
-test('production preparation injects the BSD crest patch before serving v22.5', () => {
+test('production preparation injects crest patch then multitournament patch exactly once', () => {
   assert.equal(typeof productionBuild.prepareReleaseHtml, 'function');
   const prepared = productionBuild.prepareReleaseHtml(fixtureRelease());
   assert.match(prepared, /ciao-prod-bsd-crests-20260907/);
+  assert.match(prepared, /ciao-prod-multitournament-matches-20260907/);
+  assert.ok(
+    prepared.indexOf('ciao-prod-bsd-crests-20260907') <
+    prepared.indexOf('ciao-prod-multitournament-matches-20260907')
+  );
   assert.match(prepared, /sports\.bzzoiro\.com\/img\/team/);
+  assert.match(prepared, /Прогнозы/);
+  assert.match(prepared, /Рейтинг/);
+  assert.match(prepared, /Таблицы/);
+  assert.doesNotMatch(prepared, /compat-v22-5-emoji\.mjs/);
+
+  const twice = productionBuild.prepareReleaseHtml(prepared);
+  assert.equal((twice.match(/ciao-prod-bsd-crests-20260907/g) || []).length, 2);
+  assert.equal((twice.match(/ciao-prod-multitournament-matches-20260907/g) || []).length, 2);
 });
