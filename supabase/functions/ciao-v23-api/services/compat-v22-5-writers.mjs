@@ -28,6 +28,15 @@ function teamOut(row){
   return {id:Number(row.id),name:String(row.name??''),short_name:row.short_name??null,custom_emoji_id:row.custom_emoji_id??null,bsd_team_id:row.bsd_team_id==null?null:Number(row.bsd_team_id)};
 }
 
+function notificationOut(row={}){
+  return {
+    deadline:row.deadline_reminders_enabled!==false,
+    lineup:row.lineup_notifications_enabled===true,
+    kickoff:row.kickoff_notifications_enabled===true,
+    result:row.result_notifications_enabled===true,
+  };
+}
+
 export function createV22CompatWriters({db,now=()=>Date.now()}={}){
   if(!db?.from)throw new Error('db_required');
 
@@ -89,21 +98,18 @@ export function createV22CompatWriters({db,now=()=>Date.now()}={}){
     const mapping={deadline:'deadline_reminders_enabled',lineup:'lineup_notifications_enabled',kickoff:'kickoff_notifications_enabled',result:'result_notifications_enabled'};
     const patch={};
     for(const [key,column] of Object.entries(mapping))if(Object.hasOwn(preferences,key))patch[column]=preferences[key]===true;
+    const select='id,deadline_reminders_enabled,lineup_notifications_enabled,kickoff_notifications_enabled,result_notifications_enabled';
     if(Object.keys(patch).length){
       patch.updated_at=new Date(Number(now())).toISOString();
-      const q=await db.from('cp_users').update(patch).eq('id',uid).select('id').single();
+      const q=await db.from('cp_users').update(patch).eq('id',uid).select(select).single();
       if(q?.error)throw q.error;
       if(!q?.data)throw new Error('user_not_found');
+      return notificationOut(q.data);
     }
-    const current=await db.from('cp_users').select('deadline_reminders_enabled,lineup_notifications_enabled,kickoff_notifications_enabled,result_notifications_enabled').eq('id',uid).maybeSingle();
-    if(current?.error)throw current.error;
-    const row=current?.data??patch;
-    return {
-      deadline:row.deadline_reminders_enabled!==false,
-      lineup:row.lineup_notifications_enabled===true,
-      kickoff:row.kickoff_notifications_enabled===true,
-      result:row.result_notifications_enabled===true,
-    };
+    const q=await db.from('cp_users').select(select).eq('id',uid).maybeSingle();
+    if(q?.error)throw q.error;
+    if(!q?.data)throw new Error('user_not_found');
+    return notificationOut(q.data);
   }
 
   async function clientEvent(){return true;}
