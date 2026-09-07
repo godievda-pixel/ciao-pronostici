@@ -34,10 +34,13 @@ export function validateHomeCalcioPolishSafePatchedHtml(input){
   const html=String(input||'');
   const count=html.split(HOME_CALCIO_POLISH_MARKER).length-1;
   if(count!==2)throw new Error(`production safe home/calcio marker count invalid: ${count}`);
-  const mineAt=html.indexOf(MINE_STAGE_MARKER),homeAt=html.indexOf(HOME_CALCIO_POLISH_MARKER);
-  if(mineAt<0||homeAt<0||mineAt>=homeAt)throw new Error('production safe home/calcio layer order invalid');
-  if(html.includes(BROKEN_FONT))throw new Error('unsafe nested Home/Calcio font literal leaked into production');
-  if(!html.includes(SAFE_FONT))throw new Error('safe Home/Calcio font literal missing');
+  const mineAt=html.indexOf(MINE_STAGE_MARKER);
+  const homeAt=html.indexOf(HOME_CALCIO_POLISH_MARKER);
+  const homeEnd=html.indexOf(HOME_CALCIO_POLISH_MARKER,homeAt+HOME_CALCIO_POLISH_MARKER.length);
+  if(mineAt<0||homeAt<0||homeEnd<0||mineAt>=homeAt)throw new Error('production safe home/calcio layer order invalid');
+  const layer=html.slice(homeAt,homeEnd+HOME_CALCIO_POLISH_MARKER.length);
+  if(layer.includes(BROKEN_FONT))throw new Error('unsafe nested Home/Calcio font literal leaked into injected runtime');
+  if(!layer.includes(SAFE_FONT))throw new Error('safe Home/Calcio font literal missing from injected runtime');
   new Function(homeCalcioPolishRuntimeSourceSafe());
   return true;
 }
