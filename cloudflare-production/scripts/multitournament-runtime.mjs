@@ -33,12 +33,15 @@ export function multitournamentRuntimeSource() {
   const __CWMT_LOCAL_BY_BSD=${reverseMapJson};
   const __cwMtLegacyCalendar=calendar;
   const __cwMtLegacyBind=bind;
+  const __cwMtLegacyRefreshLive=refreshLive;
   let __cwMtCompetition='';
   let __cwMtStageKey='';
   let __cwMtPayload=null;
   let __cwMtLoading=false;
   let __cwMtError='';
   let __cwMtRequestVersion=0;
+  let __cwMtRefreshTimer=0;
+  let __cwMtRefreshError='';
 
   function __cwMtEsc(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))}
   function __cwMtMeta(key){return __CWMT_COMPETITIONS[key]||null}
@@ -54,15 +57,27 @@ export function multitournamentRuntimeSource() {
   function __cwMtStageBarHtml(){const groups=__cwMtGroups();return groups.length?'<div class="rounds cwmt-rounds">'+groups.map(g=>'<button type="button" class="round-chip '+(g.key===__cwMtStageKey?'active':'')+'" data-cwmt-stage="'+__cwMtEsc(g.key)+'">'+__cwMtEsc(g.label)+'</button>').join('')+'</div>':''}
   function __cwMtCoverHtml(key){const meta=__cwMtMeta(key)||__CWMT_COMPETITIONS.serie_a;return '<section class="cwmt-cover" data-cwmt-theme="'+__cwMtEsc(meta.theme)+'"><button type="button" class="cwmt-back" data-cwmt-action="hub" aria-label="Назад">‹</button><h2>'+__cwMtEsc(meta.title)+'</h2></section>'}
   function __cwMtHubHtml(){return '<section class="cwmt-hub"><div class="section-title cwmt-hub-title"><h3>Матчи</h3></div><div class="cwmt-grid">${cards}</div></section>'}
+
+  function __cwMtIsoDate(year,month,day){return String(year).padStart(4,'0')+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0')}
+  function __cwMtSeasonRange(now=new Date()){const d=now instanceof Date?now:new Date(now),year=d.getFullYear(),month=d.getMonth()+1,startYear=month>=7?year:year-1;return {from:__cwMtIsoDate(startYear,7,1),to:__cwMtIsoDate(startYear+1,6,30)}}
+  function __cwMtGroupSignature(payload){const rows=Array.isArray(payload?.matches)?payload.matches:[],keys=[];for(const m of rows){const k=String(m?.stageKey||'matches');if(!keys.includes(k))keys.push(k)}return keys.join('|')}
+  function __cwMtApplyPayload(version,payload,{quiet=false}={}){if(version!==__cwMtRequestVersion)return false;if(!payload||String(payload?.competition||'')!==String(__cwMtCompetition||''))return false;const selected=__cwMtStageKey,prevSignature=__cwMtGroupSignature(__cwMtPayload),nextSignature=__cwMtGroupSignature(payload);__cwMtPayload=payload;__cwMtLoading=false;__cwMtError='';__cwMtRefreshError='';const groups=__cwMtGroups();if(selected&&groups.some(g=>g.key===selected))__cwMtStageKey=selected;else __cwMtStageKey=groups[0]?.key||'';if(quiet&&prevSignature===nextSignature&&main){__cwMtPatchVisibleMatches(payload)}else render();return true}
+  function __cwMtPatchVisibleMatches(payload){if(!main)return false;const rows=Array.isArray(payload?.matches)?payload.matches:[],hosts=[...(main.querySelectorAll?.('[data-cwmt-match]')||[])];for(const match of rows){const wanted=String(match?.matchId||''),host=hosts.find(el=>String(el.getAttribute?.('data-cwmt-match')||'')===wanted);if(!host)continue;const center=host.querySelector?.('.cwmt-match-center');if(center)center.innerHTML=__cwMtCenterHtml(match)}return true}
+  async function __cwMtLoadCompetition(key,{quiet=false}={}){if(!__cwMtMeta(key)||key==='serie_a')return false;const version=++__cwMtRequestVersion;const selectedAtStart=__cwMtCompetition;if(!quiet){__cwMtLoading=true;__cwMtError='';render()}try{const range=__cwMtSeasonRange(new Date()),url=new URL('/api/cw22/matches',location.origin);url.searchParams.set('competition',key);url.searchParams.set('from',range.from);url.searchParams.set('to',range.to);const response=await fetch(url,{headers:{accept:'application/json','x-telegram-init-data':initData},cache:'no-store'});if(!response?.ok)throw new Error('HTTP '+Number(response?.status||0));const body=await response.json(),payload=body?.data;if(version!==__cwMtRequestVersion||selectedAtStart!==__cwMtCompetition||key!==__cwMtCompetition)return false;return __cwMtApplyPayload(version,payload,{quiet})}catch(error){if(version!==__cwMtRequestVersion||selectedAtStart!==__cwMtCompetition||key!==__cwMtCompetition)return false;__cwMtLoading=false;if(quiet&&__cwMtPayload){__cwMtRefreshError=String(error?.message||'refresh_failed');return false}__cwMtError=String(error?.message||'load_failed');render();return false}}
+  function __cwMtStopRefresh(){if(__cwMtRefreshTimer){clearInterval(__cwMtRefreshTimer);__cwMtRefreshTimer=0}}
+  function __cwMtStartRefresh(){__cwMtStopRefresh();if(!(tab==='calendar'&&__cwMtCompetition&&__cwMtCompetition!=='serie_a'))return;__cwMtRefreshTimer=setInterval(()=>{if(tab==='calendar'&&__cwMtCompetition&&__cwMtCompetition!=='serie_a'&&!document.hidden)__cwMtLoadCompetition(__cwMtCompetition,{quiet:true})},30000)}
+
   function __cwMtExternalCompetitionHtml(){const meta=__cwMtMeta(__cwMtCompetition);if(!meta)return __cwMtHubHtml();const cover=__cwMtCoverHtml(__cwMtCompetition);if(__cwMtLoading&&!__cwMtPayload)return cover+'<div class="cwmt-state">Загружаем матчи…</div>';if(__cwMtError&&!__cwMtPayload)return cover+'<div class="cwmt-state"><b>Не удалось загрузить матчи</b><button type="button" data-cwmt-action="retry">Повторить</button></div>';const group=__cwMtSelectedGroup();if(!group)return cover+'<div class="cwmt-state">Матчей пока нет</div>';return cover+__cwMtStageBarHtml()+'<div class="section-title cwmt-stage-title"><h3>'+__cwMtEsc(group.label)+'</h3></div><div class="scoreboards cwmt-scoreboards">'+group.matches.map(__cwMtMatchCardHtml).join('')+'</div>'}
 
   calendar=function(){if(!__cwMtCompetition)return __cwMtHubHtml();if(__cwMtCompetition==='serie_a')return __cwMtCoverHtml('serie_a')+__cwMtLegacyCalendar();return __cwMtExternalCompetitionHtml()};
 
-  function __cwMtOpenCompetition(key){if(!__cwMtMeta(key))return;__cwMtCompetition=key;__cwMtStageKey='';__cwMtError='';if(key!=='serie_a')__cwMtPayload=null;render()}
-  function __cwMtOpenHub(){__cwMtCompetition='';__cwMtStageKey='';__cwMtPayload=null;__cwMtLoading=false;__cwMtError='';__cwMtRequestVersion+=1;render()}
-  function __cwMtResetOnLeave(){__cwMtCompetition='';__cwMtStageKey='';__cwMtPayload=null;__cwMtLoading=false;__cwMtError='';__cwMtRequestVersion+=1}
+  async function __cwMtOpenCompetition(key){if(!__cwMtMeta(key))return;__cwMtStopRefresh();__cwMtCompetition=key;__cwMtStageKey='';__cwMtError='';__cwMtRefreshError='';if(key==='serie_a'){__cwMtPayload=null;render();return}__cwMtPayload=null;render();await __cwMtLoadCompetition(key,{quiet:false});__cwMtStartRefresh()}
+  function __cwMtOpenHub(){__cwMtStopRefresh();__cwMtCompetition='';__cwMtStageKey='';__cwMtPayload=null;__cwMtLoading=false;__cwMtError='';__cwMtRefreshError='';__cwMtRequestVersion+=1;render()}
+  function __cwMtResetOnLeave(){__cwMtStopRefresh();__cwMtCompetition='';__cwMtStageKey='';__cwMtPayload=null;__cwMtLoading=false;__cwMtError='';__cwMtRefreshError='';__cwMtRequestVersion+=1}
 
-  bind=function(){__cwMtLegacyBind();root.querySelectorAll('[data-cwmt-competition]').forEach(btn=>btn.addEventListener('click',()=>__cwMtOpenCompetition(String(btn.getAttribute('data-cwmt-competition')||''))));root.querySelectorAll('[data-cwmt-stage]').forEach(btn=>btn.addEventListener('click',()=>{__cwMtStageKey=String(btn.getAttribute('data-cwmt-stage')||'');render()}));root.querySelector('[data-cwmt-action="hub"]')?.addEventListener('click',__cwMtOpenHub);root.querySelectorAll('[data-cwmt-local-club]').forEach(btn=>btn.addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation();const id=Number(btn.getAttribute('data-cwmt-local-club'));if(id>0)openClubProfile(id)}));root.querySelectorAll('button[data-tab]').forEach(btn=>btn.addEventListener('click',()=>{if(String(btn.getAttribute('data-tab')||'')!=='calendar')__cwMtResetOnLeave()}))};
+  bind=function(){__cwMtLegacyBind();root.querySelectorAll('[data-cwmt-competition]').forEach(btn=>btn.addEventListener('click',()=>__cwMtOpenCompetition(String(btn.getAttribute('data-cwmt-competition')||''))));root.querySelectorAll('[data-cwmt-stage]').forEach(btn=>btn.addEventListener('click',()=>{__cwMtStageKey=String(btn.getAttribute('data-cwmt-stage')||'');render()}));root.querySelector('[data-cwmt-action="hub"]')?.addEventListener('click',__cwMtOpenHub);root.querySelector('[data-cwmt-action="retry"]')?.addEventListener('click',()=>__cwMtLoadCompetition(__cwMtCompetition,{quiet:false}));root.querySelectorAll('[data-cwmt-local-club]').forEach(btn=>btn.addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation();const id=Number(btn.getAttribute('data-cwmt-local-club'));if(id>0)openClubProfile(id)}));root.querySelectorAll('button[data-tab]').forEach(btn=>btn.addEventListener('click',()=>{if(String(btn.getAttribute('data-tab')||'')!=='calendar')__cwMtResetOnLeave()}))};
+
+  refreshLive=async function(){const result=await __cwMtLegacyRefreshLive();return result};
 
   try{const n=root.querySelector('button[data-tab="mine"] .nav-label');if(n)n.textContent='Прогнозы'}catch(_e){}
   try{const n=root.querySelector('button[data-tab="table"] .nav-label');if(n)n.textContent='Рейтинг'}catch(_e){}
