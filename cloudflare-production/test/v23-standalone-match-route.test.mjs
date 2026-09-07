@@ -50,14 +50,17 @@ test('Match Center tab switch updates the canonical route section for refresh/de
     return {match,data:payload.section==='events'?{incidents:[]}:{}};
   }};
   const app=createApp({documentRef,windowRef,api,telegram:telegram(),clock:()=>new Date('2026-09-07T17:00:00.000Z'),timeZone:'Europe/Berlin'});
-  await app.start();
-  assert.equal(windowRef.location.pathname,'/match/ucl/77/overview');
+  try{
+    await app.start();
+    assert.equal(windowRef.location.pathname,'/match/ucl/77/overview');
 
-  const click=root.listeners.get('click');
-  await click({target:target({action:'match-tab',section:'events'})});
+    const click=root.listeners.get('click');
+    await click({target:target({action:'match-tab',section:'events'})});
 
-  assert.equal(windowRef.location.pathname,'/match/ucl/77/events');
-  assert.equal(app.current().section,'events');
-  assert.ok(calls.some(call=>call.action==='match_center'&&call.payload.section==='events'));
-  app.destroy();
+    assert.equal(windowRef.location.pathname,'/match/ucl/77/events');
+    assert.equal(app.current().section,'events');
+    assert.ok(calls.some(call=>call.action==='match_center'&&call.payload.section==='events'));
+  }finally{
+    app.destroy();
+  }
 });
