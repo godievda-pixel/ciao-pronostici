@@ -28,11 +28,11 @@ async function activeBuild(){
   const arr=await st.json();
   const id=arr?.[0]?.current_build;
   if(!id)throw new Error("release_state_missing");
-  const br=await fetch(`${SUPABASE_URL}/rest/v1/cp_frontend_builds?build_id=eq.${encodeURIComponent(id)}&select=build_id,url,enabled`,{headers:head});
+  const br=await fetch(`${SUPABASE_URL}/rest/v1/cp_frontend_builds?build_id=eq.${encodeURIComponent(id)}&select=build_id,url,is_stable`,{headers:head});
   if(!br.ok)throw new Error(`build_http_${br.status}`);
   const builds=await br.json();
   const b=builds?.[0];
-  if(!b?.enabled||!b?.url)throw new Error("build_disabled");
+  if(!b?.is_stable||!b?.url)throw new Error("build_disabled");
   cached=b;
   last=Date.now();
   return b;
@@ -62,7 +62,7 @@ Deno.serve(async req=>{
       ok:!!b,
       service:"Ciao Web Redirect",
       mode:"redirect",
-      version:3,
+      version:4,
       current_build:b?.build_id??null,
       url:b?.url??null,
       resolution_error:r.resolution_error,
