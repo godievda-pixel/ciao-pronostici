@@ -35,6 +35,14 @@ import {
   injectPredictionMineStagePolishPatch,
   validatePredictionMineStagePolishPatchedHtml,
 } from './prediction-mine-stage-polish.mjs';
+import {
+  injectHomeCalcioPolishPatch,
+  validateHomeCalcioPolishPatchedHtml,
+} from './home-calcio-polish.mjs';
+import {
+  injectHomeCalcioSafetyPatch,
+  validateHomeCalcioSafetyPatchedHtml,
+} from './home-calcio-safety.mjs';
 
 export const RELEASE_SOURCE_URL = 'https://dkefzepiiudehhzbbrjn.supabase.co/storage/v1/object/public/ciao-miniapp/migration/v22-5-resolved-no-x2.html';
 export const RELEASE_PATH = '/releases/v22-5.html';
@@ -65,6 +73,28 @@ export function validateReleaseHtml(input) {
   return true;
 }
 
+export function validateBrowserScripts(input) {
+  const html = String(input || '');
+  const scriptRe = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
+  let match;
+  let classicIndex = 0;
+  while ((match = scriptRe.exec(html))) {
+    const attrs = String(match[1] || '');
+    if (/\bsrc\s*=/i.test(attrs)) continue;
+    const typeMatch = attrs.match(/\btype\s*=\s*(?:(["'])(.*?)\1|([^\s>]+))/i);
+    const type = String(typeMatch?.[2] || typeMatch?.[3] || '').trim().toLowerCase();
+    if (type && !/^(?:text|application)\/(?:java|ecma)script$/.test(type)) continue;
+    classicIndex += 1;
+    try {
+      new Function(String(match[2] || ''));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`browser script syntax invalid at inline script ${classicIndex}: ${message}`);
+    }
+  }
+  return true;
+}
+
 export function prepareReleaseHtml(input) {
   const source = String(input || '');
   validateReleaseHtml(source);
@@ -86,8 +116,12 @@ export function prepareReleaseHtml(input) {
   validatePredictionStageLockUiPatchedHtml(withStageLockUi);
   const withLiveScrollPolish = injectPredictionLiveScrollPolishPatch(withStageLockUi);
   validatePredictionLiveScrollPolishPatchedHtml(withLiveScrollPolish);
-  const release = injectPredictionMineStagePolishPatch(withLiveScrollPolish);
-  validatePredictionMineStagePolishPatchedHtml(release);
+  const withMineStagePolish = injectPredictionMineStagePolishPatch(withLiveScrollPolish);
+  validatePredictionMineStagePolishPatchedHtml(withMineStagePolish);
+  const withHomeCalcioPolish = injectHomeCalcioPolishPatch(withMineStagePolish);
+  validateHomeCalcioPolishPatchedHtml(withHomeCalcioPolish);
+  const release = injectHomeCalcioSafetyPatch(withHomeCalcioPolish);
+  validateHomeCalcioSafetyPatchedHtml(release);
   return release;
 }
 
@@ -96,6 +130,7 @@ export async function build() {
   if (!releaseResponse.ok) throw new Error(`release source HTTP ${releaseResponse.status}`);
   const source = await releaseResponse.text();
   const release = prepareReleaseHtml(source);
+  validateBrowserScripts(release);
   const rootHtml = rootHtmlFor({ release });
   await mkdir(resolve(distDir, 'releases'), { recursive: true });
   await writeFile(resolve(distDir, 'index.html'), rootHtml, 'utf8');
