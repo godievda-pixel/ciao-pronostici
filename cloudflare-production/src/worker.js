@@ -1,15 +1,8 @@
 import { isExternalCompetition } from './matches/competition-config.mjs';
-import {
-  BsdUpstreamError,
-  fetchBsdMatches,
-  fetchBsdStageProbe,
-  providerNormalizerProbe,
-} from './matches/bsd-provider.mjs';
-import { normalizeBsdEvent } from './matches/normalizer.mjs';
+import { BsdUpstreamError, fetchBsdMatches } from './matches/bsd-provider.mjs';
 
 const API_PATH = '/api/cw22/matches';
 const INTERNAL_CACHE_SECONDS = 20;
-const MATCHES_RUNTIME_REVISION = 'cw22-matches-v2';
 
 function json(body, status = 200, headers = {}) {
   return new Response(JSON.stringify(body), {
@@ -43,23 +36,7 @@ function externalCompetition(value) {
   }
 }
 
-function normalizerProbe() {
-  const match = normalizeBsdEvent({
-    id: 'probe',
-    status: 'upcoming',
-    round_name: 'Матчи',
-    round_number: 1,
-    home_team: { id: 77, name: 'Inter', country_code: 'IT' },
-    away_team: { id: 1, name: 'Liverpool', country_code: 'GB' },
-  }, 'ucl', { italianTeamIds: new Set(['77']) });
-  return String(match?.stageKey || '');
-}
-
-export function createWorker({
-  fetchMatches = fetchBsdMatches,
-  fetchStageProbe = fetchBsdStageProbe,
-  cache = null,
-} = {}) {
+export function createWorker({ fetchMatches = fetchBsdMatches, cache = null } = {}) {
   return {
     async fetch(request, env = {}, ctx = {}) {
       const url = new URL(request.url);
@@ -70,8 +47,6 @@ export function createWorker({
           service: 'ciao-web-app',
           matches_provider: 'bsd-v2',
           bsd_configured: Boolean(String(env?.BSD_API_KEY || '').trim()),
-          normalizer_probe: normalizerProbe(),
-          provider_normalizer_probe: providerNormalizerProbe(),
         });
       }
 
@@ -97,7 +72,6 @@ export function createWorker({
 
       const from = String(url.searchParams.get('from') || '').trim();
       const to = String(url.searchParams.get('to') || '').trim();
-      const debugStage = url.searchParams.get('debug_stage') === '1';
       const activeCache = cache || globalThis.caches?.default || null;
       const key = cacheKeyFor(url);
 
@@ -107,28 +81,23 @@ export function createWorker({
       }
 
       try {
-        const providerArgs = {
+        const matches = await fetchMatches({
           competition,
           from,
           to,
           apiKey,
           fetchImpl: fetch,
-        };
-        const [matches, stageProbe] = await Promise.all([
-          fetchMatches(providerArgs),
-          debugStage ? fetchStageProbe(providerArgs) : Promise.resolve(undefined),
-        ]);
-        const data = {
-          competition,
-          from,
-          to,
-          provider: 'bsd-v2',
-          runtime_revision: MATCHES_RUNTIME_REVISION,
-          matches,
-        };
-        if (debugStage) data.stage_probe = stageProbe;
-
-        const internal = json({ ok: true, data }, 200, {
+        });
+        const internal = json({
+          ok: true,
+          data: {
+            competition,
+            from,
+            to,
+            provider: 'bsd-v2',
+            matches,
+          },
+        }, 200, {
           'cache-control': `public, max-age=${INTERNAL_CACHE_SECONDS}`,
         });
 
