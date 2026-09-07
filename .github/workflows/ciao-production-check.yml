@@ -1,0 +1,38 @@
+name: Ciao production check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cloudflare-production/**'
+      - '.github/workflows/ciao-production-check.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'cloudflare-production/**'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloudflare-production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: cloudflare-production/package.json
+
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
