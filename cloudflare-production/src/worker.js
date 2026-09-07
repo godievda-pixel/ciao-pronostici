@@ -1,5 +1,10 @@
 import { isExternalCompetition } from './matches/competition-config.mjs';
-import { BsdUpstreamError, fetchBsdMatches, providerNormalizerProbe } from './matches/bsd-provider.mjs';
+import {
+  BsdUpstreamError,
+  fetchBsdMatches,
+  fetchBsdStageProbe,
+  providerNormalizerProbe,
+} from './matches/bsd-provider.mjs';
 import { normalizeBsdEvent } from './matches/normalizer.mjs';
 
 const API_PATH = '/api/cw22/matches';
@@ -50,7 +55,11 @@ function normalizerProbe() {
   return String(match?.stageKey || '');
 }
 
-export function createWorker({ fetchMatches = fetchBsdMatches, cache = null } = {}) {
+export function createWorker({
+  fetchMatches = fetchBsdMatches,
+  fetchStageProbe = fetchBsdStageProbe,
+  cache = null,
+} = {}) {
   return {
     async fetch(request, env = {}, ctx = {}) {
       const url = new URL(request.url);
@@ -88,6 +97,7 @@ export function createWorker({ fetchMatches = fetchBsdMatches, cache = null } = 
 
       const from = String(url.searchParams.get('from') || '').trim();
       const to = String(url.searchParams.get('to') || '').trim();
+      const debugStage = url.searchParams.get('debug_stage') === '1';
       const activeCache = cache || globalThis.caches?.default || null;
       const key = cacheKeyFor(url);
 
@@ -97,24 +107,28 @@ export function createWorker({ fetchMatches = fetchBsdMatches, cache = null } = 
       }
 
       try {
-        const matches = await fetchMatches({
+        const providerArgs = {
           competition,
           from,
           to,
           apiKey,
           fetchImpl: fetch,
-        });
-        const internal = json({
-          ok: true,
-          data: {
-            competition,
-            from,
-            to,
-            provider: 'bsd-v2',
-            runtime_revision: MATCHES_RUNTIME_REVISION,
-            matches,
-          },
-        }, 200, {
+        };
+        const [matches, stageProbe] = await Promise.all([
+          fetchMatches(providerArgs),
+          debugStage ? fetchStageProbe(providerArgs) : Promise.resolve(undefined),
+        ]);
+        const data = {
+          competition,
+          from,
+          to,
+          provider: 'bsd-v2',
+          runtime_revision: MATCHES_RUNTIME_REVISION,
+          matches,
+        };
+        if (debugStage) data.stage_probe = stageProbe;
+
+        const internal = json({ ok: true, data }, 200, {
           'cache-control': `public, max-age=${INTERNAL_CACHE_SECONDS}`,
         });
 
