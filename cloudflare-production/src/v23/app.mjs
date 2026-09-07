@@ -287,9 +287,8 @@ export function createApp({
     }
     if(action==='match-tab'){
       const section=text(data.section)||'overview';
-      await matchCenter.selectTab(section);
       const route=currentRoute();
-      if(route.screen==='match')await live.start({screen:'match',competition:route.tournament,matchId:route.matchId,section});
+      if(route.screen==='match')await router.replace({...route,section});
       return;
     }
     if(action==='save-prediction'){
