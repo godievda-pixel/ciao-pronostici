@@ -73,9 +73,12 @@ export function parseRoute(urlOrPath) {
     return route({screen:'ranking',subview:parts[1]});
   }
 
-  if (parts[0] === 'matches' && parts.length === 2) {
-    const tournament = PATH_TO_TOURNAMENT[parts[1]];
-    if (tournament && MATCH_TOURNAMENTS.has(tournament)) return route({screen:'matches',tournament});
+  if (parts[0] === 'matches') {
+    if (parts.length === 1) return route({screen:'matches'});
+    if (parts.length === 2) {
+      const tournament = PATH_TO_TOURNAMENT[parts[1]];
+      if (tournament && MATCH_TOURNAMENTS.has(tournament)) return route({screen:'matches',tournament});
+    }
     return homeRoute();
   }
 
@@ -131,6 +134,7 @@ export function serializeRoute(input = {}) {
 
   if (screen === 'matches') {
     const tournament = clean(input.tournament);
+    if (!tournament) return '/matches';
     if (!MATCH_TOURNAMENTS.has(tournament)) return '/home';
     return `/matches/${TOURNAMENT_TO_PATH[tournament]}`;
   }
