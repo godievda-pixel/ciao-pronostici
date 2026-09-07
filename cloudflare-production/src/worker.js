@@ -4,6 +4,7 @@ import { normalizeBsdEvent } from './matches/normalizer.mjs';
 
 const API_PATH = '/api/cw22/matches';
 const INTERNAL_CACHE_SECONDS = 20;
+const MATCHES_RUNTIME_REVISION = 'cw22-matches-v2';
 
 function json(body, status = 200, headers = {}) {
   return new Response(JSON.stringify(body), {
@@ -110,6 +111,7 @@ export function createWorker({ fetchMatches = fetchBsdMatches, cache = null } = 
             from,
             to,
             provider: 'bsd-v2',
+            runtime_revision: MATCHES_RUNTIME_REVISION,
             matches,
           },
         }, 200, {
