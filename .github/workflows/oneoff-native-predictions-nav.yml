@@ -1,0 +1,46 @@
+name: One-off native predictions nav label
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/oneoff-native-predictions-nav.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-shell-nav:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Normalize Predictions nav label in tracked shell
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile, writeFile } from 'node:fs/promises';
+          const path = 'cloudflare-production/src/app-shell.html';
+          let html = await readFile(path, 'utf8');
+          const before = '<button data-tab="mine"><b><svg viewBox="0 0 24 24"><path d="M7 4.5h10a2 2 0 0 1 2 2v13H5v-13a2 2 0 0 1 2-2Z"/><path d="M8.5 9h7M8.5 12.5h7M8.5 16h4"/></svg></b><span class="nav-label">Мои<br>прогнозы</span></button>';
+          const after = '<button data-tab="mine"><b><svg viewBox="0 0 24 24"><path d="M7 4.5h10a2 2 0 0 1 2 2v13H5v-13a2 2 0 0 1 2-2Z"/><path d="M8.5 9h7M8.5 12.5h7M8.5 16h4"/></svg></b><span class="nav-label">Прогнозы</span></button>';
+          if (!html.includes(after)) {
+            if (!html.includes(before)) throw new Error('expected tracked mine nav markup not found');
+            html = html.replace(before, after);
+            await writeFile(path, html, 'utf8');
+          }
+          NODE
+      - name: Commit tracked shell nav edit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add cloudflare-production/src/app-shell.html
+          if git diff --cached --quiet; then
+            echo "Nav already normalized"
+            exit 0
+          fi
+          git commit -m "refactor: set Predictions label in tracked shell"
+          git push origin HEAD:main
