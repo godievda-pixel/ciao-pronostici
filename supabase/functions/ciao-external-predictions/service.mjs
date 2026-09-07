@@ -108,7 +108,6 @@ export function createExternalPredictionService({repository,fetchMatches,now=()=
   }
 
   async function syncDue({initData='internal-sync'}={}){
-    await ensureEnabled();
     const result={synced:0,competitions:{}};
     for(const competition of EXTERNAL){
       try{
