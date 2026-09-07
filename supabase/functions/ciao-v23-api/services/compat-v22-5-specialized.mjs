@@ -5,6 +5,12 @@ function rows(query){
   return Array.isArray(query?.data)?query.data:[];
 }
 
+function single(query,error='not_found'){
+  if(query?.error)throw query.error;
+  if(!query?.data)throw new Error(error);
+  return query.data;
+}
+
 function compactTeam(team){
   if(!team)return null;
   return {
@@ -13,6 +19,12 @@ function compactTeam(team){
     short_name:team.short_name??null,
     custom_emoji_id:team.custom_emoji_id??null,
   };
+}
+
+function matchTeam(team){
+  const base=compactTeam(team);
+  if(!base)return null;
+  return {...base,bsd_team_id:team?.bsd_team_id==null?null:Number(team.bsd_team_id)};
 }
 
 function scheduleMatch(match,roundNumber){
@@ -32,7 +44,55 @@ function scheduleMatch(match,roundNumber){
 
 function liveStatus(match){return String(match?.live_status??'').toLowerCase()==='live'}
 
-export function createV22CompatSpecialized({db,now=()=>Date.now()}={}){
+function statusOf(match){
+  if(liveStatus(match))return 'live';
+  if(match?.is_finished===true||String(match?.live_status??'').toLowerCase()==='finished')return 'finished';
+  return 'upcoming';
+}
+
+function pctSplit(counts){
+  const total=counts.home+counts.draw+counts.away;
+  if(!total)return {total:0,home:{count:0,pct:0},draw:{count:0,pct:0},away:{count:0,pct:0}};
+  const keys=['home','draw','away'];
+  const raw=keys.map(key=>counts[key]*100/total),base=raw.map(Math.floor);
+  let remainder=100-base.reduce((sum,value)=>sum+value,0);
+  const order=[0,1,2].sort((a,b)=>(raw[b]-base[b])-(raw[a]-base[a]));
+  for(let i=0;i<remainder;i++)base[order[i%order.length]]++;
+  return {total,...Object.fromEntries(keys.map((key,index)=>[key,{count:counts[key],pct:base[index]}]))};
+}
+
+function predictionSplit(predictions){
+  const counts={home:0,draw:0,away:0};
+  for(const prediction of predictions){
+    const home=Number(prediction?.home_score),away=Number(prediction?.away_score);
+    if(home>away)counts.home++;
+    else if(home<away)counts.away++;
+    else counts.draw++;
+  }
+  return pctSplit(counts);
+}
+
+function legacyPrediction(row){
+  if(!row)return null;
+  return {
+    home_score:Number(row.home_score),away_score:Number(row.away_score),
+    points:row.points==null?null:Number(row.points),updated_at:row.updated_at??null,
+  };
+}
+
+function legacyMatch(row,prediction=null){
+  return {
+    id:Number(row.id),bsd_event_id:row.bsd_event_id==null?null:Number(row.bsd_event_id),kickoff_at:row.kickoff_at??null,
+    schedule_status:row.schedule_status??null,home_score:row.home_score??null,away_score:row.away_score??null,
+    is_finished:row.is_finished===true,live_status:row.live_status??null,live_elapsed:row.live_elapsed??null,
+    live_updated_at:row.live_updated_at??null,result_source:row.result_source??null,round:row.round??null,
+    home:matchTeam(row.home),away:matchTeam(row.away),prediction,
+  };
+}
+
+const MATCH_SECTION_MAP=Object.freeze({detail:'overview',stats:'stats',incidents:'events',lineups:'lineups',player_stats:'players'});
+
+export function createV22CompatSpecialized({db,matchService=null,now=()=>Date.now()}={}){
   if(!db?.from)throw new Error('db_required');
 
   async function loadSchedule(){
@@ -107,11 +167,68 @@ export function createV22CompatSpecialized({db,now=()=>Date.now()}={}){
     };
   }
 
+  async function localMatch(matchId){
+    const id=Number(matchId);
+    if(!Number.isInteger(id)||id<=0)throw Object.assign(new Error('Некорректный матч'),{status:400});
+    const query=await db.from('cp_matches')
+      .select('id,bsd_event_id,kickoff_at,schedule_status,home_score,away_score,is_finished,live_status,live_elapsed,live_updated_at,result_source,round:cp_rounds!cp_matches_round_fk(number),home:cp_teams!cp_matches_home_team_fk(id,name,short_name,custom_emoji_id,bsd_team_id),away:cp_teams!cp_matches_away_team_fk(id,name,short_name,custom_emoji_id,bsd_team_id)')
+      .eq('id',id).maybeSingle();
+    return single(query,'Матч не найден');
+  }
+
+  async function userPrediction(matchId,userId){
+    const query=await db.from('cp_predictions').select('home_score,away_score,points,updated_at').eq('user_id',Number(userId)).eq('match_id',Number(matchId)).maybeSingle();
+    if(query?.error)throw query.error;
+    return legacyPrediction(query?.data??null);
+  }
+
+  async function splitForMatch(matchId){
+    const query=await db.from('cp_predictions').select('home_score,away_score').eq('match_id',Number(matchId));
+    return predictionSplit(rows(query));
+  }
+
+  async function loadMatchSummary(payload,context){
+    const row=await localMatch(payload?.match_id);
+    const [prediction,split]=await Promise.all([userPrediction(row.id,context?.userId),splitForMatch(row.id)]);
+    const status=statusOf(row);
+    return {
+      ok:true,match:legacyMatch(row,prediction),prediction_split:split,status,summary_only:true,
+      recommended_poll_ms:status==='live'?30000:180000,
+    };
+  }
+
+  async function loadMatchCenter(payload,context){
+    if(!matchService?.getMatchCenter)throw new Error('match_service_required');
+    const row=await localMatch(payload?.match_id);
+    const providerId=String(row.bsd_event_id??'');
+    if(!providerId)throw new Error('match_provider_id_missing');
+    const requested=[...new Set((Array.isArray(payload?.sections)&&payload.sections.length?payload.sections:['detail','stats','incidents','lineups','player_stats','overview_meta']).map(String))];
+    const providerSections=requested.filter(key=>MATCH_SECTION_MAP[key]).map(key=>[key,MATCH_SECTION_MAP[key]]);
+    const results=await Promise.all(providerSections.map(async([legacyKey,section])=>{
+      const result=await matchService.getMatchCenter({competition:'serie_a',matchId:providerId,section});
+      return [legacyKey,result?.data??null];
+    }));
+    const sectionData=Object.fromEntries(results);
+    const prediction=await userPrediction(row.id,context?.userId);
+    const split=payload?.include_split===true?await splitForMatch(row.id):null;
+    const status=statusOf(row),overviewMeta=requested.includes('overview_meta')?{venue:null,referee:null,form:{home:[],away:[]}}:null;
+    const coverage={};
+    for(const key of ['detail','stats','incidents','lineups','player_stats'])coverage[key]=sectionData[key]!=null;
+    coverage.overview_meta=overviewMeta!=null;
+    return {
+      ok:true,match:legacyMatch(row,prediction),prediction_split:split,status,cached:false,refresh_in_progress:false,
+      refreshed_sections:requested,fetched_at:new Date(Number(now())).toISOString(),coverage,
+      detail:sectionData.detail??null,stats:sectionData.stats??null,incidents:sectionData.incidents??null,lineups:sectionData.lineups??null,
+      player_stats:sectionData.player_stats??null,overview_meta:overviewMeta,errors:{},recommended_poll_ms:status==='live'?30000:180000,
+    };
+  }
+
   async function dispatch(route,payload={},context={}){
-    void payload;void context;
     if(route?.kind==='schedule')return await loadSchedule();
     if(route?.kind==='live_updates')return await loadLive({snapshot:false});
     if(route?.kind==='live_snapshot')return await loadLive({snapshot:true});
+    if(route?.kind==='match_summary')return await loadMatchSummary(payload,context);
+    if(route?.kind==='match_center')return await loadMatchCenter(payload,context);
     throw new Error(`specialized_not_implemented:${String(route?.kind??'missing')}`);
   }
 
