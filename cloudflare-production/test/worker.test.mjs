@@ -34,7 +34,7 @@ function fakeCache() {
   };
 }
 
-test('healthz reports BSD readiness and both deployed normalizer paths without exposing the secret', async () => {
+test('healthz reports BSD readiness without exposing internal diagnostics or the secret', async () => {
   const response = await worker.fetch(req('/healthz'), env());
   const body = await response.json();
   assert.equal(response.status, 200);
@@ -43,8 +43,6 @@ test('healthz reports BSD readiness and both deployed normalizer paths without e
     service: 'ciao-web-app',
     matches_provider: 'bsd-v2',
     bsd_configured: true,
-    normalizer_probe: 'league-1',
-    provider_normalizer_probe: 'league-1',
   });
   assert.equal(JSON.stringify(body).includes('fake-bsd-key'), false);
 
@@ -80,7 +78,7 @@ test('matches API reports missing BSD secret without leaking configuration detai
   assert.deepEqual(await response.json(), { ok: false, error: 'bsd_api_key_missing' });
 });
 
-test('matches API returns the canonical envelope with runtime revision and shields BSD with a 20 second URL cache', async () => {
+test('matches API returns the canonical envelope and shields BSD with a 20 second URL cache', async () => {
   let calls = 0;
   const cache = fakeCache();
   const custom = createWorker({
@@ -104,7 +102,6 @@ test('matches API returns the canonical envelope with runtime revision and shiel
       from: '2026-07-01',
       to: '2027-06-30',
       provider: 'bsd-v2',
-      runtime_revision: 'cw22-matches-v2',
       matches: [{ matchId: 'ucl:1', kickoffAt: '2026-07-01T19:00:00Z', to: '2027-06-30' }],
     },
   });
@@ -114,32 +111,15 @@ test('matches API returns the canonical envelope with runtime revision and shiel
   assert.equal(calls, 1);
 });
 
-test('debug_stage returns only injected safe stage probe metadata', async () => {
-  const custom = createWorker({
-    fetchMatches: async () => [],
-    fetchStageProbe: async () => ({
-      event_id: '1',
-      round_name: 'Матчи',
-      stage: null,
-      phase: null,
-      group_name: null,
-      round_number: null,
-      round: 1,
-      matchday: null,
-      normalized_stage_key: 'league-1',
-      normalized_stage_label: 'Общий этап · 1 тур',
-      normalized_round: 1,
-    }),
-  });
+test('debug query parameters do not expose provider diagnostics', async () => {
+  const custom = createWorker({ fetchMatches: async () => [] });
   const response = await custom.fetch(req('/api/cw22/matches?competition=ucl&from=2026-07-01&to=2027-06-30&debug_stage=1', {
     headers: authHeaders(),
   }), env());
   const body = await response.json();
   assert.equal(response.status, 200);
-  assert.equal(body.data.stage_probe.round_name, 'Матчи');
-  assert.equal(body.data.stage_probe.round, 1);
-  assert.equal(body.data.stage_probe.normalized_stage_key, 'league-1');
-  assert.equal(JSON.stringify(body).includes('fake-bsd-key'), false);
+  assert.equal('stage_probe' in body.data, false);
+  assert.equal('runtime_revision' in body.data, false);
 });
 
 test('BSD upstream errors expose safe diagnostics only', async () => {
