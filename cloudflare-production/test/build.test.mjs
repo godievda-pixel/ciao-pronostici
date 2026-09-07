@@ -44,6 +44,7 @@ test('production preparation injects approved layers and restores Home after glo
     'ciao-prod-home-predictions-nav-fix-20260907',
     'ciao-prod-prediction-stage-lock-ui-20260907',
     'ciao-prod-prediction-live-scroll-polish-20260907',
+    'ciao-prod-prediction-mine-stage-polish-20260907',
   ];
   for (const marker of order) assert.match(prepared, new RegExp(marker));
   for (let i=1;i<order.length;i++) assert.ok(prepared.indexOf(order[i-1]) < prepared.indexOf(order[i]));
@@ -59,12 +60,16 @@ test('production preparation injects approved layers and restores Home after glo
   assert.match(prepared, /predict=function\(\)\{return __cwPredLegacyPredict\(\)\}/);
   assert.match(prepared, /mine=function\(\)\{return __cwPredCenterHtml\(\)\}/);
   assert.match(prepared, /__cwPredUxCurrentStageLabel/);
-  assert.match(prepared, /n-1/);
   assert.match(prepared, /cwpred-stage-locked::before/);
   assert.match(prepared, /cwpred-status--live/);
   assert.match(prepared, /#E7072E/i);
   assert.match(prepared, /getBoundingClientRect\(\)\.top/);
   assert.match(prepared, /window\.scrollBy/);
+  assert.match(prepared, /__cwPredMineStagePreviousLabel/);
+  assert.match(prepared, /— : —/);
+  assert.match(prepared, /cwpred-mine-missing/);
+  assert.match(prepared, /cwpred-stage-locked::before\{display:none!important\}/);
+  assert.match(prepared, /replace\(\/\[🔒🔐\]/);
   assert.match(prepared, /Рейтинг/);
   assert.match(prepared, /Таблицы/);
   assert.doesNotMatch(prepared, /compat-v22-5-emoji\.mjs/);
