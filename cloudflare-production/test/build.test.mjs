@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import * as productionBuild from '../scripts/build.mjs';
 
 const { validateReleaseHtml } = productionBuild;
@@ -29,6 +30,15 @@ test('production root serves the stable v22.5 release directly', () => {
 
 test('production release accepts the real grouped no-x2 CSS patch', () => {
   assert.equal(validateReleaseHtml(fixtureRelease()), true);
+});
+
+test('production build uses the tracked app shell instead of remote release HTML', async () => {
+  assert.equal(typeof productionBuild.loadAppShell, 'function');
+  assert.equal('RELEASE_SOURCE_URL' in productionBuild, false);
+  const shell = await productionBuild.loadAppShell();
+  assert.match(shell, /ciao-prod-no-x2-20260903/);
+  const tracked = await readFile(new URL('../src/app-shell.html', import.meta.url), 'utf8');
+  assert.equal(shell, tracked);
 });
 
 test('production preparation injects approved layers and restores Home after global scheduler', () => {
