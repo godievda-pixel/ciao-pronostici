@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { homeCalcioPolishRuntimeSource } from '../scripts/home-calcio-polish.mjs';
+import { homeCalcioPolishRuntimeSourceSafe } from '../scripts/home-calcio-polish-safe.mjs';
 import { homeCalcioSafetyRuntimeSource } from '../scripts/home-calcio-safety.mjs';
 
-test('broken production home/calcio runtimes compile as browser JavaScript', () => {
-  assert.doesNotThrow(() => new Function(homeCalcioPolishRuntimeSource()));
+test('home/calcio runtime shipped to the browser is syntactically valid', () => {
+  assert.doesNotThrow(() => new Function(homeCalcioPolishRuntimeSourceSafe()));
   assert.doesNotThrow(() => new Function(homeCalcioSafetyRuntimeSource()));
 });
