@@ -162,6 +162,7 @@ export function runtimePatchSource() {
   try{const base=serieA;serieA=function(){return __cw225RewriteLegacyCrests(base(),__cw225SerieTeams())}}catch(_e){}
   try{const base=matchCenterHtml;matchCenterHtml=function(data){const match=data?.match||data||{};return __cw225RewriteLegacyCrests(base(data),[match?.home,match?.away])}}catch(_e){}
   try{__cw18Logo=function(team,cls=''){const url=__cw225BsdCrestUrl(team);return url?'<img class="'+__cw225Attr(cls)+'" loading="lazy" decoding="async" src="'+__cw225Attr(url)+'" alt="">':'<span>⚽</span>'}}catch(_e){}
+  try{teamLogoHtml=function(team,cls='cw16-team-logo'){const url=__cw225BsdCrestUrl(team);return url?'<img class="'+__cw225Attr(cls)+'" loading="lazy" decoding="async" src="'+__cw225Attr(url)+'" alt="'+__cw225Attr(team?.name||'')+'">':'<span class="cw16-fav-fallback" aria-hidden="true">⚽</span>'}}catch(_e){}
   try{__cw2154EmojiAssetUrl=function(){return ''};__cw2154RepairClubAssets=function(){return 0}}catch(_e){}
   /* /${BSD_CREST_PATCH_MARKER} */
 `;
