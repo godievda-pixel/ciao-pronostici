@@ -28,6 +28,21 @@ function normalizedStatus(value) {
   return 'scheduled';
 }
 
+function providerSide(raw, side) {
+  const value = raw?.[`${side}_team`] ?? raw?.[side];
+  if (value && typeof value === 'object') {
+    return {
+      ...value,
+      id:value.id ?? value.team_id ?? raw?.[`${side}_team_id`],
+      name:value.name ?? value.short_name ?? value.shortName ?? raw?.[`${side}_team_name`],
+    };
+  }
+  return {
+    id:raw?.[`${side}_team_id`],
+    name:text(value) || raw?.[`${side}_team_name`],
+  };
+}
+
 function normalizeTeam(raw, italianTeamIds, localizeTeam) {
   const team = raw && typeof raw === 'object' ? raw : {};
   const id = text(team.id ?? team.team_id);
@@ -88,12 +103,12 @@ export function normalizeProviderMatch(raw = {}, context = {}) {
 
   const stage = text(raw.round_name ?? raw.stage ?? raw.phase ?? raw.group_name);
   const home = normalizeTeam(
-    raw.home_team ?? raw.home ?? { id: raw.home_team_id, name: raw.home_team_name },
+    providerSide(raw, 'home'),
     italianTeamIds,
     context.localizeTeam,
   );
   const away = normalizeTeam(
-    raw.away_team ?? raw.away ?? { id: raw.away_team_id, name: raw.away_team_name },
+    providerSide(raw, 'away'),
     italianTeamIds,
     context.localizeTeam,
   );
