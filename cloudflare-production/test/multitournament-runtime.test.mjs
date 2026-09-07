@@ -95,6 +95,8 @@ function runtimeHarness(fetchImpl) {
   const expose = `\nglobalThis.__cwMtTest={
     setCompetition:key=>{__cwMtCompetition=key},
     setStage:key=>{__cwMtStageKey=key},
+    setPayload:value=>{__cwMtPayload=value},
+    groups:()=>__cwMtGroups().map(g=>g.key),
     load:(key,options)=>__cwMtLoadCompetition(key,options),
     state:()=>({payload:__cwMtPayload,stage:__cwMtStageKey,error:__cwMtError,version:__cwMtRequestVersion})
   };`;
@@ -164,4 +166,15 @@ test('quiet refresh preserves selected stage when it still exists', async () => 
   await harness.load('ucl', { quiet: true });
 
   assert.equal(harness.state().stage, 'league:3');
+});
+
+test('runtime stage switcher follows actual match chronology', () => {
+  const harness = runtimeHarness(async () => ({ ok:true, json:async()=>({ok:true,data:{competition:'uecl',matches:[]}}) }));
+  harness.setCompetition('uecl');
+  harness.setPayload({ competition:'uecl', matches:[
+    { matchId:'uecl:1', stageKey:'playoff', stageLabel:'Стыковые матчи', stageOrder:250, kickoffAt:'2026-08-20T18:30:00Z' },
+    { matchId:'uecl:2', stageKey:'league-1', stageLabel:'Общий этап · 1 тур', stageOrder:101, kickoffAt:'2026-10-15T19:00:00Z' },
+    { matchId:'uecl:3', stageKey:'league-2', stageLabel:'Общий этап · 2 тур', stageOrder:102, kickoffAt:'2026-10-22T19:00:00Z' },
+  ]});
+  assert.equal(JSON.stringify(harness.groups()), JSON.stringify(['playoff','league-1','league-2']));
 });
