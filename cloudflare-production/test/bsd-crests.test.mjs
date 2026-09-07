@@ -24,8 +24,14 @@ test('maps the legacy local Serie A team ids to BSD ids', () => {
 });
 
 test('builds club crest urls only from BSD', () => {
-  assert.equal(bsdCrestUrlFor({ id: 8, name: 'Интер' }), 'https://sports.bzzoiro.com/img/team/77/?bg=transparent');
-  assert.equal(bsdCrestUrlFor({ crestUrl: 'https://sports.bzzoiro.com/img/team/63/?bg=transparent' }), 'https://sports.bzzoiro.com/img/team/63/?bg=transparent');
+  assert.equal(
+    bsdCrestUrlFor({ id: 8, name: 'Интер' }),
+    'https://sports.bzzoiro.com/img/team/77/?bg=transparent',
+  );
+  assert.equal(
+    bsdCrestUrlFor({ crestUrl: 'https://sports.bzzoiro.com/img/team/63/?bg=transparent' }),
+    'https://sports.bzzoiro.com/img/team/63/?bg=transparent',
+  );
   assert.equal(bsdCrestUrlFor({ id: 9999, name: 'Неизвестный клуб' }), '');
 });
 

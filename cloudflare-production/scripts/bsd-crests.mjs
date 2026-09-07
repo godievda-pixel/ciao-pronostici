@@ -24,33 +24,55 @@ export const BSD_TEAM_ID_BY_LOCAL_ID = Object.freeze({
 });
 
 const BSD_TEAM_ID_BY_NAME = Object.freeze({
-  'аталанта': 71, 'atalanta': 71,
-  'болонья': 66, 'bologna': 66,
-  'кальяри': 67, 'cagliari': 67,
-  'комо': 69, 'como': 69,
-  'фиорентина': 68, 'fiorentina': 68,
-  'фрозиноне': 1277, 'frosinone': 1277,
-  'дженоа': 59, 'genoa': 59,
-  'интер': 77, 'inter': 77,
-  'ювентус': 73, 'juventus': 73,
-  'лацио': 70, 'lazio': 70,
-  'лечче': 60, 'lecce': 60,
-  'милан': 63, 'milan': 63,
-  'монца': 1286, 'monza': 1286,
-  'наполи': 62, 'napoli': 62,
-  'парма': 74, 'parma': 74,
-  'рома': 65, 'roma': 65,
-  'сассуоло': 61, 'sassuolo': 61,
-  'торино': 78, 'torino': 78,
-  'удинезе': 75, 'udinese': 75,
-  'венеция': 1285, 'venezia': 1285,
+  'аталанта': 71,
+  'atalanta': 71,
+  'болонья': 66,
+  'bologna': 66,
+  'кальяри': 67,
+  'cagliari': 67,
+  'комо': 69,
+  'como': 69,
+  'фиорентина': 68,
+  'fiorentina': 68,
+  'фрозиноне': 1277,
+  'frosinone': 1277,
+  'дженоа': 59,
+  'genoa': 59,
+  'интер': 77,
+  'inter': 77,
+  'ювентус': 73,
+  'juventus': 73,
+  'лацио': 70,
+  'lazio': 70,
+  'лечче': 60,
+  'lecce': 60,
+  'милан': 63,
+  'milan': 63,
+  'монца': 1286,
+  'monza': 1286,
+  'наполи': 62,
+  'napoli': 62,
+  'парма': 74,
+  'parma': 74,
+  'рома': 65,
+  'roma': 65,
+  'сассуоло': 61,
+  'sassuolo': 61,
+  'торино': 78,
+  'torino': 78,
+  'удинезе': 75,
+  'udinese': 75,
+  'венеция': 1285,
+  'venezia': 1285,
 });
 
 const BSD_TEAM_IDS = new Set(Object.values(BSD_TEAM_ID_BY_LOCAL_ID));
 const BSD_CREST_ORIGIN = 'https://sports.bzzoiro.com/img/team';
 const FINAL_IIFE_MARKER = '  /* ===== /Ciao, Web! v22.5 product polish layer ===== */\n\n})();\n</script>';
 
-function text(value) { return String(value ?? '').trim(); }
+function text(value) {
+  return String(value ?? '').trim();
+}
 
 export function bsdTeamIdFor(team = {}) {
   const direct = Number(
