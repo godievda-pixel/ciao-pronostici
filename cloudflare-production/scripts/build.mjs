@@ -3,6 +3,10 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { injectBsdCrestPatch, validateBsdCrestPatchedHtml } from './bsd-crests.mjs';
 import { injectMultitournamentPatch, validateMultitournamentPatchedHtml } from './multitournament-runtime.mjs';
+import {
+  injectMultitournamentCardThemePatch,
+  validateMultitournamentCardThemePatchedHtml,
+} from './multitournament-card-theme.mjs';
 
 export const RELEASE_SOURCE_URL = 'https://dkefzepiiudehhzbbrjn.supabase.co/storage/v1/object/public/ciao-miniapp/migration/v22-5-resolved-no-x2.html';
 export const RELEASE_PATH = '/releases/v22-5.html';
@@ -38,8 +42,10 @@ export function prepareReleaseHtml(input) {
   validateReleaseHtml(source);
   const withCrests = injectBsdCrestPatch(source);
   validateBsdCrestPatchedHtml(withCrests);
-  const release = injectMultitournamentPatch(withCrests);
-  validateMultitournamentPatchedHtml(release);
+  const withTournaments = injectMultitournamentPatch(withCrests);
+  validateMultitournamentPatchedHtml(withTournaments);
+  const release = injectMultitournamentCardThemePatch(withTournaments);
+  validateMultitournamentCardThemePatchedHtml(release);
   return release;
 }
 
