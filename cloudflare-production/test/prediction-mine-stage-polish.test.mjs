@@ -15,7 +15,7 @@ test('locked stage chips are dimmed without visible lock glyphs',()=>{
   const s=predictionMineStagePolishSource();
   assert.match(s,/cwpred-stage-locked::before\{display:none!important\}/);
   assert.match(s,/cwpred-stage-locked::after\{display:none!important\}/);
-  assert.match(s,/replace\(\/🔒/);
+  assert.match(s,/replace\(\/\[🔒🔐\]/);
 });
 
 test('missing prediction is compact and cannot overflow the center column',()=>{
