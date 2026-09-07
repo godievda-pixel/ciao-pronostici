@@ -65,3 +65,24 @@ test('provider match normalization derives Italian relevance from stable team id
   assert.equal(normalized.isQualification, false);
   assert.equal(normalized.kickoffAt, '2026-09-12T18:45:00Z');
 });
+
+test('provider match normalization preserves side ids when BSD sends team names as strings', () => {
+  const normalized = normalizeProviderMatch({
+    id: 9911,
+    event_date: '2026-09-20T18:45:00Z',
+    status: 'scheduled',
+    home_team: 'Inter',
+    home_team_id: 10,
+    away_team: 'Liverpool',
+    away_team_id: 20,
+  }, {
+    competition: 'ucl',
+    italianTeamIds: new Set(['10']),
+  });
+
+  assert.equal(normalized.home.id, '10');
+  assert.equal(normalized.home.nameProvider, 'Inter');
+  assert.equal(normalized.home.countryCode, 'IT');
+  assert.equal(normalized.away.id, '20');
+  assert.equal(normalized.away.nameProvider, 'Liverpool');
+});
