@@ -34,7 +34,7 @@ function fakeCache() {
   };
 }
 
-test('healthz reports BSD readiness without exposing the secret', async () => {
+test('healthz reports BSD readiness and deployed normalizer behavior without exposing the secret', async () => {
   const response = await worker.fetch(req('/healthz'), env());
   const body = await response.json();
   assert.equal(response.status, 200);
@@ -43,6 +43,7 @@ test('healthz reports BSD readiness without exposing the secret', async () => {
     service: 'ciao-web-app',
     matches_provider: 'bsd-v2',
     bsd_configured: true,
+    normalizer_probe: 'league-1',
   });
   assert.equal(JSON.stringify(body).includes('fake-bsd-key'), false);
 
