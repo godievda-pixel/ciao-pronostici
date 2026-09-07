@@ -15,6 +15,10 @@ import {
   injectMultitournamentPredictionsThemePatch,
   validateMultitournamentPredictionsThemePatchedHtml,
 } from './multitournament-predictions-theme.mjs';
+import {
+  injectGlobalRefreshPatch,
+  validateGlobalRefreshPatchedHtml,
+} from './global-refresh-runtime.mjs';
 
 export const RELEASE_SOURCE_URL = 'https://dkefzepiiudehhzbbrjn.supabase.co/storage/v1/object/public/ciao-miniapp/migration/v22-5-resolved-no-x2.html';
 export const RELEASE_PATH = '/releases/v22-5.html';
@@ -56,8 +60,10 @@ export function prepareReleaseHtml(input) {
   validateMultitournamentCardThemePatchedHtml(withMatchTheme);
   const withPredictions = injectMultitournamentPredictionsPatch(withMatchTheme);
   validateMultitournamentPredictionsPatchedHtml(withPredictions);
-  const release = injectMultitournamentPredictionsThemePatch(withPredictions);
-  validateMultitournamentPredictionsThemePatchedHtml(release);
+  const withPredictionTheme = injectMultitournamentPredictionsThemePatch(withPredictions);
+  validateMultitournamentPredictionsThemePatchedHtml(withPredictionTheme);
+  const release = injectGlobalRefreshPatch(withPredictionTheme);
+  validateGlobalRefreshPatchedHtml(release);
   return release;
 }
 
