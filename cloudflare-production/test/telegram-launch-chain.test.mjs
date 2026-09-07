@@ -24,3 +24,11 @@ test('launcher gives every Mini App launch a unique Cloudflare document URL', as
   assert.match(s, /location:target\.toString\(\)/);
   assert.match(s, /no-store, no-cache, must-revalidate, max-age=0/);
 });
+
+test('launcher health exposes safe registry diagnostics without secret values', async () => {
+  const s = await source('supabase/functions/ciao-web-app/index.ts');
+  assert.match(s, /resolution_error/);
+  assert.match(s, /supabase_url_present/);
+  assert.match(s, /service_key_present/);
+  assert.doesNotMatch(s, /service_key_value/);
+});
