@@ -21,14 +21,15 @@ test('one visible-screen scheduler uses exactly the approved 15 second cadence',
   assert.match(s, /__cwRefreshScreenKey/);
 });
 
-test('scheduler dispatches only the current visible resource', () => {
+test('native Predictions owns mine refresh while Home uses the core scheduler', () => {
   const s = source();
-  assert.match(s, /tab==='predict'\|\|tab==='mine'/);
-  assert.match(s, /__cwPredRefreshVisible\(\{quiet:true\}\)/);
+  assert.match(s, /tab==='mine'&&globalThis\.CiaoPredictionsScreen\?\.isOpen\?\.\(\)/);
+  assert.match(s, /tab==='predict'\|\|tab==='table'\|\|tab==='seriea'\|\|tab==='profile'\|\|tab==='calendar'/);
+  assert.doesNotMatch(s, /__cwPredRefreshVisible/);
+  assert.doesNotMatch(s, /__cwPredCompetition/);
+  assert.doesNotMatch(s, /__cwPredStageKey/);
   assert.match(s, /tab==='calendar'/);
   assert.match(s, /__cwMtRefreshVisible\(\{quiet:true\}\)/);
-  assert.match(s, /tab==='table'\|\|tab==='seriea'\|\|tab==='profile'/);
-  assert.doesNotMatch(s, /for\s*\([^)]*\b(?:predict|mine|table|calendar|seriea|profile)\b/);
 });
 
 test('legacy network schedulers are neutralized before the global scheduler starts', () => {
@@ -55,12 +56,12 @@ test('core state refresh preserves unsaved Serie A draft and current scroll', ()
   assert.doesNotMatch(s, /draft\.clear\(\)(?!;for\(const \[k,v\] of keptDraft\))/);
 });
 
-test('global refresh patch injects once after Predictions theme', () => {
-  const html = '<html><script>\n(function(){\n/* ciao-prod-multitournament-predictions-theme-20260907 */\n  /* ===== /Ciao, Web! v22.5 product polish layer ===== */\n\n})();\n</script></html>';
+test('global refresh patch injects once after accepted Matches theme', () => {
+  const html = '<html><script>\n(function(){\n/* ciao-prod-multitournament-card-theme-20260907 */\n  /* ===== /Ciao, Web! v22.5 product polish layer ===== */\n\n})();\n</script></html>';
   const once = injectGlobalRefreshPatch(html);
   const twice = injectGlobalRefreshPatch(once);
   assert.equal(once, twice);
   assert.equal(validateGlobalRefreshPatchedHtml(once), true);
   assert.match(once, new RegExp(GLOBAL_REFRESH_MARKER));
-  assert.ok(once.indexOf('ciao-prod-multitournament-predictions-theme-20260907') < once.indexOf(GLOBAL_REFRESH_MARKER));
+  assert.ok(once.indexOf('ciao-prod-multitournament-card-theme-20260907') < once.indexOf(GLOBAL_REFRESH_MARKER));
 });
