@@ -4,6 +4,7 @@ import { normalizeBsdEvent } from './normalizer.mjs';
 export const BSD_BASE = 'https://sports.bzzoiro.com/api/v2';
 const MAX_RANGE_DAYS = 370;
 const EUROPEAN = new Set(['ucl', 'uel', 'uecl']);
+const COPPA_SINGLE_LEG_STAGES = new Set(['r32', 'r16', 'qf', 'final']);
 
 export class BsdUpstreamError extends Error {
   constructor(stage, status, code = 'upstream_failed') {
@@ -189,6 +190,50 @@ async function fetchItalianTeamIds(apiKey, fetchImpl) {
   return new Set(teams.map(team => text(team?.id)).filter(Boolean));
 }
 
+function providerRevisionRank(match) {
+  const value = Number(match?.sourceId);
+  if (Number.isFinite(value)) return value;
+  return Number.NEGATIVE_INFINITY;
+}
+
+export function dedupeCoppaSingleLegMatches(matches) {
+  const rows = Array.isArray(matches) ? matches : [];
+  const selected = new Map();
+  const untouched = [];
+
+  for (const match of rows) {
+    const stageKey = text(match?.stageKey);
+    const homeId = text(match?.homeTeam?.id);
+    const awayId = text(match?.awayTeam?.id);
+    if (!COPPA_SINGLE_LEG_STAGES.has(stageKey) || !homeId || !awayId) {
+      untouched.push(match);
+      continue;
+    }
+
+    const pair = [homeId, awayId].sort().join(':');
+    const key = `${stageKey}:${pair}`;
+    const previous = selected.get(key);
+    if (!previous) {
+      selected.set(key, match);
+      continue;
+    }
+
+    const previousRank = providerRevisionRank(previous);
+    const currentRank = providerRevisionRank(match);
+    if (currentRank > previousRank) {
+      selected.set(key, match);
+      continue;
+    }
+    if (currentRank === previousRank) {
+      const previousTime = Date.parse(previous?.kickoffAt || '') || 0;
+      const currentTime = Date.parse(match?.kickoffAt || '') || 0;
+      if (currentTime > previousTime) selected.set(key, match);
+    }
+  }
+
+  return [...untouched, ...selected.values()];
+}
+
 export async function fetchBsdMatches({
   competition,
   from,
@@ -222,7 +267,11 @@ export async function fetchBsdMatches({
     }
   }
 
-  return matches.sort((a, b) => {
+  const filtered = competition === 'coppa_italia'
+    ? dedupeCoppaSingleLegMatches(matches)
+    : matches;
+
+  return filtered.sort((a, b) => {
     const ta = Date.parse(a?.kickoffAt || '') || 0;
     const tb = Date.parse(b?.kickoffAt || '') || 0;
     return ta - tb || String(a?.matchId || '').localeCompare(String(b?.matchId || ''));
