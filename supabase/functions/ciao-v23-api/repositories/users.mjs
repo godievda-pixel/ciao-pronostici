@@ -100,6 +100,12 @@ export function createUserRepository({db} = {}) {
     return normalizedTeam(query.data);
   }
 
+  async function listTeams() {
+    const query = await db.from('cp_teams').select('id,bsd_team_id');
+    const rows = queryData(query) ?? [];
+    return rows.map(normalizedTeam).filter(team => team && team.providerTeamId);
+  }
+
   async function listTeamsByProviderIds(providerTeamIds = []) {
     const values = [...new Set((Array.isArray(providerTeamIds) ? providerTeamIds : [])
       .map(value => Number(value))
@@ -146,6 +152,7 @@ export function createUserRepository({db} = {}) {
     syncTelegramProfile,
     getProfile,
     getTeam,
+    listTeams,
     listTeamsByProviderIds,
     setFavoriteTeam,
     updateNotificationSettings,
