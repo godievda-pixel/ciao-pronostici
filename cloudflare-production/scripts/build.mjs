@@ -8,33 +8,9 @@ import {
   validateMultitournamentCardThemePatchedHtml,
 } from './multitournament-card-theme.mjs';
 import {
-  injectMultitournamentPredictionsPatch,
-  validateMultitournamentPredictionsPatchedHtml,
-} from './multitournament-predictions-runtime.mjs';
-import {
-  injectMultitournamentPredictionsThemePatch,
-  validateMultitournamentPredictionsThemePatchedHtml,
-} from './multitournament-predictions-theme.mjs';
-import {
   injectGlobalRefreshPatch,
   validateGlobalRefreshPatchedHtml,
 } from './global-refresh-runtime.mjs';
-import {
-  injectHomePredictionsNavFixPatch,
-  validateHomePredictionsNavFixPatchedHtml,
-} from './home-predictions-nav-fix.mjs';
-import {
-  injectPredictionStageLockUiPatch,
-  validatePredictionStageLockUiPatchedHtml,
-} from './prediction-stage-lock-ui.mjs';
-import {
-  injectPredictionLiveScrollPolishPatch,
-  validatePredictionLiveScrollPolishPatchedHtml,
-} from './prediction-live-scroll-polish.mjs';
-import {
-  injectPredictionMineStagePolishPatch,
-  validatePredictionMineStagePolishPatchedHtml,
-} from './prediction-mine-stage-polish.mjs';
 
 export const RELEASE_PATH = '/releases/v22-5.html';
 export const NO_X2_MARKER = 'ciao-prod-no-x2-20260903';
@@ -103,20 +79,8 @@ export function prepareReleaseHtml(input) {
   validateMultitournamentPatchedHtml(withTournaments);
   const withMatchTheme = injectMultitournamentCardThemePatch(withTournaments);
   validateMultitournamentCardThemePatchedHtml(withMatchTheme);
-  const withPredictions = injectMultitournamentPredictionsPatch(withMatchTheme);
-  validateMultitournamentPredictionsPatchedHtml(withPredictions);
-  const withPredictionTheme = injectMultitournamentPredictionsThemePatch(withPredictions);
-  validateMultitournamentPredictionsThemePatchedHtml(withPredictionTheme);
-  const withGlobalRefresh = injectGlobalRefreshPatch(withPredictionTheme);
-  validateGlobalRefreshPatchedHtml(withGlobalRefresh);
-  const withHomeFix = injectHomePredictionsNavFixPatch(withGlobalRefresh);
-  validateHomePredictionsNavFixPatchedHtml(withHomeFix);
-  const withStageLockUi = injectPredictionStageLockUiPatch(withHomeFix);
-  validatePredictionStageLockUiPatchedHtml(withStageLockUi);
-  const withLiveScrollPolish = injectPredictionLiveScrollPolishPatch(withStageLockUi);
-  validatePredictionLiveScrollPolishPatchedHtml(withLiveScrollPolish);
-  const release = injectPredictionMineStagePolishPatch(withLiveScrollPolish);
-  validatePredictionMineStagePolishPatchedHtml(release);
+  const release = injectGlobalRefreshPatch(withMatchTheme);
+  validateGlobalRefreshPatchedHtml(release);
   return release;
 }
 
