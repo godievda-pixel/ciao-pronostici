@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { injectBsdCrestPatch, validateBsdCrestPatchedHtml } from './bsd-crests.mjs';
+import { injectMultitournamentPatch, validateMultitournamentPatchedHtml } from './multitournament-runtime.mjs';
 
 export const RELEASE_SOURCE_URL = 'https://dkefzepiiudehhzbbrjn.supabase.co/storage/v1/object/public/ciao-miniapp/migration/v22-5-resolved-no-x2.html';
 export const RELEASE_PATH = '/releases/v22-5.html';
@@ -35,8 +36,10 @@ export function validateReleaseHtml(input) {
 export function prepareReleaseHtml(input) {
   const source = String(input || '');
   validateReleaseHtml(source);
-  const release = injectBsdCrestPatch(source);
-  validateBsdCrestPatchedHtml(release);
+  const withCrests = injectBsdCrestPatch(source);
+  validateBsdCrestPatchedHtml(withCrests);
+  const release = injectMultitournamentPatch(withCrests);
+  validateMultitournamentPatchedHtml(release);
   return release;
 }
 
