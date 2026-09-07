@@ -31,7 +31,7 @@ test('production release accepts the real grouped no-x2 CSS patch', () => {
   assert.equal(validateReleaseHtml(fixtureRelease()), true);
 });
 
-test('production preparation injects all approved layers ending with one global refresh scheduler', () => {
+test('production preparation injects approved layers and restores Home after global scheduler', () => {
   assert.equal(typeof productionBuild.prepareReleaseHtml, 'function');
   const prepared = productionBuild.prepareReleaseHtml(fixtureRelease());
   const order = [
@@ -41,6 +41,7 @@ test('production preparation injects all approved layers ending with one global 
     'ciao-prod-multitournament-predictions-20260907',
     'ciao-prod-multitournament-predictions-theme-20260907',
     'ciao-prod-global-refresh-15000-20260907',
+    'ciao-prod-home-predictions-nav-fix-20260907',
   ];
   for (const marker of order) assert.match(prepared, new RegExp(marker));
   for (let i=1;i<order.length;i++) assert.ok(prepared.indexOf(order[i-1]) < prepared.indexOf(order[i]));
@@ -51,7 +52,10 @@ test('production preparation injects all approved layers ending with one global 
   assert.match(prepared, /\.cwpred-mode/);
   assert.match(prepared, /const __CW_REFRESH_MS=15000/);
   assert.match(prepared, /__cwRefreshVisibleNow/);
-  assert.match(prepared, /Прогнозы/);
+  assert.match(prepared, /textContent='Главная'/);
+  assert.match(prepared, /textContent='Прогнозы'/);
+  assert.match(prepared, /predict=function\(\)\{return __cwPredLegacyPredict\(\)\}/);
+  assert.match(prepared, /mine=function\(\)\{return __cwPredCenterHtml\(\)\}/);
   assert.match(prepared, /Рейтинг/);
   assert.match(prepared, /Таблицы/);
   assert.doesNotMatch(prepared, /compat-v22-5-emoji\.mjs/);
