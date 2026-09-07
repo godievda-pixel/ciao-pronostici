@@ -5,15 +5,11 @@ on:
     branches: [main]
     paths:
       - 'cloudflare-production/**'
-      - 'supabase/functions/ciao-web-app/**'
-      - 'supabase/functions/ciao-pronostici-router/**'
       - '.github/workflows/ciao-production-check.yml'
   pull_request:
     branches: [main]
     paths:
       - 'cloudflare-production/**'
-      - 'supabase/functions/ciao-web-app/**'
-      - 'supabase/functions/ciao-pronostici-router/**'
 
 jobs:
   verify:

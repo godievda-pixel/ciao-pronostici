@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { injectBsdCrestPatch, validateBsdCrestPatchedHtml } from './bsd-crests.mjs';
@@ -8,50 +8,41 @@ import {
   validateMultitournamentCardThemePatchedHtml,
 } from './multitournament-card-theme.mjs';
 import {
+  injectMultitournamentPredictionsPatch,
+  validateMultitournamentPredictionsPatchedHtml,
+} from './multitournament-predictions-runtime.mjs';
+import {
+  injectMultitournamentPredictionsThemePatch,
+  validateMultitournamentPredictionsThemePatchedHtml,
+} from './multitournament-predictions-theme.mjs';
+import {
   injectGlobalRefreshPatch,
   validateGlobalRefreshPatchedHtml,
 } from './global-refresh-runtime.mjs';
+import {
+  injectHomePredictionsNavFixPatch,
+  validateHomePredictionsNavFixPatchedHtml,
+} from './home-predictions-nav-fix.mjs';
+import {
+  injectPredictionStageLockUiPatch,
+  validatePredictionStageLockUiPatchedHtml,
+} from './prediction-stage-lock-ui.mjs';
+import {
+  injectPredictionLiveScrollPolishPatch,
+  validatePredictionLiveScrollPolishPatchedHtml,
+} from './prediction-live-scroll-polish.mjs';
+import {
+  injectPredictionMineStagePolishPatch,
+  validatePredictionMineStagePolishPatchedHtml,
+} from './prediction-mine-stage-polish.mjs';
 
+export const RELEASE_SOURCE_URL = 'https://dkefzepiiudehhzbbrjn.supabase.co/storage/v1/object/public/ciao-miniapp/migration/v22-5-resolved-no-x2.html';
 export const RELEASE_PATH = '/releases/v22-5.html';
 export const NO_X2_MARKER = 'ciao-prod-no-x2-20260903';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-export const APP_SHELL_PATH = resolve(root, 'src/app-shell.html');
-const predictionsSourceDir = resolve(root, 'src/predictions');
-const competitionConfigSource = resolve(root, 'src/matches/competition-config.mjs');
 const distDir = resolve(root, 'dist');
-const predictionsOutDir = resolve(distDir, 'predictions');
-const matchesOutDir = resolve(distDir, 'matches');
 const releaseOut = resolve(distDir, 'releases/v22-5.html');
-
-export async function loadAppShell() {
-  return readFile(APP_SHELL_PATH, 'utf8');
-}
-
-async function copyTree(sourceDir, targetDir, copied, prefix = '') {
-  await mkdir(targetDir, { recursive: true });
-  const entries = await readdir(sourceDir, { withFileTypes: true });
-  for (const entry of entries) {
-    const source = resolve(sourceDir, entry.name);
-    const target = resolve(targetDir, entry.name);
-    const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
-    if (entry.isDirectory()) {
-      await copyTree(source, target, copied, relative);
-      continue;
-    }
-    if (!entry.isFile() || !/\.(?:mjs|css)$/.test(entry.name)) continue;
-    await copyFile(source, target);
-    copied.push(relative);
-  }
-}
-
-export async function copyPredictionsAssets() {
-  const copied = [];
-  await copyTree(predictionsSourceDir, predictionsOutDir, copied);
-  await mkdir(matchesOutDir, { recursive: true });
-  await copyFile(competitionConfigSource, resolve(matchesOutDir, 'competition-config.mjs'));
-  return copied.sort();
-}
 
 export function rootHtmlFor({ release }) {
   return String(release || '');
@@ -83,17 +74,30 @@ export function prepareReleaseHtml(input) {
   validateMultitournamentPatchedHtml(withTournaments);
   const withMatchTheme = injectMultitournamentCardThemePatch(withTournaments);
   validateMultitournamentCardThemePatchedHtml(withMatchTheme);
-  const release = injectGlobalRefreshPatch(withMatchTheme);
-  validateGlobalRefreshPatchedHtml(release);
+  const withPredictions = injectMultitournamentPredictionsPatch(withMatchTheme);
+  validateMultitournamentPredictionsPatchedHtml(withPredictions);
+  const withPredictionTheme = injectMultitournamentPredictionsThemePatch(withPredictions);
+  validateMultitournamentPredictionsThemePatchedHtml(withPredictionTheme);
+  const withGlobalRefresh = injectGlobalRefreshPatch(withPredictionTheme);
+  validateGlobalRefreshPatchedHtml(withGlobalRefresh);
+  const withHomeFix = injectHomePredictionsNavFixPatch(withGlobalRefresh);
+  validateHomePredictionsNavFixPatchedHtml(withHomeFix);
+  const withStageLockUi = injectPredictionStageLockUiPatch(withHomeFix);
+  validatePredictionStageLockUiPatchedHtml(withStageLockUi);
+  const withLiveScrollPolish = injectPredictionLiveScrollPolishPatch(withStageLockUi);
+  validatePredictionLiveScrollPolishPatchedHtml(withLiveScrollPolish);
+  const release = injectPredictionMineStagePolishPatch(withLiveScrollPolish);
+  validatePredictionMineStagePolishPatchedHtml(release);
   return release;
 }
 
 export async function build() {
-  const source = await loadAppShell();
+  const releaseResponse = await fetch(RELEASE_SOURCE_URL, { headers: { 'cache-control': 'no-cache' } });
+  if (!releaseResponse.ok) throw new Error(`release source HTTP ${releaseResponse.status}`);
+  const source = await releaseResponse.text();
   const release = prepareReleaseHtml(source);
   const rootHtml = rootHtmlFor({ release });
   await mkdir(resolve(distDir, 'releases'), { recursive: true });
-  await copyPredictionsAssets();
   await writeFile(resolve(distDir, 'index.html'), rootHtml, 'utf8');
   await writeFile(releaseOut, release, 'utf8');
   return { ok: true, entry: 'dist/index.html', release: 'dist/releases/v22-5.html', bytes: Buffer.byteLength(release) };

@@ -1,5 +1,5 @@
 export const GLOBAL_REFRESH_MARKER = 'ciao-prod-global-refresh-15000-20260907';
-const MATCHES_THEME_MARKER = 'ciao-prod-multitournament-card-theme-20260907';
+const PREDICTIONS_THEME_MARKER = 'ciao-prod-multitournament-predictions-theme-20260907';
 const FINAL_IIFE_MARKER = '  /* ===== /Ciao, Web! v22.5 product polish layer ===== */\n\n})();\n</script>';
 
 export function globalRefreshRuntimeSource() {
@@ -14,6 +14,7 @@ export function globalRefreshRuntimeSource() {
     let key=String(tab||'');
     try{if(typeof matchViewId!=='undefined'&&matchViewId)key+='|match:'+String(matchViewId)}catch(_e){}
     try{if(typeof clubViewId!=='undefined'&&clubViewId)key+='|club:'+String(clubViewId)}catch(_e){}
+    try{if((tab==='predict'||tab==='mine')&&typeof __cwPredCompetition!=='undefined')key+='|pred:'+String(__cwPredCompetition||'')+':'+String(__cwPredStageKey||'')}catch(_e){}
     try{if(tab==='calendar'&&typeof __cwMtCompetition!=='undefined')key+='|matches:'+String(__cwMtCompetition||'')+':'+String(__cwMtStageKey||'')}catch(_e){}
     return key;
   }
@@ -37,7 +38,7 @@ export function globalRefreshRuntimeSource() {
       if(typeof matchViewId!=='undefined'&&matchViewId){return await refreshLive()}
       if(typeof clubViewId!=='undefined'&&clubViewId)return false;
     }catch(_e){}
-    if(!(tab==='predict'||tab==='table'||tab==='seriea'||tab==='profile'||tab==='calendar')||!S)return false;
+    if(!(tab==='table'||tab==='seriea'||tab==='profile'||tab==='calendar')||!S)return false;
     const keptDraft=new Map(draft);
     const scrollTop=Number(main?.scrollTop||0);
     try{
@@ -54,12 +55,14 @@ export function globalRefreshRuntimeSource() {
 
   async function __cwRefreshVisibleNow(){
     if(document.hidden||__cwRefreshBusy)return false;
-    if(tab==='mine'&&globalThis.CiaoPredictionsScreen?.isOpen?.())return false;
-    if(tab==='mine')return false;
     __cwRefreshBusy=true;
     const seq=++__cwRefreshSeq;
     const screenKey=__cwRefreshScreenKey();
     try{
+      if(tab==='predict'||tab==='mine'){
+        if(typeof __cwPredRefreshVisible==='function')return await __cwPredRefreshVisible({quiet:true});
+        return false;
+      }
       if(tab==='calendar'&&typeof __cwMtRefreshVisible==='function'){
         const external=typeof __cwMtCompetition!=='undefined'&&__cwMtCompetition&&__cwMtCompetition!=='serie_a';
         const handled=await __cwMtRefreshVisible({quiet:true});
@@ -90,7 +93,7 @@ export function globalRefreshRuntimeSource() {
 export function injectGlobalRefreshPatch(input) {
   const html = String(input || '');
   if (html.includes(GLOBAL_REFRESH_MARKER)) return html;
-  if (!html.includes(MATCHES_THEME_MARKER)) throw new Error('production Matches theme layer missing before global refresh runtime');
+  if (!html.includes(PREDICTIONS_THEME_MARKER)) throw new Error('production Predictions theme layer missing before global refresh runtime');
   const index = html.lastIndexOf(FINAL_IIFE_MARKER);
   if (index < 0) throw new Error('production v22.5 final IIFE marker missing');
   return `${html.slice(0, index)}${globalRefreshRuntimeSource()}${html.slice(index)}`;
@@ -100,13 +103,12 @@ export function validateGlobalRefreshPatchedHtml(input) {
   const html = String(input || '');
   const count = html.split(GLOBAL_REFRESH_MARKER).length - 1;
   if (count !== 2) throw new Error(`production global refresh marker count invalid: ${count}`);
-  const themeAt = html.indexOf(MATCHES_THEME_MARKER);
+  const themeAt = html.indexOf(PREDICTIONS_THEME_MARKER);
   const refreshAt = html.indexOf(GLOBAL_REFRESH_MARKER);
   if (themeAt < 0 || refreshAt < 0 || themeAt >= refreshAt) throw new Error('production global refresh layer order invalid');
   const source = globalRefreshRuntimeSource();
   if (!source.includes('const __CW_REFRESH_MS=15000')) throw new Error('production 15 second refresh cadence missing');
   if (!source.includes('visibilitychange')) throw new Error('production refresh visibility handling missing');
   if (source.includes('30000')) throw new Error('legacy 30 second cadence leaked into global refresh source');
-  if (source.includes('__cwPred')) throw new Error('legacy Predictions refresh leaked into global scheduler');
   return true;
 }
