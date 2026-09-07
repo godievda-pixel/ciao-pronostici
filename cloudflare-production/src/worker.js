@@ -1,5 +1,6 @@
 import { isExternalCompetition } from './matches/competition-config.mjs';
 import { BsdUpstreamError, fetchBsdMatches } from './matches/bsd-provider.mjs';
+import { normalizeBsdEvent } from './matches/normalizer.mjs';
 
 const API_PATH = '/api/cw22/matches';
 const INTERNAL_CACHE_SECONDS = 20;
@@ -36,6 +37,18 @@ function externalCompetition(value) {
   }
 }
 
+function normalizerProbe() {
+  const match = normalizeBsdEvent({
+    id: 'probe',
+    status: 'upcoming',
+    round_name: 'Матчи',
+    round_number: 1,
+    home_team: { id: 77, name: 'Inter', country_code: 'IT' },
+    away_team: { id: 1, name: 'Liverpool', country_code: 'GB' },
+  }, 'ucl', { italianTeamIds: new Set(['77']) });
+  return String(match?.stageKey || '');
+}
+
 export function createWorker({ fetchMatches = fetchBsdMatches, cache = null } = {}) {
   return {
     async fetch(request, env = {}, ctx = {}) {
@@ -47,6 +60,7 @@ export function createWorker({ fetchMatches = fetchBsdMatches, cache = null } = 
           service: 'ciao-web-app',
           matches_provider: 'bsd-v2',
           bsd_configured: Boolean(String(env?.BSD_API_KEY || '').trim()),
+          normalizer_probe: normalizerProbe(),
         });
       }
 
