@@ -19,6 +19,10 @@ import {
   injectGlobalRefreshPatch,
   validateGlobalRefreshPatchedHtml,
 } from './global-refresh-runtime.mjs';
+import {
+  injectHomePredictionsNavFixPatch,
+  validateHomePredictionsNavFixPatchedHtml,
+} from './home-predictions-nav-fix.mjs';
 
 export const RELEASE_SOURCE_URL = 'https://dkefzepiiudehhzbbrjn.supabase.co/storage/v1/object/public/ciao-miniapp/migration/v22-5-resolved-no-x2.html';
 export const RELEASE_PATH = '/releases/v22-5.html';
@@ -62,8 +66,10 @@ export function prepareReleaseHtml(input) {
   validateMultitournamentPredictionsPatchedHtml(withPredictions);
   const withPredictionTheme = injectMultitournamentPredictionsThemePatch(withPredictions);
   validateMultitournamentPredictionsThemePatchedHtml(withPredictionTheme);
-  const release = injectGlobalRefreshPatch(withPredictionTheme);
-  validateGlobalRefreshPatchedHtml(release);
+  const withGlobalRefresh = injectGlobalRefreshPatch(withPredictionTheme);
+  validateGlobalRefreshPatchedHtml(withGlobalRefresh);
+  const release = injectHomePredictionsNavFixPatch(withGlobalRefresh);
+  validateHomePredictionsNavFixPatchedHtml(release);
   return release;
 }
 
