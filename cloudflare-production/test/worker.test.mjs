@@ -80,7 +80,7 @@ test('matches API reports missing BSD secret without leaking configuration detai
   assert.deepEqual(await response.json(), { ok: false, error: 'bsd_api_key_missing' });
 });
 
-test('matches API returns the canonical envelope and shields BSD with a 20 second URL cache', async () => {
+test('matches API returns the canonical envelope with runtime revision and shields BSD with a 20 second URL cache', async () => {
   let calls = 0;
   const cache = fakeCache();
   const custom = createWorker({
@@ -104,6 +104,7 @@ test('matches API returns the canonical envelope and shields BSD with a 20 secon
       from: '2026-07-01',
       to: '2027-06-30',
       provider: 'bsd-v2',
+      runtime_revision: 'cw22-matches-v2',
       matches: [{ matchId: 'ucl:1', kickoffAt: '2026-07-01T19:00:00Z', to: '2027-06-30' }],
     },
   });
