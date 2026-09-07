@@ -92,6 +92,16 @@ test('Telegram sync updates mutable identity fields but never writes telegram_id
   assert.equal(fixture.tables.cp_users[0].telegram_id, 446763142);
 });
 
+test('user repository exposes the configured local team registry before provider localization', async () => {
+  const fixture = makeUserDb({cp_users:[baseUser],cp_teams:teams});
+  const repository = createUserRepository({db:fixture.db});
+  assert.deepEqual(await repository.listTeams(), [
+    {id:11,providerTeamId:'77'},
+    {id:12,providerTeamId:'73'},
+    {id:99,providerTeamId:'57'},
+  ]);
+});
+
 test('bootstrap combines current Telegram profile, prediction stats, all-scope rank and localized favorite choices', async () => {
   const calls = [];
   const userRepository = {
@@ -104,13 +114,14 @@ test('bootstrap combines current Telegram profile, prediction stats, all-scope r
         settings:{deadlineReminders:true,lineupNotifications:false,kickoffNotifications:false,resultNotifications:false},
       };
     },
-    async listTeamsByProviderIds(ids) {
-      calls.push(['teams',...ids]);
+    async listTeams() {
+      calls.push(['teams']);
       return [{id:11,providerTeamId:'77'},{id:12,providerTeamId:'73'}];
     },
   };
   const matchService = {
-    async listFavoriteItalianTeams() {
+    async listFavoriteItalianTeams({providerTeamIds} = {}) {
+      assert.deepEqual(providerTeamIds, ['77','73']);
       return [
         {id:'77',nameRu:'Интер',crestUrl:'inter.png',countryCode:'IT'},
         {id:'73',nameRu:'Ювентус',crestUrl:'juve.png',countryCode:'IT'},
@@ -140,13 +151,19 @@ test('bootstrap combines current Telegram profile, prediction stats, all-scope r
 
 test('favorite team accepts only a local cp_teams id backed by an eligible Italian provider id', async () => {
   const calls = [];
+  const providerRequests = [];
   const userRepository = {
     async getTeam(teamId) {
       return teamId === 12 ? {id:12,providerTeamId:'73'} : {id:99,providerTeamId:'57'};
     },
     async setFavoriteTeam(userId,teamId) { calls.push([userId,teamId]); return {favoriteTeamId:teamId}; },
   };
-  const matchService = {async listFavoriteItalianTeams(){return[{id:'77'},{id:'73'}];}};
+  const matchService = {
+    async listFavoriteItalianTeams({providerTeamIds} = {}) {
+      providerRequests.push(providerTeamIds);
+      return providerTeamIds?.includes('73') ? [{id:'73'}] : [];
+    },
+  };
   const service = createProfileService({
     userRepository,matchService,
     predictionRepository:{statsForUser:async()=>({})},
@@ -157,6 +174,7 @@ test('favorite team accepts only a local cp_teams id backed by an eligible Itali
   assert.deepEqual(calls, [[7,12]]);
   await assert.rejects(() => service.setFavoriteTeam(7,99), /favorite_team_not_eligible/);
   assert.deepEqual(calls, [[7,12]]);
+  assert.deepEqual(providerRequests, [['73'],['57']]);
 });
 
 test('partial notification patch updates only supplied settings flag', async () => {
