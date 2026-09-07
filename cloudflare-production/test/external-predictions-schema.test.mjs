@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 const path = new URL('../../supabase/migrations/20260907_ciao_external_predictions.sql', import.meta.url);
 const cronPath = new URL('../../supabase/migrations/20260907_ciao_external_predictions_cron.sql', import.meta.url);
+const darkSyncPath = new URL('../../supabase/migrations/20260907_ciao_external_predictions_dark_sync.sql', import.meta.url);
 
 test('external prediction migration defines isolated RLS-protected storage and unified view', async () => {
   const sql = await readFile(path, 'utf8');
@@ -18,7 +19,7 @@ test('external prediction migration defines isolated RLS-protected storage and u
   ]) assert.ok(sql.toLowerCase().includes(fragment.toLowerCase()), fragment);
 });
 
-test('external prediction cron settles in background only while feature flag is enabled', async () => {
+test('original external prediction cron is recorded as feature-gated rollout history', async () => {
   const sql = await readFile(cronPath, 'utf8');
   for (const fragment of [
     'create or replace function public.ciao_external_cron_token()',
@@ -29,4 +30,15 @@ test('external prediction cron settles in background only while feature flag is 
     "key = 'external_predictions_v1'",
     'enabled = true',
   ]) assert.ok(sql.toLowerCase().includes(fragment.toLowerCase()), fragment);
+});
+
+test('corrective cron migration allows protected dark-launch sync before UI enablement', async () => {
+  const sql = await readFile(darkSyncPath, 'utf8');
+  for (const fragment of [
+    "'ciao-external-predictions-sync'",
+    "'*/5 * * * *'",
+    "'x-ciao-cron-token'",
+    '"action":"sync_due"',
+  ]) assert.ok(sql.toLowerCase().includes(fragment.toLowerCase()), fragment);
+  assert.doesNotMatch(sql, /external_predictions_v1|enabled\s*=\s*true/i);
 });
