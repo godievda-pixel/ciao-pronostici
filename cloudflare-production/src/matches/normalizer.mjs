@@ -105,7 +105,9 @@ function score(event, side, status) {
 }
 
 function rawStage(event) {
-  return text(event?.round_name ?? event?.stage ?? event?.phase ?? event?.group_name);
+  return [event?.round_name, event?.stage, event?.phase, event?.group_name]
+    .map(value => text(value))
+    .find(Boolean) || '';
 }
 
 function roundFrom(event, stageText) {
@@ -134,7 +136,7 @@ function normalizeStage(stageText, round, competition) {
     };
   }
 
-  if (/league\s+(phase|stage)/i.test(lower)) {
+  if (/league[\s-]+(phase|stage)/i.test(lower)) {
     const number = round ?? integerOrNull(lower.match(/(?:round|matchday)\s*(\d{1,2})/i)?.[1]);
     return number
       ? { key: `league-${number}`, label: `Общий этап · ${number} тур`, order: 100 + number, recognized: true }
