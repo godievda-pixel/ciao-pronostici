@@ -28,6 +28,7 @@ test('legacy Home renderer is restored and unified prediction center lives only 
   assert.match(s,/if\(tab!=='mine'\)return false/);
   assert.match(s,/tab==='predict'/);
   assert.match(s,/__cwRefreshCurrentCoreScreen/);
+  assert.match(s,/__cwRefreshStart\(\)/);
 });
 
 test('prediction theme cannot leak onto Home',()=>{
