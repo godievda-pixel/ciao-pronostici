@@ -47,6 +47,12 @@ test('selected tournament themes both the application background and match cards
   assert.match(s, /\.header/);
 });
 
+test('themed tournament header avoids mobile backdrop-filter repaint lag', () => {
+  const s = source();
+  assert.match(s, /\[data-cwmt-screen-theme\] \.header\{[^}]*backdrop-filter:none!important/);
+  assert.match(s, /-webkit-backdrop-filter:none!important/);
+});
+
 test('patch injects once after the multitournament runtime and before final IIFE marker', () => {
   const html = '<html><script>\n(function(){\n/* ciao-prod-multitournament-matches-20260907 */\n  /* ===== /Ciao, Web! v22.5 product polish layer ===== */\n\n})();\n</script></html>';
   const once = injectMultitournamentCardThemePatch(html);
