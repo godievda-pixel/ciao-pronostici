@@ -35,6 +35,14 @@ import {
   injectPredictionMineStagePolishPatch,
   validatePredictionMineStagePolishPatchedHtml,
 } from './prediction-mine-stage-polish.mjs';
+import {
+  injectHomeCalcioPolishPatch,
+  validateHomeCalcioPolishPatchedHtml,
+} from './home-calcio-polish.mjs';
+import {
+  injectHomeCalcioSafetyPatch,
+  validateHomeCalcioSafetyPatchedHtml,
+} from './home-calcio-safety.mjs';
 
 export const RELEASE_SOURCE_URL = 'https://dkefzepiiudehhzbbrjn.supabase.co/storage/v1/object/public/ciao-miniapp/migration/v22-5-resolved-no-x2.html';
 export const RELEASE_PATH = '/releases/v22-5.html';
@@ -86,8 +94,12 @@ export function prepareReleaseHtml(input) {
   validatePredictionStageLockUiPatchedHtml(withStageLockUi);
   const withLiveScrollPolish = injectPredictionLiveScrollPolishPatch(withStageLockUi);
   validatePredictionLiveScrollPolishPatchedHtml(withLiveScrollPolish);
-  const release = injectPredictionMineStagePolishPatch(withLiveScrollPolish);
-  validatePredictionMineStagePolishPatchedHtml(release);
+  const withMineStagePolish = injectPredictionMineStagePolishPatch(withLiveScrollPolish);
+  validatePredictionMineStagePolishPatchedHtml(withMineStagePolish);
+  const withHomeCalcioPolish = injectHomeCalcioPolishPatch(withMineStagePolish);
+  validateHomeCalcioPolishPatchedHtml(withHomeCalcioPolish);
+  const release = injectHomeCalcioSafetyPatch(withHomeCalcioPolish);
+  validateHomeCalcioSafetyPatchedHtml(release);
   return release;
 }
 
