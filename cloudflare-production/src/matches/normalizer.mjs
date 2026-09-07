@@ -7,6 +7,19 @@ const FINISHED_STATUSES = new Set(['finished', 'ended', 'fulltime', 'full_time',
 const POSTPONED_STATUSES = new Set(['postponed', 'pst']);
 const CANCELLED_STATUSES = new Set(['cancelled', 'canceled', 'canc']);
 
+const RUSSIAN_TEAM_NAME_BY_BSD_ID = Object.freeze({
+  '1':'Ливерпуль','2':'Борнмут','7':'Сандерленд','12':'Манчестер Сити','17':'Манчестер Юнайтед','18':'Арсенал',
+  '22':'Спортинг','35':'Порту','37':'Бенфика','41':'Вильярреал','44':'Барселона','48':'Реал Сосьедад','49':'Сельта',
+  '56':'Бетис','57':'Реал Мадрид','59':'Дженоа','61':'Сассуоло','62':'Наполи','63':'Милан','64':'Кремонезе','65':'Рома',
+  '67':'Кальяри','68':'Фиорентина','69':'Комо','71':'Аталанта','72':'Пиза','73':'Ювентус','74':'Парма','75':'Удинезе',
+  '76':'Верона','77':'Интер','78':'Торино','80':'РБ Лейпциг','84':'Штутгарт','92':'Боруссия Дортмунд','97':'Ренн',
+  '99':'Ланс','106':'Лилль','114':'ПСЖ','118':'Олимпиакос','119':'Пафос','121':'Будё-Глимт','122':'Аякс','123':'Брюгге',
+  '126':'Кайрат','134':'Фенербахче','138':'Фейеноорд','143':'Ференцварош','147':'РБ Зальцбург','171':'НЕК Неймеген',
+  '180':'АЗ Алкмар','329':'АЕК','348':'Левски','374':'Слован Братислава','402':'Шахтёр','412':'Сабах','416':'Хапоэль Беэр-Шева',
+  '441':'Мьельбю','1277':'Фрозиноне','1285':'Венеция','1286':'Монца','1393':'Палермо','1607':'Мантова','1608':'Зюдтироль',
+  '2076':'Викинг','2313':'Борац Баня-Лука','2346':'Омония','2838':'Рига','3298':'Арарат-Армения','3379':'Хапоэль Тель-Авив',
+});
+
 function text(value) {
   return String(value ?? '').trim();
 }
@@ -41,21 +54,6 @@ function teamObject(event, side) {
   return value && typeof value === 'object' ? value : {};
 }
 
-function preferredTeamName(event, side, object) {
-  return text(
-    object?.name_ru ??
-      object?.ru_name ??
-      object?.localized_name?.ru ??
-      event?.[`${side}_team_name_ru`] ??
-      event?.[`${side}_name_ru`] ??
-      object?.name ??
-      object?.team_name ??
-      (typeof event?.[`${side}_team`] === 'string' ? event?.[`${side}_team`] : '') ??
-      event?.[`${side}_team_name`] ??
-      event?.[`${side}_name`],
-  ) || '—';
-}
-
 function teamId(event, side, object) {
   return text(
     object?.id ??
@@ -63,6 +61,28 @@ function teamId(event, side, object) {
       event?.[`${side}_team_id`] ??
       event?.[`${side}_id`],
   );
+}
+
+function preferredTeamName(event, side, object, id) {
+  const explicitRussian = text(
+    object?.name_ru ??
+      object?.ru_name ??
+      object?.localized_name?.ru ??
+      event?.[`${side}_team_name_ru`] ??
+      event?.[`${side}_name_ru`],
+  );
+  if (explicitRussian) return explicitRussian;
+
+  const localized = text(RUSSIAN_TEAM_NAME_BY_BSD_ID[id]);
+  if (localized) return localized;
+
+  return text(
+    object?.name ??
+      object?.team_name ??
+      (typeof event?.[`${side}_team`] === 'string' ? event?.[`${side}_team`] : '') ??
+      event?.[`${side}_team_name`] ??
+      event?.[`${side}_name`],
+  ) || '—';
 }
 
 function teamCountry(object) {
@@ -78,7 +98,7 @@ function normalizeTeam(event, side, italianTeamIds) {
   const isItalian = italianTeamIds.has(id) || countryCode === 'ITA';
   return Object.freeze({
     id,
-    name: preferredTeamName(event, side, object),
+    name: preferredTeamName(event, side, object, id),
     countryCode: isItalian ? 'ITA' : countryCode,
     crestUrl: id ? `${BSD_CREST_ORIGIN}/${encodeURIComponent(id)}/?bg=transparent` : '',
     isItalian,
