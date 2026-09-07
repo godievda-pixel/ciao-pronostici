@@ -31,29 +31,26 @@ test('production release accepts the real grouped no-x2 CSS patch', () => {
   assert.equal(validateReleaseHtml(fixtureRelease()), true);
 });
 
-test('production preparation injects crest, Matches layers, Predictions runtime and theme exactly once', () => {
+test('production preparation injects all approved layers ending with one global refresh scheduler', () => {
   assert.equal(typeof productionBuild.prepareReleaseHtml, 'function');
   const prepared = productionBuild.prepareReleaseHtml(fixtureRelease());
-  for (const marker of [
-    'ciao-prod-bsd-crests-20260907',
-    'ciao-prod-multitournament-matches-20260907',
-    'ciao-prod-multitournament-card-theme-20260907',
-    'ciao-prod-multitournament-predictions-20260907',
-    'ciao-prod-multitournament-predictions-theme-20260907',
-  ]) assert.match(prepared, new RegExp(marker));
   const order = [
     'ciao-prod-bsd-crests-20260907',
     'ciao-prod-multitournament-matches-20260907',
     'ciao-prod-multitournament-card-theme-20260907',
     'ciao-prod-multitournament-predictions-20260907',
     'ciao-prod-multitournament-predictions-theme-20260907',
+    'ciao-prod-global-refresh-15000-20260907',
   ];
+  for (const marker of order) assert.match(prepared, new RegExp(marker));
   for (let i=1;i<order.length;i++) assert.ok(prepared.indexOf(order[i-1]) < prepared.indexOf(order[i]));
   assert.match(prepared, /sports\.bzzoiro\.com\/img\/team/);
   assert.match(prepared, /data-cwpred-mode="edit"/);
   assert.match(prepared, /data-cwpred-mode="mine"/);
   assert.match(prepared, /data-cwpred-screen-theme="champions"/);
   assert.match(prepared, /\.cwpred-mode/);
+  assert.match(prepared, /const __CW_REFRESH_MS=15000/);
+  assert.match(prepared, /__cwRefreshVisibleNow/);
   assert.match(prepared, /Прогнозы/);
   assert.match(prepared, /Рейтинг/);
   assert.match(prepared, /Таблицы/);
