@@ -2,10 +2,14 @@ import { getCompetitionConfig } from './competition-config.mjs';
 
 const BSD_CREST_ORIGIN = 'https://sports.bzzoiro.com/img/team';
 const EUROPEAN = new Set(['ucl', 'uel', 'uecl']);
-const LIVE_STATUSES = new Set(['live', 'inprogress', 'in_progress', 'playing', '1h', 'ht', '2h', 'et', 'pen_live']);
+const LIVE_STATUSES = new Set(['live', 'inprogress', 'in_progress', 'playing', '1h', '2h']);
+const HALFTIME_STATUSES = new Set(['ht', 'halftime', 'half_time', 'half-time', 'half time', 'interval', 'break']);
+const EXTRA_TIME_STATUSES = new Set(['et', 'extra_time', 'extra-time', 'extra time', 'extra_time_live']);
+const PENALTIES_STATUSES = new Set(['pen_live', 'penalties', 'penalties_live', 'penalty_shootout', 'penalty-shootout', 'shootout', 'shootout_live']);
 const FINISHED_STATUSES = new Set(['finished', 'ended', 'fulltime', 'full_time', 'ft', 'aet', 'pen']);
 const POSTPONED_STATUSES = new Set(['postponed', 'pst']);
 const CANCELLED_STATUSES = new Set(['cancelled', 'canceled', 'canc']);
+const SCORE_VISIBLE_STATUSES = new Set(['live', 'halftime', 'extra_time', 'penalties', 'finished']);
 
 const RUSSIAN_TEAM_NAME_BY_BSD_ID = Object.freeze({
   '1':'Ливерпуль','2':'Борнмут','7':'Сандерленд','12':'Манчестер Сити','17':'Манчестер Юнайтед','18':'Арсенал',
@@ -111,6 +115,9 @@ export function isItalianTeam(team = {}) {
 
 function normalizeStatus(event) {
   const status = text(event?.status ?? event?.state).toLowerCase();
+  if (HALFTIME_STATUSES.has(status)) return 'halftime';
+  if (EXTRA_TIME_STATUSES.has(status)) return 'extra_time';
+  if (PENALTIES_STATUSES.has(status)) return 'penalties';
   if (LIVE_STATUSES.has(status)) return 'live';
   if (FINISHED_STATUSES.has(status)) return 'finished';
   if (POSTPONED_STATUSES.has(status)) return 'postponed';
@@ -119,7 +126,7 @@ function normalizeStatus(event) {
 }
 
 function score(event, side, status) {
-  if (status !== 'live' && status !== 'finished') return null;
+  if (!SCORE_VISIBLE_STATUSES.has(status)) return null;
   const value = event?.[`${side}_score`] ?? event?.score?.[side] ?? event?.scores?.[side];
   return numberOrNull(value);
 }
