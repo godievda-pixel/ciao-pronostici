@@ -70,6 +70,26 @@ test('runtime patch replaces legacy emoji image markup before it reaches the DOM
   assert.equal(context.__cw2154RepairClubAssets(), 0);
 });
 
+test('club profile teamLogoHtml uses BSD crest instead of Telegram emoji asset', () => {
+  const legacy = team => `<img class="cw16-team-logo" src="https://legacy.invalid/?asset=emoji&id=${team.custom_emoji_id}" alt="">`;
+  const context = {
+    S: { round: { matches: [] }, serie_a_table: { rows: [] } },
+    predict: () => '',
+    mine: () => '',
+    __cw9CalendarCard: () => '',
+    serieA: () => '',
+    matchCenterHtml: () => '',
+    __cw18Logo: () => '',
+    __cw2154EmojiAssetUrl: () => '',
+    __cw2154RepairClubAssets: () => 0,
+    teamLogoHtml: legacy,
+  };
+  vm.runInNewContext(runtimePatchSource(), context);
+  const html = context.teamLogoHtml({ id: 8, name: 'Интер', custom_emoji_id: 'old' }, 'cw16-team-logo');
+  assert.match(html, /sports\.bzzoiro\.com\/img\/team\/77\//);
+  assert.doesNotMatch(html, /asset=emoji/);
+});
+
 test('runtime patch contains no Telegram emoji asset dependency', () => {
   const source = runtimePatchSource();
   assert.match(source, new RegExp(BSD_CREST_PATCH_MARKER));
