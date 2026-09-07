@@ -24,10 +24,12 @@ async function activeBuild(){
   if(!SUPABASE_URL||!key)throw new Error("launcher_env_missing");
   const head={"apikey":key,"authorization":`Bearer ${key}`};
   const st=await fetch(`${SUPABASE_URL}/rest/v1/cp_frontend_release_state?id=eq.1&select=current_build`,{headers:head});
+  if(!st.ok)throw new Error(`release_state_http_${st.status}`);
   const arr=await st.json();
   const id=arr?.[0]?.current_build;
   if(!id)throw new Error("release_state_missing");
   const br=await fetch(`${SUPABASE_URL}/rest/v1/cp_frontend_builds?build_id=eq.${encodeURIComponent(id)}&select=build_id,url,enabled`,{headers:head});
+  if(!br.ok)throw new Error(`build_http_${br.status}`);
   const builds=await br.json();
   const b=builds?.[0];
   if(!b?.enabled||!b?.url)throw new Error("build_disabled");
@@ -36,9 +38,13 @@ async function activeBuild(){
   return b;
 }
 
-async function safeBuild(){
-  try{return await activeBuild()}
-  catch(e){console.error("launcher_resolve_error",e);return null}
+async function resolveBuild(){
+  try{return{build:await activeBuild(),resolution_error:null}}
+  catch(e){
+    const resolution_error=e instanceof Error?e.message:String(e);
+    console.error("launcher_resolve_error",resolution_error);
+    return{build:null,resolution_error};
+  }
 }
 
 const NO_STORE_HEADERS={
@@ -50,18 +56,23 @@ const NO_STORE_HEADERS={
 Deno.serve(async req=>{
   const u=new URL(req.url);
   if(u.pathname.endsWith("/health")){
-    const b=await safeBuild();
+    const r=await resolveBuild();
+    const b=r.build;
     return Response.json({
       ok:!!b,
       service:"Ciao Web Redirect",
       mode:"redirect",
-      version:2,
+      version:3,
       current_build:b?.build_id??null,
       url:b?.url??null,
+      resolution_error:r.resolution_error,
+      supabase_url_present:Boolean(SUPABASE_URL),
+      service_key_present:Boolean(serviceKey()),
     },{status:b?200:503,headers:NO_STORE_HEADERS});
   }
 
-  const resolved=await safeBuild();
+  const r=await resolveBuild();
+  const resolved=r.build;
   if(!resolved){
     return new Response("Ciao, Web! launcher unavailable",{
       status:503,
