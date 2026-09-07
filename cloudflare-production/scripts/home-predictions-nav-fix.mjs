@@ -70,6 +70,7 @@ export function homePredictionsNavFixSource(){
     finally{__cwRefreshBusy=false}
   };
   try{window.__cwRefreshVisibleNow=__cwRefreshVisibleNow}catch(_e){}
+  __cwRefreshStart();
 
   __cwHomePredFixNav();
   __cwPredApplyTheme();
@@ -95,7 +96,7 @@ export function validateHomePredictionsNavFixPatchedHtml(input){
   const fixAt=html.indexOf(HOME_PREDICTIONS_NAV_FIX_MARKER);
   if(refreshAt<0||fixAt<0||refreshAt>=fixAt)throw new Error('production Home/Predictions nav fix layer order invalid');
   const source=homePredictionsNavFixSource();
-  for(const required of ["textContent='Главная'","textContent='Прогнозы'","predict=function(){return __cwPredLegacyPredict()}","mine=function(){return __cwPredCenterHtml()}","if(tab!=='mine')return false"]){
+  for(const required of ["textContent='Главная'","textContent='Прогнозы'","predict=function(){return __cwPredLegacyPredict()}","mine=function(){return __cwPredCenterHtml()}","if(tab!=='mine')return false","__cwRefreshStart()"]){
     if(!source.includes(required))throw new Error(`production Home/Predictions nav contract missing: ${required}`);
   }
   return true;
