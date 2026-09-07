@@ -129,9 +129,15 @@ export function createMatchService({provider, localizationLookup} = {}) {
     };
   }
 
-  async function listFavoriteItalianTeams() {
+  async function listFavoriteItalianTeams({providerTeamIds} = {}) {
     const ids = await italianIds();
-    return [...ids].map(id => localizeTeam({id, countryCode:'IT', crestUrl:null}, localizationLookup));
+    const requested = Array.isArray(providerTeamIds)
+      ? [...new Set(providerTeamIds.map(text).filter(Boolean))]
+      : null;
+    const eligibleIds = requested === null
+      ? [...ids]
+      : requested.filter(id => ids.has(id));
+    return eligibleIds.map(id => localizeTeam({id, countryCode:'IT', crestUrl:null}, localizationLookup));
   }
 
   async function getFavoriteNextMatch({favoriteTeamProviderId, nowIso} = {}) {
