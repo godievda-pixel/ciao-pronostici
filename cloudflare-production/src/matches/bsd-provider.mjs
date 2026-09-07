@@ -2,7 +2,6 @@ import { getCompetitionConfig } from './competition-config.mjs';
 import { normalizeBsdEvent } from './normalizer.mjs';
 
 export const BSD_BASE = 'https://sports.bzzoiro.com/api/v2';
-export const BSD_PROVIDER_REVISION = 'stage-normalizer-v2';
 const MAX_RANGE_DAYS = 370;
 const EUROPEAN = new Set(['ucl', 'uel', 'uecl']);
 
@@ -190,17 +189,17 @@ async function fetchItalianTeamIds(apiKey, fetchImpl) {
   return new Set(teams.map(team => text(team?.id)).filter(Boolean));
 }
 
-function primitiveProbe(value) {
-  if (value === null || value === undefined) return null;
-  if (['string', 'number', 'boolean'].includes(typeof value)) return value;
-  if (Array.isArray(value)) return '[array]';
-  return '[object]';
-}
-
-async function fetchCompetitionContext({ competition, from, to, apiKey, fetchImpl }) {
+export async function fetchBsdMatches({
+  competition,
+  from,
+  to,
+  apiKey,
+  fetchImpl = fetch,
+}) {
   const range = assertRange(from, to);
   const league = await resolveLeague(competition, apiKey, fetchImpl);
   const season = await resolveSeason(league.id, apiKey, fetchImpl);
+
   const [events, italianTeamIds] = await Promise.all([
     fetchAll('/events/', {
       league_id: league.id,
@@ -212,57 +211,6 @@ async function fetchCompetitionContext({ competition, from, to, apiKey, fetchImp
       ? fetchItalianTeamIds(apiKey, fetchImpl)
       : Promise.resolve(new Set()),
   ]);
-  return { events, italianTeamIds };
-}
-
-export function providerNormalizerProbe() {
-  const match = normalizeBsdEvent({
-    id: 'probe',
-    status: 'upcoming',
-    round_name: 'Матчи',
-    round_number: 1,
-    home_team: { id: 77, name: 'Inter', country_code: 'IT' },
-    away_team: { id: 1, name: 'Liverpool', country_code: 'GB' },
-  }, 'ucl', { italianTeamIds: new Set(['77']) });
-  return String(match?.stageKey || '');
-}
-
-export async function fetchBsdStageProbe({
-  competition,
-  from,
-  to,
-  apiKey,
-  fetchImpl = fetch,
-}) {
-  const { events, italianTeamIds } = await fetchCompetitionContext({ competition, from, to, apiKey, fetchImpl });
-  for (const event of events) {
-    const match = normalizeBsdEvent(event, competition, { italianTeamIds });
-    if (!match) continue;
-    return {
-      event_id: text(event?.id ?? event?.event_id ?? event?.match_id),
-      round_name: primitiveProbe(event?.round_name),
-      stage: primitiveProbe(event?.stage),
-      phase: primitiveProbe(event?.phase),
-      group_name: primitiveProbe(event?.group_name),
-      round_number: primitiveProbe(event?.round_number),
-      round: primitiveProbe(event?.round),
-      matchday: primitiveProbe(event?.matchday),
-      normalized_stage_key: match.stageKey,
-      normalized_stage_label: match.stageLabel,
-      normalized_round: match.round,
-    };
-  }
-  return null;
-}
-
-export async function fetchBsdMatches({
-  competition,
-  from,
-  to,
-  apiKey,
-  fetchImpl = fetch,
-}) {
-  const { events, italianTeamIds } = await fetchCompetitionContext({ competition, from, to, apiKey, fetchImpl });
 
   const matches = [];
   for (const event of events) {
