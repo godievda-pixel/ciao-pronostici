@@ -31,14 +31,19 @@ test('production release accepts the real grouped no-x2 CSS patch', () => {
   assert.equal(validateReleaseHtml(fixtureRelease()), true);
 });
 
-test('production preparation injects crest patch then multitournament patch exactly once', () => {
+test('production preparation injects crest, multitournament and card-theme patches exactly once', () => {
   assert.equal(typeof productionBuild.prepareReleaseHtml, 'function');
   const prepared = productionBuild.prepareReleaseHtml(fixtureRelease());
   assert.match(prepared, /ciao-prod-bsd-crests-20260907/);
   assert.match(prepared, /ciao-prod-multitournament-matches-20260907/);
+  assert.match(prepared, /ciao-prod-multitournament-card-theme-20260907/);
   assert.ok(
     prepared.indexOf('ciao-prod-bsd-crests-20260907') <
     prepared.indexOf('ciao-prod-multitournament-matches-20260907')
+  );
+  assert.ok(
+    prepared.indexOf('ciao-prod-multitournament-matches-20260907') <
+    prepared.indexOf('ciao-prod-multitournament-card-theme-20260907')
   );
   assert.match(prepared, /sports\.bzzoiro\.com\/img\/team/);
   assert.match(prepared, /Прогнозы/);
@@ -49,4 +54,5 @@ test('production preparation injects crest patch then multitournament patch exac
   const twice = productionBuild.prepareReleaseHtml(prepared);
   assert.equal((twice.match(/ciao-prod-bsd-crests-20260907/g) || []).length, 2);
   assert.equal((twice.match(/ciao-prod-multitournament-matches-20260907/g) || []).length, 2);
+  assert.equal((twice.match(/ciao-prod-multitournament-card-theme-20260907/g) || []).length, 2);
 });
