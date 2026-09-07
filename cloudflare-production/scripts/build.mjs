@@ -23,6 +23,10 @@ import {
   injectHomePredictionsNavFixPatch,
   validateHomePredictionsNavFixPatchedHtml,
 } from './home-predictions-nav-fix.mjs';
+import {
+  injectPredictionStageLockUiPatch,
+  validatePredictionStageLockUiPatchedHtml,
+} from './prediction-stage-lock-ui.mjs';
 
 export const RELEASE_SOURCE_URL = 'https://dkefzepiiudehhzbbrjn.supabase.co/storage/v1/object/public/ciao-miniapp/migration/v22-5-resolved-no-x2.html';
 export const RELEASE_PATH = '/releases/v22-5.html';
@@ -68,8 +72,10 @@ export function prepareReleaseHtml(input) {
   validateMultitournamentPredictionsThemePatchedHtml(withPredictionTheme);
   const withGlobalRefresh = injectGlobalRefreshPatch(withPredictionTheme);
   validateGlobalRefreshPatchedHtml(withGlobalRefresh);
-  const release = injectHomePredictionsNavFixPatch(withGlobalRefresh);
-  validateHomePredictionsNavFixPatchedHtml(release);
+  const withHomeFix = injectHomePredictionsNavFixPatch(withGlobalRefresh);
+  validateHomePredictionsNavFixPatchedHtml(withHomeFix);
+  const release = injectPredictionStageLockUiPatch(withHomeFix);
+  validatePredictionStageLockUiPatchedHtml(release);
   return release;
 }
 
