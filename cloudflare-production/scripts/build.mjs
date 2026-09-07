@@ -73,6 +73,28 @@ export function validateReleaseHtml(input) {
   return true;
 }
 
+export function validateBrowserScripts(input) {
+  const html = String(input || '');
+  const scriptRe = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
+  let match;
+  let classicIndex = 0;
+  while ((match = scriptRe.exec(html))) {
+    const attrs = String(match[1] || '');
+    if (/\bsrc\s*=/i.test(attrs)) continue;
+    const typeMatch = attrs.match(/\btype\s*=\s*(?:(["'])(.*?)\1|([^\s>]+))/i);
+    const type = String(typeMatch?.[2] || typeMatch?.[3] || '').trim().toLowerCase();
+    if (type && !/^(?:text|application)\/(?:java|ecma)script$/.test(type)) continue;
+    classicIndex += 1;
+    try {
+      new Function(String(match[2] || ''));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`browser script syntax invalid at inline script ${classicIndex}: ${message}`);
+    }
+  }
+  return true;
+}
+
 export function prepareReleaseHtml(input) {
   const source = String(input || '');
   validateReleaseHtml(source);
@@ -108,6 +130,7 @@ export async function build() {
   if (!releaseResponse.ok) throw new Error(`release source HTTP ${releaseResponse.status}`);
   const source = await releaseResponse.text();
   const release = prepareReleaseHtml(source);
+  validateBrowserScripts(release);
   const rootHtml = rootHtmlFor({ release });
   await mkdir(resolve(distDir, 'releases'), { recursive: true });
   await writeFile(resolve(distDir, 'index.html'), rootHtml, 'utf8');
