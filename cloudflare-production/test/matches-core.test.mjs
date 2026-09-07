@@ -140,6 +140,18 @@ test('BSD generic Матчи stage plus a European round number becomes a league
   assert.equal(match.stageLabel, 'Общий этап · 1 тур');
 });
 
+test('BSD empty round_name falls through to hyphenated league-phase stage', () => {
+  const match = normalizeBsdEvent(event({
+    id: 402,
+    round_name: '',
+    stage: 'league-phase',
+    round_number: 8,
+  }), 'ucl', { italianTeamIds: italian });
+
+  assert.equal(match.stageKey, 'league-8');
+  assert.equal(match.stageLabel, 'Общий этап · 8 тур');
+});
+
 test('European groups follow actual tournament chronology when a qualifying playoff precedes league phase', () => {
   const matches = [
     normalizeBsdEvent(event({
