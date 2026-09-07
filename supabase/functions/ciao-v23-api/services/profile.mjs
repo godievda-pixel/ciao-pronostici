@@ -43,12 +43,12 @@ export function createProfileService({userRepository, matchService, predictionRe
   }
 
   async function favoriteChoices() {
-    if (!matchService.listFavoriteItalianTeams || !userRepository.listTeamsByProviderIds) {
+    if (!matchService.listFavoriteItalianTeams || !userRepository.listTeams) {
       throw new Error('favorite_choices_unavailable');
     }
-    const providerTeams = await matchService.listFavoriteItalianTeams();
-    const providerIds = providerTeams.map(team => text(team?.id)).filter(Boolean);
-    const localTeams = await userRepository.listTeamsByProviderIds(providerIds);
+    const localTeams = await userRepository.listTeams();
+    const providerTeamIds = localTeams.map(team => text(team?.providerTeamId)).filter(Boolean);
+    const providerTeams = await matchService.listFavoriteItalianTeams({providerTeamIds});
     return localizedChoices(providerTeams, localTeams);
   }
 
@@ -98,8 +98,9 @@ export function createProfileService({userRepository, matchService, predictionRe
       throw new Error('favorite_update_unavailable');
     }
     const localTeam = await userRepository.getTeam(teamId);
-    const allowed = new Set((await matchService.listFavoriteItalianTeams()).map(team => text(team?.id)).filter(Boolean));
-    if (!allowed.has(text(localTeam?.providerTeamId))) throw new Error('favorite_team_not_eligible');
+    const providerTeamId = text(localTeam?.providerTeamId);
+    const eligible = await matchService.listFavoriteItalianTeams({providerTeamIds:[providerTeamId]});
+    if (!eligible.some(team => text(team?.id) === providerTeamId)) throw new Error('favorite_team_not_eligible');
     return await userRepository.setFavoriteTeam(id, Number(localTeam.id));
   }
 
