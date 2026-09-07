@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { createWorker } from '../src/worker.js';
 
 test('HTML documents are always served no-store to avoid stale Telegram WebView builds', async () => {
@@ -40,4 +41,10 @@ test('non-HTML static assets keep their asset cache headers', async () => {
 
   const response = await worker.fetch(new Request('https://ciao-web-app.ciao-web.workers.dev/app.css'), env, {});
   assert.equal(response.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+});
+
+test('Static Assets route through Worker so HTML cache policy is actually applied in production', async () => {
+  const raw = await readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
+  const config = JSON.parse(raw);
+  assert.equal(config.assets?.run_worker_first, true);
 });
