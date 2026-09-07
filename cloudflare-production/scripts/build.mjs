@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { injectBsdCrestPatch, validateBsdCrestPatchedHtml } from './bsd-crests.mjs';
@@ -41,11 +41,36 @@ export const NO_X2_MARKER = 'ciao-prod-no-x2-20260903';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const APP_SHELL_PATH = resolve(root, 'src/app-shell.html');
+const predictionsSourceDir = resolve(root, 'src/predictions');
 const distDir = resolve(root, 'dist');
+const predictionsOutDir = resolve(distDir, 'predictions');
 const releaseOut = resolve(distDir, 'releases/v22-5.html');
 
 export async function loadAppShell() {
   return readFile(APP_SHELL_PATH, 'utf8');
+}
+
+async function copyTree(sourceDir, targetDir, copied, prefix = '') {
+  await mkdir(targetDir, { recursive: true });
+  const entries = await readdir(sourceDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const source = resolve(sourceDir, entry.name);
+    const target = resolve(targetDir, entry.name);
+    const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) {
+      await copyTree(source, target, copied, relative);
+      continue;
+    }
+    if (!entry.isFile() || !/\.(?:mjs|css)$/.test(entry.name)) continue;
+    await copyFile(source, target);
+    copied.push(relative);
+  }
+}
+
+export async function copyPredictionsAssets() {
+  const copied = [];
+  await copyTree(predictionsSourceDir, predictionsOutDir, copied);
+  return copied.sort();
 }
 
 export function rootHtmlFor({ release }) {
@@ -100,6 +125,7 @@ export async function build() {
   const release = prepareReleaseHtml(source);
   const rootHtml = rootHtmlFor({ release });
   await mkdir(resolve(distDir, 'releases'), { recursive: true });
+  await copyPredictionsAssets();
   await writeFile(resolve(distDir, 'index.html'), rootHtml, 'utf8');
   await writeFile(releaseOut, release, 'utf8');
   return { ok: true, entry: 'dist/index.html', release: 'dist/releases/v22-5.html', bytes: Buffer.byteLength(release) };
