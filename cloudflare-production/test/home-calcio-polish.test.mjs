@@ -52,7 +52,7 @@ test('Calcio today combines Serie A and all supported Italian-club competitions'
 });
 
 test('patch injects once after the final prediction polish and validates its contract', () => {
-  const base = `<!doctype html><html><body><script>/* ciao-prod-prediction-mine-stage-polish-20260907 */\n})();\n</script></body></html>`;
+  const base = `<!doctype html><html><body><script>/* ciao-prod-prediction-mine-stage-polish-20260907 */\n  /* ===== /Ciao, Web! v22.5 product polish layer ===== */\n\n})();\n</script></body></html>`;
   const once = injectHomeCalcioPolishPatch(base);
   const twice = injectHomeCalcioPolishPatch(once);
   assert.equal(once, twice);
