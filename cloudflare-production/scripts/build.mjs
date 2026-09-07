@@ -18,8 +18,10 @@ export const NO_X2_MARKER = 'ciao-prod-no-x2-20260903';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const APP_SHELL_PATH = resolve(root, 'src/app-shell.html');
 const predictionsSourceDir = resolve(root, 'src/predictions');
+const competitionConfigSource = resolve(root, 'src/matches/competition-config.mjs');
 const distDir = resolve(root, 'dist');
 const predictionsOutDir = resolve(distDir, 'predictions');
+const matchesOutDir = resolve(distDir, 'matches');
 const releaseOut = resolve(distDir, 'releases/v22-5.html');
 
 export async function loadAppShell() {
@@ -46,6 +48,8 @@ async function copyTree(sourceDir, targetDir, copied, prefix = '') {
 export async function copyPredictionsAssets() {
   const copied = [];
   await copyTree(predictionsSourceDir, predictionsOutDir, copied);
+  await mkdir(matchesOutDir, { recursive: true });
+  await copyFile(competitionConfigSource, resolve(matchesOutDir, 'competition-config.mjs'));
   return copied.sort();
 }
 
