@@ -69,3 +69,14 @@ test('same result signature is idempotent and corrected final recalculates point
   score=[2,2];await service.syncDue({initData:'internal'});
   assert.equal(repo.changedSettlements,2);assert.equal(repo.predictions[0].points,0);
 });
+
+test('secured sync can warm snapshots while user feature stays disabled',async()=>{
+  const repo=new Repo();repo.enabled=false;
+  const provider=async({competition})=>competition==='ucl'?[canonical(12)]:[];
+  const service=createExternalPredictionService({repository:repo,fetchMatches:provider,now:()=>Date.parse(at)});
+  const sync=await service.syncDue({initData:'internal-sync'});
+  assert.equal(sync.competitions.ucl.ok,true);
+  assert.equal(repo.matches.length,1);
+  await assert.rejects(()=>service.state({userId:7,competition:'ucl',initData:'x'}),error=>error?.code==='feature_disabled');
+  await assert.rejects(()=>service.savePredictions({userId:7,competition:'ucl',initData:'x',predictions:[]}),error=>error?.code==='feature_disabled');
+});
