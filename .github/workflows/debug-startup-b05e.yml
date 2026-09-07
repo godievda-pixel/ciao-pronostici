@@ -1,0 +1,27 @@
+name: Debug startup b05e
+
+on:
+  push:
+    branches: ['debug/startup-b05e1bb5']
+
+jobs:
+  verify-runtime:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloudflare-production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: cloudflare-production/package.json
+      - name: Install
+        run: npm install --no-audit --no-fund
+      - name: Test
+        run: npm test
+      - name: Build
+        run: npm run build
