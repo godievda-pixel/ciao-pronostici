@@ -46,6 +46,13 @@ const REQUIRED_SCREEN_SELECTORS = Object.freeze({
   ],
 });
 
+function exactCssBlock(css, selector) {
+  const start = css.indexOf(`${selector} {`);
+  if (start === -1) return '';
+  const end = css.indexOf('}', start);
+  return end === -1 ? '' : css.slice(start, end + 1);
+}
+
 test('every standalone v23 screen has a dedicated visual surface before Telegram smoke', async () => {
   const css = await fs.readFile(screensCssPath, 'utf8');
   for (const [screen, selectors] of Object.entries(REQUIRED_SCREEN_SELECTORS)) {
@@ -58,9 +65,8 @@ test('every standalone v23 screen has a dedicated visual surface before Telegram
 test('mobile-heavy standalone controls explicitly support horizontal tabs without page-level overflow', async () => {
   const css = await fs.readFile(screensCssPath, 'utf8');
   for (const selector of ['.prediction-filters','.match-center__tabs','.table-competitions']) {
-    const start = css.indexOf(selector);
-    assert.notEqual(start, -1, `missing ${selector}`);
-    const block = css.slice(start, css.indexOf('}', start) + 1);
+    const block = exactCssBlock(css, selector);
+    assert.notEqual(block, '', `missing exact ${selector} block`);
     assert.match(block, /overflow-x:\s*auto/, `${selector}: must scroll internally on narrow screens`);
   }
   assert.match(css, /\.standings-row\s*\{[^}]*grid-template-columns:/s, 'standings must own a compact grid instead of overflowing the page');
