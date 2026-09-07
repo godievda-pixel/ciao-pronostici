@@ -1,5 +1,5 @@
 import { isExternalCompetition } from './matches/competition-config.mjs';
-import { BsdUpstreamError, fetchBsdMatches } from './matches/bsd-provider.mjs';
+import { BsdUpstreamError, fetchBsdMatches, providerNormalizerProbe } from './matches/bsd-provider.mjs';
 import { normalizeBsdEvent } from './matches/normalizer.mjs';
 
 const API_PATH = '/api/cw22/matches';
@@ -61,6 +61,7 @@ export function createWorker({ fetchMatches = fetchBsdMatches, cache = null } = 
           matches_provider: 'bsd-v2',
           bsd_configured: Boolean(String(env?.BSD_API_KEY || '').trim()),
           normalizer_probe: normalizerProbe(),
+          provider_normalizer_probe: providerNormalizerProbe(),
         });
       }
 
