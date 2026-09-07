@@ -145,3 +145,7 @@ export function installPredictionsScreen(
 export function nativePredictionsEnabled(locationRef = globalThis.location) {
   return new URLSearchParams(locationRef?.search || '').get('native_predictions') === '1';
 }
+
+if (typeof document !== 'undefined' && nativePredictionsEnabled()) {
+  globalThis.CiaoPredictionsScreen = installPredictionsScreen(document);
+}
