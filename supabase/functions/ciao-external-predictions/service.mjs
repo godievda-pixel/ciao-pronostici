@@ -5,6 +5,7 @@ import {
   predictionDeadlineAt,
   resultSignature,
 } from './domain.mjs';
+import { predictionStageGate, isFuturePredictionStageLocked } from './stage-gate.mjs';
 
 const EXTERNAL=['coppa_italia','ucl','uel','uecl'];
 
@@ -70,14 +71,21 @@ export function createExternalPredictionService({repository,fetchMatches,now=()=
     const predictions=ids.length?await repository.listUserPredictions(Number(userId),ids):[];
     const pm=new Map(predictions.map(p=>[Number(p.external_match_id),p]));
     const nowMs=Number(now());
+    const gate=predictionStageGate(competition,rows);
     return {
       competition,stale,server_time:new Date(nowMs).toISOString(),
-      matches:rows.map(row=>({
-        ...dbRowToMatch(row),
-        open:isPredictionOpen(row,nowMs),
-        deadline_at:predictionDeadlineAt(row.kickoff_at),
-        prediction:pm.get(Number(row.id))??null,
-      })),
+      prediction_stage_key:gate.currentStageKey,
+      prediction_stage_order:gate.currentStageOrder,
+      matches:rows.map(row=>{
+        const stageLocked=isFuturePredictionStageLocked(competition,row,gate);
+        return {
+          ...dbRowToMatch(row),
+          open:!stageLocked&&isPredictionOpen(row,nowMs),
+          stage_locked:stageLocked,
+          deadline_at:predictionDeadlineAt(row.kickoff_at),
+          prediction:pm.get(Number(row.id))??null,
+        };
+      }),
     };
   }
 
@@ -85,13 +93,14 @@ export function createExternalPredictionService({repository,fetchMatches,now=()=
     if(!validCompetition(competition))throw new ExternalPredictionServiceError('invalid_competition',400);
     if(!Number.isInteger(Number(userId))||Number(userId)<=0)throw new ExternalPredictionServiceError('invalid_user',400);
     await ensureEnabled();
-    await syncCompetition(competition,{initData,allowFallback:false});
+    const synced=await syncCompetition(competition,{initData,allowFallback:false});
+    const gate=predictionStageGate(competition,synced.rows);
     const items=Array.isArray(predictions)?predictions:[];
     const requestedIds=items.map(x=>String(x?.match_id??'')).filter(Boolean);
     const sameCompetitionIds=requestedIds.filter(id=>parseExternalMatchId(id)?.competition===competition);
     const rows=await repository.findMatchesByCanonicalIds(sameCompetitionIds);
     const byId=new Map(rows.map(row=>[canonicalId(row),row]));
-    const closed=[],invalid=[],writes=[],seen=new Set(),nowMs=Number(now());
+    const closed=[],invalid=[],stage_locked=[],writes=[],seen=new Set(),nowMs=Number(now());
     for(const item of items){
       const matchId=String(item?.match_id??'');
       if(seen.has(matchId))continue;seen.add(matchId);
@@ -100,11 +109,12 @@ export function createExternalPredictionService({repository,fetchMatches,now=()=
       if(!parsed||parsed.competition!==competition||!isValidPredictionScore(home)||!isValidPredictionScore(away)){invalid.push(matchId);continue}
       const row=byId.get(matchId);
       if(!row){invalid.push(matchId);continue}
+      if(isFuturePredictionStageLocked(competition,row,gate)){stage_locked.push(matchId);continue}
       if(!isPredictionOpen(row,nowMs)){closed.push(matchId);continue}
       writes.push({user_id:Number(userId),external_match_id:Number(row.id),home_score:home,away_score:away,points:null,base_points:null,calculated_at:null,updated_at:new Date(nowMs).toISOString()});
     }
     if(writes.length)await repository.upsertUserPredictions(writes);
-    return {saved:writes.length,closed,invalid,deadline_minutes:15};
+    return {saved:writes.length,closed,invalid,stage_locked,deadline_minutes:15,prediction_stage_key:gate.currentStageKey};
   }
 
   async function syncDue({initData='internal-sync'}={}){
