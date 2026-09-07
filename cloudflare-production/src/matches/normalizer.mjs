@@ -115,9 +115,25 @@ function roundFrom(event, stageText) {
   return match ? integerOrNull(match[1]) : null;
 }
 
-function normalizeStage(stageText, round) {
+function normalizeStage(stageText, round, competition) {
   const raw = text(stageText);
   const lower = raw.toLowerCase().replace(/[–—]/g, '-').replace(/\s+/g, ' ');
+
+  if (
+    EUROPEAN.has(competition) &&
+    /^(матчи|matches)$/i.test(lower) &&
+    Number.isInteger(round) &&
+    round >= 1 &&
+    round <= 8
+  ) {
+    return {
+      key: `league-${round}`,
+      label: `Общий этап · ${round} тур`,
+      order: 100 + round,
+      recognized: true,
+    };
+  }
+
   if (/league\s+(phase|stage)/i.test(lower)) {
     const number = round ?? integerOrNull(lower.match(/(?:round|matchday)\s*(\d{1,2})/i)?.[1]);
     return number
@@ -163,7 +179,7 @@ export function normalizeBsdEvent(event, competition, options = {}) {
     const status = normalizeStatus(event);
     const stageText = rawStage(event);
     const round = roundFrom(event, stageText);
-    const stage = normalizeStage(stageText, round);
+    const stage = normalizeStage(stageText, round, competition);
 
     if (competition === 'coppa_italia' && !['r32','r16','qf','sf','final'].includes(stage.key)) return null;
     if (EUROPEAN.has(competition) && !isItalianTeam(homeTeam) && !isItalianTeam(awayTeam)) return null;
@@ -208,6 +224,13 @@ export function groupMatches(matches, competition) {
     groups.get(key).matches.push(match);
   }
 
+  const firstKickoff = group => {
+    const times = group.matches
+      .map(match => Date.parse(match?.kickoffAt || ''))
+      .filter(Number.isFinite);
+    return times.length ? Math.min(...times) : Number.POSITIVE_INFINITY;
+  };
+
   return [...groups.values()]
     .map(group => ({
       ...group,
@@ -217,5 +240,5 @@ export function groupMatches(matches, competition) {
         return ta - tb || String(a?.matchId || '').localeCompare(String(b?.matchId || ''));
       }),
     }))
-    .sort((a, b) => a.order - b.order || a.label.localeCompare(b.label, 'ru'));
+    .sort((a, b) => firstKickoff(a) - firstKickoff(b) || a.order - b.order || a.label.localeCompare(b.label, 'ru'));
 }
