@@ -59,6 +59,7 @@ export function multitournamentCardThemeSource() {
   __cwMtPolishTheme(__cwMtCompetition);
 
   try{const styleId='cwmt-card-theme-style';if(!document.getElementById(styleId)){const style=document.createElement('style');style.id=styleId;style.textContent='\
+#ciao-miniapp-root .brand small{display:none!important}\
 #ciao-miniapp-root[data-cwmt-screen-theme="serie-a"]{--cwmt-a:#3150ff;--cwmt-b:#0b2f88;--cwmt-a-rgb:49,80,255;--cwmt-b-rgb:11,47,136;--cwmt-card-top:#0d173a;--cwmt-card-bottom:#070e26;background:radial-gradient(circle at 50% -10%,rgba(49,80,255,.34),transparent 34%),radial-gradient(circle at 100% 12%,rgba(11,47,136,.18),transparent 30%),linear-gradient(180deg,#040919 0%,#050b1d 46%,#030817 100%)!important}\
 #ciao-miniapp-root[data-cwmt-screen-theme="coppa"]{--cwmt-a:#159457;--cwmt-b:#9f2435;--cwmt-a-rgb:21,148,87;--cwmt-b-rgb:159,36,53;--cwmt-card-top:#10231b;--cwmt-card-bottom:#090f0d;background:radial-gradient(circle at 18% -8%,rgba(21,148,87,.30),transparent 34%),radial-gradient(circle at 92% 4%,rgba(159,36,53,.22),transparent 32%),linear-gradient(180deg,#07100d 0%,#090d0d 48%,#050908 100%)!important}\
 #ciao-miniapp-root[data-cwmt-screen-theme="champions"]{--cwmt-a:#5367e6;--cwmt-b:#49318f;--cwmt-a-rgb:83,103,230;--cwmt-b-rgb:73,49,143;--cwmt-card-top:#151a4a;--cwmt-card-bottom:#090d25;background:radial-gradient(circle at 50% -8%,rgba(83,103,230,.34),transparent 35%),radial-gradient(circle at 96% 12%,rgba(73,49,143,.24),transparent 30%),linear-gradient(180deg,#070a20 0%,#090c25 48%,#050718 100%)!important}\
