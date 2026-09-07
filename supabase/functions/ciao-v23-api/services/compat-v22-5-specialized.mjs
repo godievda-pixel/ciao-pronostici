@@ -42,6 +42,21 @@ function scheduleMatch(match,roundNumber){
   };
 }
 
+function calendarMatch(match){
+  return {
+    match_id:Number(match.id),
+    kickoff_at:match.kickoff_at??null,
+    round_number:Number(match?.round?.number)||null,
+    home:compactTeam(match.home),
+    away:compactTeam(match.away),
+    home_score:match.home_score??null,
+    away_score:match.away_score??null,
+    is_finished:match.is_finished===true,
+    live_status:match.live_status??null,
+    live_elapsed:match.live_elapsed??null,
+  };
+}
+
 function liveStatus(match){return String(match?.live_status??'').toLowerCase()==='live'}
 
 function statusOf(match){
@@ -223,12 +238,73 @@ export function createV22CompatSpecialized({db,matchService=null,now=()=>Date.no
     };
   }
 
+  async function loadClubCalendar(payload){
+    const teamId=Number(payload?.team_id);
+    if(!Number.isInteger(teamId)||teamId<=0)throw Object.assign(new Error('Некорректный клуб'),{status:400});
+    const [roundQuery,countQuery,clubQuery]=await Promise.all([
+      db.from('cp_rounds').select('id,number,nominal_date').order('number',{ascending:true}),
+      db.from('cp_matches').select('id,round_id,is_finished'),
+      db.from('cp_matches')
+        .select('id,kickoff_at,home_score,away_score,is_finished,live_status,live_elapsed,round:cp_rounds!cp_matches_round_fk(number),home:cp_teams!cp_matches_home_team_fk(id,name,short_name,custom_emoji_id),away:cp_teams!cp_matches_away_team_fk(id,name,short_name,custom_emoji_id)')
+        .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
+        .order('kickoff_at',{ascending:true,nullsFirst:false}),
+    ]);
+    const roundRows=rows(roundQuery),countRows=rows(countQuery),clubRows=rows(clubQuery);
+    const counts=new Map();
+    for(const match of countRows){
+      const key=Number(match.round_id),value=counts.get(key)??{total:0,finished:0};
+      value.total++;
+      if(match.is_finished===true)value.finished++;
+      counts.set(key,value);
+    }
+    const rounds=roundRows.map(round=>{
+      const count=counts.get(Number(round.id))??{total:0,finished:0};
+      return {
+        number:Number(round.number),nominal_date:round.nominal_date??null,
+        total:count.total,finished:count.finished,is_complete:count.total>0&&count.finished>=count.total,
+      };
+    }).filter(round=>round.number>0);
+    const current_round=rounds.find(round=>round.total>0&&!round.is_complete)?.number??[...rounds].reverse().find(round=>round.total>0)?.number??1;
+    const all=clubRows.map(calendarMatch);
+    const recent=all.filter(match=>match.is_finished).sort((a,b)=>String(b.kickoff_at??'').localeCompare(String(a.kickoff_at??'')));
+    const upcoming=all.filter(match=>!match.is_finished).sort((a,b)=>String(a.kickoff_at??'').localeCompare(String(b.kickoff_at??'')));
+    return {ok:true,matches:{all,recent,upcoming,rounds,current_round}};
+  }
+
+  async function loadPredictionInsights(payload,context){
+    const matchId=Number(payload?.match_id);
+    if(!Number.isInteger(matchId)||matchId<=0)throw Object.assign(new Error('Некорректный матч'),{status:400});
+    const matchQuery=await db.from('cp_matches').select('id,kickoff_at,is_finished,live_status').eq('id',matchId).maybeSingle();
+    const match=single(matchQuery,'Матч не найден');
+    const kickoff=Date.parse(String(match.kickoff_at??''));
+    const revealed=match.is_finished===true||liveStatus(match)||(Number.isFinite(kickoff)&&Number(now())>=kickoff-DEADLINE_MS);
+    if(!revealed)return {ok:true,revealed:false,total:0,top_scores:[],same_count:0,same_pct:0};
+
+    const predictionQuery=await db.from('cp_predictions').select('user_id,home_score,away_score').eq('match_id',matchId);
+    const predictions=rows(predictionQuery),total=predictions.length,counts=new Map();
+    for(const prediction of predictions){
+      const score=`${Number(prediction.home_score)}:${Number(prediction.away_score)}`;
+      counts.set(score,(counts.get(score)??0)+1);
+    }
+    const top_scores=[...counts.entries()]
+      .map(([score,count])=>({score,count,pct:total?Math.round(count*100/total):0}))
+      .sort((a,b)=>b.count-a.count||a.score.localeCompare(b.score,'ru'))
+      .slice(0,5);
+    const own=predictions.find(row=>Number(row.user_id)===Number(context?.userId));
+    const ownScore=own?`${Number(own.home_score)}:${Number(own.away_score)}`:'';
+    const same_count=ownScore?(counts.get(ownScore)??0):0;
+    const same_pct=total?Math.round(same_count*100/total):0;
+    return {ok:true,revealed:true,total,top_scores,same_count,same_pct};
+  }
+
   async function dispatch(route,payload={},context={}){
     if(route?.kind==='schedule')return await loadSchedule();
     if(route?.kind==='live_updates')return await loadLive({snapshot:false});
     if(route?.kind==='live_snapshot')return await loadLive({snapshot:true});
     if(route?.kind==='match_summary')return await loadMatchSummary(payload,context);
     if(route?.kind==='match_center')return await loadMatchCenter(payload,context);
+    if(route?.kind==='club_calendar')return await loadClubCalendar(payload);
+    if(route?.kind==='prediction_insights')return await loadPredictionInsights(payload,context);
     throw new Error(`specialized_not_implemented:${String(route?.kind??'missing')}`);
   }
 
