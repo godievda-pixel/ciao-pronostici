@@ -163,7 +163,7 @@ export function runtimePatchSource() {
   try{const base=matchCenterHtml;matchCenterHtml=function(data){const match=data?.match||data||{};return __cw225RewriteLegacyCrests(base(data),[match?.home,match?.away])}}catch(_e){}
   try{__cw18Logo=function(team,cls=''){const url=__cw225BsdCrestUrl(team);return url?'<img class="'+__cw225Attr(cls)+'" loading="lazy" decoding="async" src="'+__cw225Attr(url)+'" alt="">':'<span>⚽</span>'}}catch(_e){}
   try{teamLogoHtml=function(team,cls='cw16-team-logo'){const url=__cw225BsdCrestUrl(team);return url?'<img class="'+__cw225Attr(cls)+'" loading="lazy" decoding="async" src="'+__cw225Attr(url)+'" alt="'+__cw225Attr(team?.name||'')+'">':'<span class="cw16-fav-fallback" aria-hidden="true">⚽</span>'}}catch(_e){}
-  try{const styleId='cw225-club-crest-size';if(!document.getElementById(styleId)){const style=document.createElement('style');style.id=styleId;style.textContent='#ciao-miniapp-root .cw16-club-crest img{width:58px!important;height:58px!important}';document.head.appendChild(style)}}catch(_e){}
+  try{const styleId='cw225-club-crest-size';if(!document.getElementById(styleId)){const style=document.createElement('style');style.id=styleId;style.textContent='#ciao-miniapp-root .cw16-club-crest img{width:52px!important;height:52px!important}';document.head.appendChild(style)}}catch(_e){}
   try{__cw2154EmojiAssetUrl=function(){return ''};__cw2154RepairClubAssets=function(){return 0}}catch(_e){}
   /* /${BSD_CREST_PATCH_MARKER} */
 `;
