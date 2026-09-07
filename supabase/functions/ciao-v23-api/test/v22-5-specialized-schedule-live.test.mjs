@@ -25,7 +25,7 @@ function dbFixture(){
           select(){return this},
           order(){return this},
           gte(){return this},
-          lte(){return thenable(matches)},
+          lte(){return this},
           then(resolve,reject){return Promise.resolve({data:matches,error:null}).then(resolve,reject)},
         };
         return q;
