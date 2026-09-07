@@ -6,7 +6,7 @@ export function multitournamentCardThemeSource() {
   return `
   /* ${MULTITOURNAMENT_CARD_THEME_MARKER} */
   function __cwMtPolishState(match){
-    if(match?.status==='live')return 'live';
+    if(['live','halftime','extra_time','penalties'].includes(match?.status))return 'live';
     if(match?.status==='finished')return 'finished';
     if(match?.status==='postponed')return 'postponed';
     if(match?.status==='cancelled')return 'cancelled';
@@ -14,17 +14,23 @@ export function multitournamentCardThemeSource() {
   }
   function __cwMtPolishStatus(match){
     if(match?.status==='live'){const minute=Number(match?.minute);return 'LIVE'+(Number.isFinite(minute)?' · '+minute+'′':'')}
+    if(match?.status==='halftime')return 'ПЕРЕРЫВ';
+    if(match?.status==='extra_time')return 'ДОП. ВРЕМЯ';
+    if(match?.status==='penalties')return 'ПЕНАЛЬТИ';
     if(match?.status==='finished')return 'Матч завершён';
     if(match?.status==='postponed')return 'Матч перенесён';
     if(match?.status==='cancelled')return 'Матч отменён';
     return 'Матч не начался'
   }
   function __cwMtPolishScore(match){
-    if((match?.status==='live'||match?.status==='finished')&&match?.homeScore!=null&&match?.awayScore!=null)return String(match.homeScore)+':'+String(match.awayScore);
+    if(['live','halftime','extra_time','penalties','finished'].includes(match?.status)&&match?.homeScore!=null&&match?.awayScore!=null)return String(match.homeScore)+':'+String(match.awayScore);
     return '— : —'
   }
   function __cwMtPolishCaption(match){
     if(match?.status==='live')return 'счёт обновляется автоматически';
+    if(match?.status==='halftime')return 'перерыв';
+    if(match?.status==='extra_time')return 'дополнительное время';
+    if(match?.status==='penalties')return 'серия пенальти';
     if(match?.status==='finished')return 'финальный счёт';
     if(match?.status==='postponed')return 'матч перенесён';
     if(match?.status==='cancelled')return 'матч отменён';
