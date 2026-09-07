@@ -115,9 +115,17 @@ test('provider paginates events with limit 200 and increasing offset', async () 
       const offset = Number(parsed.searchParams.get('offset'));
       eventOffsets.push(offset);
       if (offset === 0) {
-        return json({ count: 201, results: Array.from({ length: 200 }, (_, i) => event(10000 + i, { round_name: 'Round of 32' })) });
+        return json({ count: 201, results: Array.from({ length: 200 }, (_, i) => event(10000 + i, {
+          round_name: 'Round of 32',
+          home_team: { id: 1000 + i, name: `Home ${i}` },
+          away_team: { id: 2000 + i, name: `Away ${i}` },
+        })) });
       }
-      return json({ count: 201, results: [event(10200, { round_name: 'Round of 32' })] });
+      return json({ count: 201, results: [event(10200, {
+        round_name: 'Round of 32',
+        home_team: { id: 1200, name: 'Home 200' },
+        away_team: { id: 2200, name: 'Away 200' },
+      })] });
     }
     throw new Error(`unexpected URL ${value}`);
   };
