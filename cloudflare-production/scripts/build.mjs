@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { injectBsdCrestPatch, validateBsdCrestPatchedHtml } from './bsd-crests.mjs';
 
 export const RELEASE_SOURCE_URL = 'https://dkefzepiiudehhzbbrjn.supabase.co/storage/v1/object/public/ciao-miniapp/migration/v22-5-resolved-no-x2.html';
 export const RELEASE_PATH = '/releases/v22-5.html';
@@ -31,11 +32,19 @@ export function validateReleaseHtml(input) {
   return true;
 }
 
+export function prepareReleaseHtml(input) {
+  const source = String(input || '');
+  validateReleaseHtml(source);
+  const release = injectBsdCrestPatch(source);
+  validateBsdCrestPatchedHtml(release);
+  return release;
+}
+
 export async function build() {
   const releaseResponse = await fetch(RELEASE_SOURCE_URL, { headers: { 'cache-control': 'no-cache' } });
   if (!releaseResponse.ok) throw new Error(`release source HTTP ${releaseResponse.status}`);
-  const release = await releaseResponse.text();
-  validateReleaseHtml(release);
+  const source = await releaseResponse.text();
+  const release = prepareReleaseHtml(source);
   const rootHtml = rootHtmlFor({ release });
   await mkdir(resolve(distDir, 'releases'), { recursive: true });
   await writeFile(resolve(distDir, 'index.html'), rootHtml, 'utf8');

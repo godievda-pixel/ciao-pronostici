@@ -4,6 +4,22 @@ import * as productionBuild from '../scripts/build.mjs';
 
 const { validateReleaseHtml } = productionBuild;
 
+function fixtureRelease() {
+  return `<html><head><style id="ciao-prod-no-x2-20260903">
+#ciao-miniapp-root .cw18-x2,
+#ciao-miniapp-root .cw18-summary-bonus,
+#ciao-miniapp-root .cw18-rule.x2{display:none!important}
+#ciao-miniapp-root .cw18-rules-copy::after{content:'Дедлайн: прогноз на конкретный матч закрывается за 15 минут до начала.'}
+#ciao-miniapp-root .cw18-rules-card .settings-row>div>div::after{content:'5 / 3 / 2 / 0 · дедлайн −15 минут'}
+</style></head><body><script>
+(function(){
+  const app=true;
+  /* ===== /Ciao, Web! v22.5 product polish layer ===== */
+
+})();
+</script></body></html>`;
+}
+
 test('production root serves the stable v22.5 release directly', () => {
   const entry = '<!doctype html><script>location.replace("/releases/v22-5.html")</script>';
   const release = '<!doctype html><html><head><meta name="ciao-build" content="ciao-web-v22-5-20260830"></head><body>app</body></html>';
@@ -12,12 +28,12 @@ test('production root serves the stable v22.5 release directly', () => {
 });
 
 test('production release accepts the real grouped no-x2 CSS patch', () => {
-  const release = `<html><head><style id="ciao-prod-no-x2-20260903">
-#ciao-miniapp-root .cw18-x2,
-#ciao-miniapp-root .cw18-summary-bonus,
-#ciao-miniapp-root .cw18-rule.x2{display:none!important}
-#ciao-miniapp-root .cw18-rules-copy::after{content:'Дедлайн: прогноз на конкретный матч закрывается за 15 минут до начала.'}
-#ciao-miniapp-root .cw18-rules-card .settings-row>div>div::after{content:'5 / 3 / 2 / 0 · дедлайн −15 минут'}
-</style></head><body></body></html>`;
-  assert.equal(validateReleaseHtml(release), true);
+  assert.equal(validateReleaseHtml(fixtureRelease()), true);
+});
+
+test('production preparation injects the BSD crest patch before serving v22.5', () => {
+  assert.equal(typeof productionBuild.prepareReleaseHtml, 'function');
+  const prepared = productionBuild.prepareReleaseHtml(fixtureRelease());
+  assert.match(prepared, /ciao-prod-bsd-crests-20260907/);
+  assert.match(prepared, /sports\.bzzoiro\.com\/img\/team/);
 });
