@@ -52,6 +52,7 @@ export const V23_RELEASE_PATH = '/releases/v23.html';
 export const NO_X2_MARKER = 'ciao-prod-no-x2-20260903';
 export const V23_PREDICTIONS_MARKER = 'ciao-prod-multitournament-predictions-20260907';
 export const V23_CAPTURED_HOME_MARKER = 'ciao-prod-home-calcio-polish-20260908';
+export const V23_NATIVE_HOME_MARKER = 'ciao-v23-native-home-20260908';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const distDir = resolve(root, 'dist');
@@ -104,7 +105,9 @@ export function validateV23Source(input) {
   const html = String(input || '');
   if (!html.includes('Ciao, Web!')) throw new Error('v23 Ciao marker missing');
   if (!html.includes(V23_PREDICTIONS_MARKER)) throw new Error(`v23 predictions marker missing: ${V23_PREDICTIONS_MARKER}`);
-  if (!html.includes(V23_CAPTURED_HOME_MARKER)) throw new Error(`v23 captured Home marker missing: ${V23_CAPTURED_HOME_MARKER}`);
+  if (!html.includes(V23_CAPTURED_HOME_MARKER) && !html.includes(V23_NATIVE_HOME_MARKER)) {
+    throw new Error('v23 Home marker missing');
+  }
   validateBrowserScripts(html);
   return true;
 }
