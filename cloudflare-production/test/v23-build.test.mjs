@@ -8,7 +8,7 @@ import { releaseRevision } from '../scripts/release-revision.mjs';
 
 function fixtureV23(){
   return `<!doctype html><html><head><title>Ciao, Web!</title></head><body>
-<script>(function(){const x='ciao-prod-multitournament-predictions-20260907';const y='ciao-prod-home-calcio-polish-20260908';})();</script>
+<script>(function(){const x='ciao-prod-multitournament-predictions-20260907';const y='ciao-v23-native-home-20260908';})();</script>
 </body></html>`;
 }
 
