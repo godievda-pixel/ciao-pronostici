@@ -45,9 +45,11 @@ test('release sync updates Telegram only when the fixed Worker bytes match', asy
     setMenuButton: async (url) => { receivedUrl = url; return { ok: true, result: true }; },
     cryptoImpl: webcrypto,
   });
+  const expected='https://dkefzepiiudehhzbbrjn.supabase.co/functions/v1/ciao-web-app?tg_rev=2cf24dba5fb0';
   assert.equal(result.status, 200);
-  assert.equal(receivedUrl, 'https://dkefzepiiudehhzbbrjn.supabase.co/functions/v1/ciao-web-app?tg_rev=2cf24dba5fb0');
+  assert.equal(receivedUrl, expected);
   assert.equal(result.body.live_revision, '2cf24dba5fb0');
+  assert.equal(result.body.web_app_url, expected);
 });
 
 test('router exposes only revision-driven production synchronization',()=>{
