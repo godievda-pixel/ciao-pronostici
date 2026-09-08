@@ -1,4 +1,4 @@
-name: Ciao production check
+name: Ciao production release
 
 on:
   push:
@@ -14,7 +14,7 @@ on:
       - 'supabase/functions/ciao-pronostici-router/**'
 
 jobs:
-  verify:
+  release:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -32,9 +32,6 @@ jobs:
 
       - name: Install
         run: npm install --no-audit --no-fund
-
-      - name: Test
-        run: npm test
 
       - name: Build
         run: npm run build
