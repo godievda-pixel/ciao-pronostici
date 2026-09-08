@@ -8,6 +8,7 @@ const FINAL_IIFE_MARKER='  /* ===== /Ciao, Web! v22.5 product polish layer =====
 const BROKEN_FONT="font-family:'Unbounded','Manrope',sans-serif";
 const SAFE_FONT='font-family:"Unbounded","Manrope",sans-serif';
 const EXPECTED_FONT_REPLACEMENTS=2;
+const HOME_BOOTSTRAP='\n  try{__cwHomePolishDom();__cwHomeBindPolish()}catch(_e){}\n';
 
 export function homeCalcioPolishRuntimeSourceSafe(){
   const source=homeCalcioPolishRuntimeSource();
@@ -15,7 +16,7 @@ export function homeCalcioPolishRuntimeSourceSafe(){
   if(count!==EXPECTED_FONT_REPLACEMENTS){
     throw new Error(`home/calcio unsafe font literal count invalid: ${count}`);
   }
-  const safe=source.split(BROKEN_FONT).join(SAFE_FONT);
+  const safe=source.split(BROKEN_FONT).join(SAFE_FONT)+HOME_BOOTSTRAP;
   new Function(safe);
   return safe;
 }
