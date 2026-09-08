@@ -8,28 +8,29 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Inspect live Home renderer selectors
+      - name: Inspect actual Home markup templates
         shell: bash
         run: |
           set -euo pipefail
-          URL='https://ciao-web-app.ciao-web.workers.dev/?selector_probe=20260908-0915'
+          URL='https://ciao-web-app.ciao-web.workers.dev/?markup_probe=20260908-0922'
           curl -fsS --max-time 30 "$URL" -o /tmp/prod.html
           python - <<'PY'
           from pathlib import Path
+          import re
           text=Path('/tmp/prod.html').read_text()
-          needles=[
-            'Сегодня в Серии А',
-            'cw211-today',
-            'cw211-home-shell',
-            'cw211-profile-btn',
-            "if(tab!=='predict'||__cwHomeExternalCenter)return",
-            'function __cwHomePolishOrder',
-            'try{__cwHomePolishDom();__cwHomeBindPolish()}catch(_e){}',
-          ]
-          for needle in needles:
-              print('\n===',needle,'===')
-              print('count=',text.count(needle))
-              pos=text.find(needle)
-              if pos>=0:
-                  print(text[max(0,pos-700):pos+1500].replace('\n','\\n'))
+          patterns={
+            'today_markup':r"<[^>]+class=[\"'][^\"']*cw211-today[^\"']*[\"'][^>]*>",
+            'home_shell_markup':r"<[^>]+class=[\"'][^\"']*cw211-home-shell[^\"']*[\"'][^>]*>",
+            'profile_button_markup':r"<[^>]+class=[\"'][^\"']*cw211-profile-btn[^\"']*[\"'][^>]*>",
+            'user_rank_literal':r"#['\"]?\+?[^\n]{0,120}место",
+            'predict_renderer':r"function\s+predict\s*\([^)]*\)\s*\{",
+          }
+          for name,pat in patterns.items():
+              print('\n===',name,'===')
+              matches=list(re.finditer(pat,text,re.I))
+              print('count=',len(matches))
+              for m in matches[:8]:
+                  p=m.start()
+                  print(text[max(0,p-500):p+1600].replace('\n','\\n'))
+                  print('---')
           PY
