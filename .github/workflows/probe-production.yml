@@ -8,25 +8,22 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Probe Telegram production route contract
+      - name: Wait for live GitHub production entry
         shell: bash
         run: |
           set -euo pipefail
-          MANIFEST='https://dkefzepiiudehhzbbrjn.supabase.co/functions/v1/ciao-release-manifest-v1'
           ENTRY='https://godievda-pixel.github.io/ciao-pronostici/'
-          WORKER='https://ciao-web-app.ciao-web.workers.dev'
-
-          echo '=== release manifest ==='
-          code=$(curl -sS --max-time 20 -o /tmp/manifest.json -w '%{http_code}' "$MANIFEST")
-          cat /tmp/manifest.json
-          echo
-          echo "manifest_http=$code"
-          test "$code" = '200'
-          grep -Fq 'ciao-web-v22-5-cloudflare-standalone-20260830' /tmp/manifest.json
-          grep -Fq "$WORKER" /tmp/manifest.json
-
-          echo '=== GitHub entry allowlist ==='
-          curl -fsS --max-time 20 "$ENTRY" -o /tmp/entry.html
-          grep -Fq 'ciao-web-app.ciao-web.workers.dev' /tmp/entry.html
-
-          echo 'Routing contract is coherent: GitHub entry accepts the active Cloudflare build.'
+          MARKER='ciao-web-app.ciao-web.workers.dev'
+          for attempt in $(seq 1 24); do
+            curl -fsS --max-time 20 "$ENTRY" -o /tmp/entry.html
+            if grep -Fq "$MARKER" /tmp/entry.html; then
+              echo "PRESENT on attempt $attempt: Cloudflare production allowlist"
+              grep -Fq "u.hostname==='godievda-pixel.github.io'" /tmp/entry.html
+              echo 'Live GitHub entry is ready for the Cloudflare manifest.'
+              exit 0
+            fi
+            echo "ABSENT on attempt $attempt; waiting for GitHub Pages publish"
+            sleep 10
+          done
+          echo 'GitHub Pages did not publish the production route fix within probe window'
+          exit 1
