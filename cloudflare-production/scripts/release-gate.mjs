@@ -8,7 +8,8 @@ export const ROUTER_SYNC_URL='https://dkefzepiiudehhzbbrjn.supabase.co/functions
 export const TELEGRAM_PROBE_URL='https://dkefzepiiudehhzbbrjn.supabase.co/functions/v1/ciao-telegram-entry-probe';
 export const LAUNCHER_BASE_URL='https://dkefzepiiudehhzbbrjn.supabase.co/functions/v1/ciao-web-app';
 export const REQUIRED_MARKERS=[
-  'try{__cwHomePolishDom();__cwHomeBindPolish()}catch(_e){}',
+  'ciao-v23-native-home-20260908',
+  'ciao-v23-native-predictions-20260908',
   'Кальчо сегодня',
   'cw-home-profile-premium',
   'disabled aria-disabled="true" tabindex="-1"',
