@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Script } from 'node:vm';
 import { injectBsdCrestPatch, validateBsdCrestPatchedHtml } from './bsd-crests.mjs';
 import { injectMultitournamentPatch, validateMultitournamentPatchedHtml } from './multitournament-runtime.mjs';
 import {
@@ -92,10 +93,10 @@ export function validateBrowserScripts(input) {
     if (type && !/^(?:text|application)\/(?:java|ecma)script$/.test(type)) continue;
     classicIndex += 1;
     try {
-      new Function(String(match[2] || ''));
+      new Script(String(match[2] || ''), { filename: `inline-script-${classicIndex}.js` });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`browser script syntax invalid at inline script ${classicIndex}: ${message}`);
+      const stack = error instanceof Error ? String(error.stack || error.message) : String(error);
+      throw new Error(`browser script syntax invalid at inline script ${classicIndex}:\n${stack}`);
     }
   }
   return true;
