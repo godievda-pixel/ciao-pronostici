@@ -1,6 +1,7 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Script } from 'node:vm';
 import { injectBsdCrestPatch, validateBsdCrestPatchedHtml } from './bsd-crests.mjs';
 import { injectMultitournamentPatch, validateMultitournamentPatchedHtml } from './multitournament-runtime.mjs';
 import {
@@ -45,12 +46,18 @@ import {
 } from './home-calcio-safety.mjs';
 import { releaseRevision } from './release-revision.mjs';
 
+// v22.5 is retained as rollback/history only. Active production builds from tracked v23 source below.
 export const RELEASE_SOURCE_URL = 'https://dkefzepiiudehhzbbrjn.supabase.co/storage/v1/object/public/ciao-miniapp/migration/v22-5-resolved-no-x2.html';
 export const RELEASE_PATH = '/releases/v22-5.html';
+export const V23_RELEASE_PATH = '/releases/v23.html';
 export const NO_X2_MARKER = 'ciao-prod-no-x2-20260903';
+export const V23_PREDICTIONS_MARKER = 'ciao-prod-multitournament-predictions-20260907';
+export const V23_CAPTURED_HOME_MARKER = 'ciao-prod-home-calcio-polish-20260908';
+export const V23_NATIVE_HOME_MARKER = 'ciao-v23-native-home-20260908';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const distDir = resolve(root, 'dist');
+const v23SourcePath = resolve(root, 'src', 'v23', 'index.html');
 
 export function rootHtmlFor({ release }) {
   return String(release || '');
@@ -86,15 +93,27 @@ export function validateBrowserScripts(input) {
     if (type && !/^(?:text|application)\/(?:java|ecma)script$/.test(type)) continue;
     classicIndex += 1;
     try {
-      new Function(String(match[2] || ''));
+      new Script(String(match[2] || ''), { filename: `inline-script-${classicIndex}.js` });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`browser script syntax invalid at inline script ${classicIndex}: ${message}`);
+      const stack = error instanceof Error ? String(error.stack || error.message) : String(error);
+      throw new Error(`browser script syntax invalid at inline script ${classicIndex}:\n${stack}`);
     }
   }
   return true;
 }
 
+export function validateV23Source(input) {
+  const html = String(input || '');
+  if (!html.includes('Ciao, Web!')) throw new Error('v23 Ciao marker missing');
+  if (!html.includes(V23_PREDICTIONS_MARKER)) throw new Error(`v23 predictions marker missing: ${V23_PREDICTIONS_MARKER}`);
+  if (!html.includes(V23_CAPTURED_HOME_MARKER) && !html.includes(V23_NATIVE_HOME_MARKER)) {
+    throw new Error('v23 Home marker missing');
+  }
+  validateBrowserScripts(html);
+  return true;
+}
+
+// Legacy v22.5 transformer retained for rollback/history tests. Active build() does not call it.
 export function prepareReleaseHtml(input) {
   const source = String(input || '');
   validateReleaseHtml(source);
@@ -125,31 +144,37 @@ export function prepareReleaseHtml(input) {
   return release;
 }
 
-export async function writeBuildOutputs({ outputDir = distDir, rootHtml, release }) {
+export async function writeBuildOutputs({ outputDir = distDir, rootHtml, release, releaseFile = 'v22-5.html' }) {
   const releasesDir = resolve(outputDir, 'releases');
   await mkdir(releasesDir, { recursive: true });
   await writeFile(resolve(outputDir, 'index.html'), rootHtml, 'utf8');
-  await writeFile(resolve(releasesDir, 'v22-5.html'), release, 'utf8');
+  await writeFile(resolve(releasesDir, releaseFile), release, 'utf8');
   const revision = releaseRevision(Buffer.from(rootHtml, 'utf8'));
   await writeFile(resolve(outputDir, 'release-revision.txt'), `${revision}\n`, 'utf8');
   return { revision };
 }
 
-export async function build() {
-  const releaseResponse = await fetch(RELEASE_SOURCE_URL, { headers: { 'cache-control': 'no-cache' } });
-  if (!releaseResponse.ok) throw new Error(`release source HTTP ${releaseResponse.status}`);
-  const source = await releaseResponse.text();
-  const release = prepareReleaseHtml(source);
-  validateBrowserScripts(release);
-  const rootHtml = rootHtmlFor({ release });
-  const { revision } = await writeBuildOutputs({ rootHtml, release });
+export async function buildV23({ sourceHtml, outputDir = distDir } = {}) {
+  const source = sourceHtml == null ? await readFile(v23SourcePath, 'utf8') : String(sourceHtml);
+  validateV23Source(source);
+  const { revision } = await writeBuildOutputs({
+    outputDir,
+    rootHtml: source,
+    release: source,
+    releaseFile: 'v23.html',
+  });
   return {
     ok: true,
+    version: 'v23.0',
     entry: 'dist/index.html',
-    release: 'dist/releases/v22-5.html',
+    release: 'dist/releases/v23.html',
     revision,
-    bytes: Buffer.byteLength(release),
+    bytes: Buffer.byteLength(source),
   };
+}
+
+export async function build() {
+  return buildV23();
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
