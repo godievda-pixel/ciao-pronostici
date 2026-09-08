@@ -8,15 +8,23 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Require Telegram menu revision cache bust
+      - name: Publish Telegram menu revision
         shell: bash
         run: |
           set -euo pipefail
+          SETUP='https://dkefzepiiudehhzbbrjn.supabase.co/functions/v1/ciao-pronostici-router/setup'
           PROBE='https://dkefzepiiudehhzbbrjn.supabase.co/functions/v1/ciao-telegram-entry-probe'
           EXPECT='https://dkefzepiiudehhzbbrjn.supabase.co/functions/v1/ciao-web-app?tg_rev=20260908-0525'
+
+          curl -fsS --max-time 30 "$SETUP" -o /tmp/setup.json
+          cat /tmp/setup.json
+          echo
+          grep -Fq '"critical_ok":true' /tmp/setup.json
+          grep -Fq "\"app_url\":\"$EXPECT\"" /tmp/setup.json
+
           curl -fsS --max-time 20 "$PROBE" -o /tmp/tg-entry.json
           cat /tmp/tg-entry.json
           echo
           grep -Fq '"ok":true' /tmp/tg-entry.json
           grep -Fq "\"web_app_url\":\"$EXPECT\"" /tmp/tg-entry.json
-          echo 'Telegram menu uses a fresh revision URL.'
+          echo 'Telegram menu revision is live.'
