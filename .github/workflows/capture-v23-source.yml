@@ -1,0 +1,42 @@
+name: Capture v23 source snapshot
+
+on:
+  push:
+    branches: [feat/v23-native-source]
+    paths:
+      - '.github/workflows/capture-v23-source.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/v23-native-source
+          fetch-depth: 0
+      - name: Capture current production Worker exactly once
+        shell: bash
+        run: |
+          set -euo pipefail
+          TARGET='cloudflare-production/src/v23/index.html'
+          URL='https://ciao-web-app.ciao-web.workers.dev/'
+          if [ -f "$TARGET" ]; then
+            echo 'v23 source already exists; refusing to recapture mutable production.'
+            exit 1
+          fi
+          mkdir -p "$(dirname "$TARGET")"
+          curl --fail --silent --show-error --max-time 30 "$URL" -o "$TARGET"
+          grep -Fq 'Ciao, Web!' "$TARGET"
+          grep -Fq 'ciao-prod-home-calcio-polish-20260908' "$TARGET"
+          grep -Fq 'ciao-prod-multitournament-predictions-20260907' "$TARGET"
+          echo "bytes=$(wc -c < "$TARGET")"
+          echo "sha256=$(sha256sum "$TARGET" | awk '{print $1}')"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add "$TARGET"
+          git commit -m 'build: freeze current production as v23 source'
+          git push origin HEAD:feat/v23-native-source
