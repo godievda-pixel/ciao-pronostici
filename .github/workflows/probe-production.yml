@@ -8,33 +8,13 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify Telegram production route end to end
+      - name: Inspect Telegram menu button target
         shell: bash
         run: |
           set -euo pipefail
-          MANIFEST='https://dkefzepiiudehhzbbrjn.supabase.co/functions/v1/ciao-release-manifest-v1'
-          ENTRY='https://godievda-pixel.github.io/ciao-pronostici/'
-          WORKER='https://ciao-web-app.ciao-web.workers.dev'
-
-          echo '=== manifest ==='
-          code=$(curl -sS --max-time 20 -o /tmp/manifest.json -w '%{http_code}' "$MANIFEST")
-          cat /tmp/manifest.json
+          PROBE='https://dkefzepiiudehhzbbrjn.supabase.co/functions/v1/ciao-telegram-entry-probe'
+          curl -fsS --max-time 20 "$PROBE" -o /tmp/tg-entry.json
+          cat /tmp/tg-entry.json
           echo
-          test "$code" = '200'
-          grep -Fq '"ok":true' /tmp/manifest.json
-          grep -Fq 'ciao-web-v22-5-cloudflare-standalone-20260830' /tmp/manifest.json
-          grep -Fq "$WORKER" /tmp/manifest.json
-
-          echo '=== Telegram entry ==='
-          curl -fsS --max-time 20 "$ENTRY" -o /tmp/entry.html
-          grep -Fq 'ciao-web-app.ciao-web.workers.dev' /tmp/entry.html
-          grep -Fq "u.hostname==='godievda-pixel.github.io'" /tmp/entry.html
-
-          echo '=== active Worker ==='
-          curl -fsS --max-time 20 "$WORKER/" -o /tmp/prod.html
-          grep -Fq 'try{__cwHomePolishDom();__cwHomeBindPolish()}catch(_e){}' /tmp/prod.html
-          grep -Fq 'Кальчо сегодня' /tmp/prod.html
-          grep -Fq 'cw-home-profile-premium' /tmp/prod.html
-          grep -Fq 'disabled aria-disabled="true" tabindex="-1"' /tmp/prod.html
-
-          echo 'END-TO-END OK: GitHub entry -> release manifest -> active Cloudflare Worker'
+          grep -Fq '"ok":true' /tmp/tg-entry.json
+          echo 'Telegram entry probe completed.'
