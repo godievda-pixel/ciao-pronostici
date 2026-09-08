@@ -1,0 +1,35 @@
+name: One-shot v23 native Home migration
+
+on:
+  push:
+    branches: [feat/v23-native-source]
+    paths:
+      - 'cloudflare-production/scripts/migrate-v23-native-home.mjs'
+      - '.github/workflows/v23-native-home-migrate.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/v23-native-source
+          fetch-depth: 0
+      - name: Migrate tracked v23 Home source
+        run: node cloudflare-production/scripts/migrate-v23-native-home.mjs
+      - name: Commit migrated v23 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- cloudflare-production/src/v23/index.html; then
+            echo 'No migration changes required.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add cloudflare-production/src/v23/index.html
+          git commit -m 'feat: migrate Home into v23 tracked source'
+          git push origin HEAD:feat/v23-native-source
