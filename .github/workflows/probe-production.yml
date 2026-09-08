@@ -8,29 +8,27 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Inspect actual Home markup templates
+      - name: Inspect render and bind runtime path
         shell: bash
         run: |
           set -euo pipefail
-          URL='https://ciao-web-app.ciao-web.workers.dev/?markup_probe=20260908-0922'
+          URL='https://ciao-web-app.ciao-web.workers.dev/?render_probe=20260908-0925'
           curl -fsS --max-time 30 "$URL" -o /tmp/prod.html
           python - <<'PY'
           from pathlib import Path
           import re
           text=Path('/tmp/prod.html').read_text()
-          patterns={
-            'today_markup':r"<[^>]+class=[\"'][^\"']*cw211-today[^\"']*[\"'][^>]*>",
-            'home_shell_markup':r"<[^>]+class=[\"'][^\"']*cw211-home-shell[^\"']*[\"'][^>]*>",
-            'profile_button_markup':r"<[^>]+class=[\"'][^\"']*cw211-profile-btn[^\"']*[\"'][^>]*>",
-            'user_rank_literal':r"#['\"]?\+?[^\n]{0,120}место",
-            'predict_renderer':r"function\s+predict\s*\([^)]*\)\s*\{",
-          }
-          for name,pat in patterns.items():
+          for name,pat in [
+            ('render',r'function\s+render\s*\([^)]*\)\s*\{'),
+            ('bind',r'function\s+bind\s*\([^)]*\)\s*\{'),
+            ('render_assign',r'render\s*=\s*function\s*\([^)]*\)\s*\{'),
+            ('bind_assign',r'bind\s*=\s*function\s*\([^)]*\)\s*\{'),
+          ]:
               print('\n===',name,'===')
-              matches=list(re.finditer(pat,text,re.I))
+              matches=list(re.finditer(pat,text))
               print('count=',len(matches))
-              for m in matches[:8]:
+              for m in matches[:10]:
                   p=m.start()
-                  print(text[max(0,p-500):p+1600].replace('\n','\\n'))
+                  print(text[max(0,p-700):p+2800].replace('\n','\\n'))
                   print('---')
           PY
