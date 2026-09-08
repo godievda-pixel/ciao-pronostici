@@ -8,27 +8,26 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Inspect render and bind runtime path
+      - name: Inspect async Home overwrite paths
         shell: bash
         run: |
           set -euo pipefail
-          URL='https://ciao-web-app.ciao-web.workers.dev/?render_probe=20260908-0925'
+          URL='https://ciao-web-app.ciao-web.workers.dev/?async_home_probe=20260908-0928'
           curl -fsS --max-time 30 "$URL" -o /tmp/prod.html
           python - <<'PY'
           from pathlib import Path
-          import re
           text=Path('/tmp/prod.html').read_text()
-          for name,pat in [
-            ('render',r'function\s+render\s*\([^)]*\)\s*\{'),
-            ('bind',r'function\s+bind\s*\([^)]*\)\s*\{'),
-            ('render_assign',r'render\s*=\s*function\s*\([^)]*\)\s*\{'),
-            ('bind_assign',r'bind\s*=\s*function\s*\([^)]*\)\s*\{'),
-          ]:
-              print('\n===',name,'===')
-              matches=list(re.finditer(pat,text))
-              print('count=',len(matches))
-              for m in matches[:10]:
-                  p=m.start()
-                  print(text[max(0,p-700):p+2800].replace('\n','\\n'))
+          needles=['function __cw18LoadFavorite','__cw18LoadFavorite=','function __cw20PatchFavoriteHome','__cw20PatchFavoriteHome=','__cw18FavoriteHome=','setTimeout(__cw18LoadFavorite,30)']
+          for needle in needles:
+              print('\n===',needle,'===')
+              start=0;count=0
+              while True:
+                  p=text.find(needle,start)
+                  if p<0: break
+                  count+=1
+                  print(text[max(0,p-900):p+3300].replace('\n','\\n'))
                   print('---')
+                  start=p+len(needle)
+                  if count>=8: break
+              print('count=',count)
           PY
