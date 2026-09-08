@@ -8,14 +8,18 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Inspect Cloudflare production fingerprint headers
+      - name: Refresh Cloudflare production fingerprint
         shell: bash
         run: |
           set -euo pipefail
-          URL='https://ciao-web-app.ciao-web.workers.dev/'
+          URL='https://ciao-web-app.ciao-web.workers.dev/?release_probe=premerge-20260908-0607'
           curl -sS --max-time 20 -D /tmp/head.txt -o /tmp/body.html "$URL"
           cat /tmp/head.txt
-          echo "sha256=$(sha256sum /tmp/body.html | awk '{print $1}')"
+          SHA=$(sha256sum /tmp/body.html | awk '{print $1}')
+          echo "sha256=$SHA"
+          echo "revision=${SHA:0:12}"
           echo "bytes=$(wc -c < /tmp/body.html)"
           grep -Eiq '^HTTP/[0-9.]+ 200' /tmp/head.txt
-          echo 'Fingerprint inspection complete.'
+          grep -Fq 'Кальчо сегодня' /tmp/body.html
+          grep -Fq 'cw-home-profile-premium' /tmp/body.html
+          echo 'Fresh production fingerprint verified.'
