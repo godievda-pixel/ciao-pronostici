@@ -34,6 +34,7 @@ export async function synchronizeRelease({
         error:'telegram_menu_update_failed',
         requested_revision:requestedRevision,
         live_revision:liveRevision,
+        telegram_error:telegram?.description??null,
       },
     };
   }
@@ -44,7 +45,7 @@ export async function synchronizeRelease({
       ok:true,
       requested_revision:requestedRevision,
       live_revision:liveRevision,
-      telegram_url:url,
+      web_app_url:url,
     },
   };
 }
