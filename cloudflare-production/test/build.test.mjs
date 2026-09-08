@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import * as productionBuild from '../scripts/build.mjs';
+import { releaseRevision } from '../scripts/release-revision.mjs';
 
 const { validateReleaseHtml } = productionBuild;
 
@@ -104,4 +108,20 @@ test('production preparation injects approved layers, Home/Calcio polish and par
   const twice = productionBuild.prepareReleaseHtml(prepared);
   for (const marker of order) assert.equal((twice.match(new RegExp(marker,'g')) || []).length, 2);
   assertInlineScriptsCompile(twice);
+});
+
+test('production output writes revision for the exact index.html bytes', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'ciao-release-'));
+  try {
+    const rootHtml = '<!doctype html><html><body>release</body></html>';
+    const release = rootHtml;
+    const result = await productionBuild.writeBuildOutputs({ outputDir: dir, rootHtml, release });
+    const index = await readFile(join(dir, 'index.html'));
+    const revisionFile = await readFile(join(dir, 'release-revision.txt'), 'utf8');
+    const expected = releaseRevision(index);
+    assert.equal(revisionFile, `${expected}\n`);
+    assert.equal(result.revision, expected);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });

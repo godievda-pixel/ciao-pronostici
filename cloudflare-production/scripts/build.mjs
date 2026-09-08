@@ -43,6 +43,7 @@ import {
   injectHomeCalcioSafetyPatch,
   validateHomeCalcioSafetyPatchedHtml,
 } from './home-calcio-safety.mjs';
+import { releaseRevision } from './release-revision.mjs';
 
 export const RELEASE_SOURCE_URL = 'https://dkefzepiiudehhzbbrjn.supabase.co/storage/v1/object/public/ciao-miniapp/migration/v22-5-resolved-no-x2.html';
 export const RELEASE_PATH = '/releases/v22-5.html';
@@ -50,7 +51,6 @@ export const NO_X2_MARKER = 'ciao-prod-no-x2-20260903';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const distDir = resolve(root, 'dist');
-const releaseOut = resolve(distDir, 'releases/v22-5.html');
 
 export function rootHtmlFor({ release }) {
   return String(release || '');
@@ -125,6 +125,16 @@ export function prepareReleaseHtml(input) {
   return release;
 }
 
+export async function writeBuildOutputs({ outputDir = distDir, rootHtml, release }) {
+  const releasesDir = resolve(outputDir, 'releases');
+  await mkdir(releasesDir, { recursive: true });
+  await writeFile(resolve(outputDir, 'index.html'), rootHtml, 'utf8');
+  await writeFile(resolve(releasesDir, 'v22-5.html'), release, 'utf8');
+  const revision = releaseRevision(Buffer.from(rootHtml, 'utf8'));
+  await writeFile(resolve(outputDir, 'release-revision.txt'), `${revision}\n`, 'utf8');
+  return { revision };
+}
+
 export async function build() {
   const releaseResponse = await fetch(RELEASE_SOURCE_URL, { headers: { 'cache-control': 'no-cache' } });
   if (!releaseResponse.ok) throw new Error(`release source HTTP ${releaseResponse.status}`);
@@ -132,10 +142,14 @@ export async function build() {
   const release = prepareReleaseHtml(source);
   validateBrowserScripts(release);
   const rootHtml = rootHtmlFor({ release });
-  await mkdir(resolve(distDir, 'releases'), { recursive: true });
-  await writeFile(resolve(distDir, 'index.html'), rootHtml, 'utf8');
-  await writeFile(releaseOut, release, 'utf8');
-  return { ok: true, entry: 'dist/index.html', release: 'dist/releases/v22-5.html', bytes: Buffer.byteLength(release) };
+  const { revision } = await writeBuildOutputs({ rootHtml, release });
+  return {
+    ok: true,
+    entry: 'dist/index.html',
+    release: 'dist/releases/v22-5.html',
+    revision,
+    bytes: Buffer.byteLength(release),
+  };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
