@@ -40,4 +40,6 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add cloudflare-production/src/v23/index.html
           git commit -m 'release: integrate native Home and Predictions into v23 source'
+          git fetch origin feat/v23-native-source
+          git rebase origin/feat/v23-native-source
           git push origin HEAD:feat/v23-native-source
