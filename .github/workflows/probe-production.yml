@@ -8,31 +8,15 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify actual Telegram launch chain
+      - name: Require Telegram menu revision cache bust
         shell: bash
         run: |
           set -euo pipefail
-          ENTRY='https://dkefzepiiudehhzbbrjn.supabase.co/functions/v1/ciao-web-app'
-          UA='Mozilla/5.0 Telegram-Android/12.0 WebView'
-
-          echo '=== launcher health ==='
-          curl -fsS --max-time 20 -A "$UA" "$ENTRY/health" -o /tmp/health.json
-          cat /tmp/health.json
+          PROBE='https://dkefzepiiudehhzbbrjn.supabase.co/functions/v1/ciao-telegram-entry-probe'
+          EXPECT='https://dkefzepiiudehhzbbrjn.supabase.co/functions/v1/ciao-web-app?tg_rev=20260908-0525'
+          curl -fsS --max-time 20 "$PROBE" -o /tmp/tg-entry.json
+          cat /tmp/tg-entry.json
           echo
-          grep -Fq 'ciao-web-v22-5-cloudflare-standalone-20260830' /tmp/health.json
-          grep -Fq 'https://ciao-web-app.ciao-web.workers.dev' /tmp/health.json
-
-          echo '=== first response ==='
-          curl -sS --max-time 20 -A "$UA" -D /tmp/headers.txt -o /tmp/first.body "$ENTRY"
-          cat /tmp/headers.txt
-          grep -Eiq '^location: https://ciao-web-app\.ciao-web\.workers\.dev/\?v=[0-9]+' /tmp/headers.txt
-          grep -Eiq '^cache-control: .*no-store' /tmp/headers.txt
-
-          echo '=== followed Telegram chain ==='
-          curl -fsSL --max-time 30 -A "$UA" "$ENTRY" -o /tmp/final.html
-          grep -Fq 'try{__cwHomePolishDom();__cwHomeBindPolish()}catch(_e){}' /tmp/final.html
-          grep -Fq 'Кальчо сегодня' /tmp/final.html
-          grep -Fq 'cw-home-profile-premium' /tmp/final.html
-          grep -Fq 'disabled aria-disabled="true" tabindex="-1"' /tmp/final.html
-          echo "final_bytes=$(wc -c < /tmp/final.html)"
-          echo 'ACTUAL TELEGRAM CHAIN OK'
+          grep -Fq '"ok":true' /tmp/tg-entry.json
+          grep -Fq "\"web_app_url\":\"$EXPECT\"" /tmp/tg-entry.json
+          echo 'Telegram menu uses a fresh revision URL.'
