@@ -8,30 +8,24 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Probe production worker
+      - name: Wait for Home bootstrap in production
         shell: bash
         run: |
           set -euo pipefail
           URL='https://ciao-web-app.ciao-web.workers.dev/'
-          echo "=== healthz ==="
-          curl -fsS --max-time 20 "${URL}healthz" || true
-          echo
-          echo "=== root headers ==="
-          curl -fsSIL --max-time 20 "$URL" | sed -n '1,30p'
-          echo "=== root body ==="
-          curl -fsS --max-time 20 "$URL" -o /tmp/prod.html
-          wc -c /tmp/prod.html
-          for marker in \
-            'ciao-prod-home-calcio-polish-20260908' \
-            'ciao-prod-home-calcio-safety-20260908' \
-            'Кальчо сегодня' \
-            'cw-home-profile-premium' \
-            'cwpred-stage-locked'; do
-            if grep -Fq "$marker" /tmp/prod.html; then
-              echo "PRESENT: $marker"
-            else
-              echo "ABSENT: $marker"
+          MARKER='try{__cwHomePolishDom();__cwHomeBindPolish()}catch(_e){}'
+          for attempt in $(seq 1 18); do
+            curl -fsS --max-time 20 "$URL" -o /tmp/prod.html
+            if grep -Fq "$MARKER" /tmp/prod.html; then
+              echo "PRESENT on attempt $attempt: Home bootstrap"
+              grep -Fq 'Кальчо сегодня' /tmp/prod.html
+              grep -Fq 'cw-home-profile-premium' /tmp/prod.html
+              grep -Fq 'disabled aria-disabled="true" tabindex="-1"' /tmp/prod.html
+              echo "Production contains bootstrap + Home/Calcio + locked-stage contracts"
+              exit 0
             fi
+            echo "ABSENT on attempt $attempt; waiting for Cloudflare Git deploy"
+            sleep 10
           done
-          echo "=== build marker candidates ==="
-          grep -Eo 'ciao-web-v[0-9A-Za-z._-]+' /tmp/prod.html | sort -u | head -20 || true
+          echo 'Home bootstrap did not reach production within probe window'
+          exit 1
