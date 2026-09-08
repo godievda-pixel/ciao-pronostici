@@ -77,8 +77,15 @@ html,body{
       const u=new URL(String(raw||''),location.href);
 
       if(u.protocol!=='https:')return null;
-      if(u.hostname!=='godievda-pixel.github.io')return null;
-      if(!u.pathname.startsWith('/ciao-pronostici/'))return null;
+
+      const githubOk=
+        u.hostname==='godievda-pixel.github.io' &&
+        u.pathname.startsWith('/ciao-pronostici/');
+
+      const cloudflareOk=
+        u.hostname==='ciao-web-app.ciao-web.workers.dev';
+
+      if(!githubOk&&!cloudflareOk)return null;
 
       return u;
     }catch{
