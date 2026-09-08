@@ -1,0 +1,152 @@
+name: v23 native predictions migration
+
+on:
+  push:
+    branches:
+      - feat/v23-native-source
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: github.event.head_commit.message == 'chore: run v23 native predictions migration'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/v23-native-source
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Migrate prediction UI into tracked v23 source
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('cloudflare-production/src/v23/index.html')
+          html = path.read_text(encoding='utf-8')
+
+          def replace_block(source, start, end, replacement=''):
+              a = source.find(start)
+              if a < 0:
+                  raise SystemExit(f'missing start marker: {start}')
+              b = source.find(end, a + len(start))
+              if b < 0:
+                  raise SystemExit(f'missing end marker: {end}')
+              b += len(end)
+              return source[:a] + replacement + source[b:]
+
+          lock_start = '  /* ciao-prod-prediction-stage-lock-ui-20260907 */'
+          lock_end = '  /* /ciao-prod-prediction-stage-lock-ui-20260907 */'
+          mine_start = '  /* ciao-prod-prediction-mine-stage-polish-20260907 */'
+          mine_end = '  /* /ciao-prod-prediction-mine-stage-polish-20260907 */'
+
+          native = r'''  /* ciao-v23-native-predictions-20260908 */
+          function __cw23PreviousLeagueStageLabel(stageKey){
+            const m=String(stageKey||'').match(/^league-(\d+)$/);
+            const n=m?Number(m[1]):NaN;
+            return Number.isFinite(n)&&n>1?(n-1)+'-го тура':'предыдущего тура';
+          }
+
+          function __cw23MinePredictionBlock(hasPrediction,prediction){
+            return '<div class="cwpred-mine-primary cw23-mine-primary"><small>ВАШ ПРОГНОЗ</small><b>'+__cwPredEsc(hasPrediction?prediction:'— : —')+'</b>'+(hasPrediction?'':'<span class="cwpred-mine-missing cw23-mine-missing">Прогноз не сделан</span>')+'</div>';
+          }
+
+          function __cw23MineStageBody(homeHtml,awayHtml,hasPrediction,prediction,score,points){
+            const result=score?'<div class="cwpred-mine-result-value"><small>СЧЁТ МАТЧА</small><b>'+__cwPredEsc(score)+'</b></div>':'<span class="cwpred-mine-await">Матч ещё не начался</span>';
+            return '<div class="cwpred-mine-matchline">'+homeHtml+__cw23MinePredictionBlock(hasPrediction,prediction)+awayHtml+'</div><div class="cwpred-mine-result-strip">'+result+(points?'<div class="cwpred-points">'+__cwPredEsc(points)+'</div>':'')+'</div>';
+          }
+
+          __cwPredExternalMineCard=function(match){
+            const p=match?.prediction;
+            const has=!!p;
+            const prediction=has?String(p.home_score)+' : '+String(p.away_score):'— : —';
+            const score=__cwPredRealScore(match),points=__cwPredPoints(p?.points);
+            return '<article class="cwpred-card cwpred-external-card cwpred-mine-card cwpred-mine-card--v3" data-cwpred-match="'+__cwPredEsc(String(match?.matchId||''))+'"><div class="cwpred-card-top"><span class="cwpred-status">'+__cwPredEsc(__cwPredStatus(match))+'</span><span class="cwpred-kickoff">'+__cwPredEsc(__cwPredDateTime(match?.kickoffAt))+'</span></div>'+__cw23MineStageBody(__cwPredExternalTeamHtml(match?.homeTeam,'home'),__cwPredExternalTeamHtml(match?.awayTeam,'away'),has,prediction,score,points)+'</article>';
+          };
+
+          __cwPredSerieMineCard=function(match){
+            const p=match?.prediction;
+            const has=!!p;
+            const prediction=has?String(p.home_score)+' : '+String(p.away_score):'— : —';
+            const score=__cwPredSerieRealScore(match),points=__cwPredPoints(p?.points);
+            return '<div class="mine-match cwpred-card cwpred-serie-card cwpred-mine-card cwpred-mine-card--v3" data-mid="'+Number(match.id)+'"><div class="cwpred-card-top"><span class="cwpred-status">'+__cwPredEsc(__cwPredSerieStatus(match))+'</span><span class="cwpred-kickoff">'+__cwPredEsc(typeof fmt==='function'?fmt(match.kickoff_at):'')+'</span></div>'+__cw23MineStageBody(__cwPredSerieTeamHtml(match.home,'home'),__cwPredSerieTeamHtml(match.away,'away'),has,prediction,score,points)+'</div>';
+          };
+
+          const __cw23DeadlineTextBase=__cwPredDeadlineText;
+          __cwPredDeadlineText=function(match){
+            if(match?.stage_locked)return 'Откроется после завершения '+__cw23PreviousLeagueStageLabel(match?.stageKey||'');
+            return __cw23DeadlineTextBase(match);
+          };
+
+          function __cw23ExternalStageBarHtml(){
+            const groups=__cwPredExternalGroups();
+            if(!groups.length)return '';
+            return '<div class="rounds cwpred-rounds">'+groups.map(g=>{
+              const locked=__cwPredUxGroupLocked(g);
+              return '<button type="button" class="round-chip '+(g.key===__cwPredStageKey?'active ':'')+(locked?'cwpred-stage-locked':'')+'" data-cwpred-stage="'+__cwPredEsc(g.key)+'" title="'+__cwPredEsc(g.label)+'" '+(locked?'disabled aria-disabled="true" tabindex="-1"':'aria-disabled="false"')+'>'+__cwPredEsc(__cwPredStageShort(g))+'</button>';
+            }).join('')+'</div>';
+          }
+          __cwPredStageBarHtml=__cw23ExternalStageBarHtml;
+
+          function __cw23SerieRoundBar(){
+            return '<div class="rounds">'+S.rounds.map(r=>{
+              const locked=!r.unlocked;
+              return '<button class="round-chip '+(r.number===S.selected_round?'active ':'')+(locked?'locked cwpred-stage-locked':'')+'" data-round="'+r.number+'" '+(locked?'disabled aria-disabled="true" tabindex="-1"':'aria-disabled="false"')+'>'+r.number+'</button>';
+            }).join('')+'</div>';
+          }
+
+          function __cw23ExternalHtml(){
+            const cover=__cwPredCoverHtml(__cwPredCompetition),controls='<div class="cwpred-tournament-controls">'+__cwPredModeHtml()+__cw23ExternalStageBarHtml()+'</div>';
+            if(__cwPredLoading&&!__cwPredExternalPayload)return cover+controls+'<div class="cwpred-state">Загружаем прогнозы…</div>';
+            if(__cwPredError&&!__cwPredExternalPayload)return cover+controls+'<div class="cwpred-state cwpred-state--error"><b>Не удалось загрузить прогнозы</b><button type="button" data-cwpred-action="retry">Повторить</button></div>';
+            const group=__cwPredSelectedGroup();
+            if(!group)return cover+controls+'<div class="cwpred-state">Матчей пока нет</div>';
+            const locked=__cwPredUxGroupLocked(group);
+            const previous=__cw23PreviousLeagueStageLabel(group.key);
+            const cards=group.matches.map(match=>__cwPredMode==='mine'?__cwPredExternalMineCard(match):__cwPredExternalEditCard(match)).join('');
+            const save=!locked&&__cwPredExternalCanSave(group)?'<div class="cwpred-savebar"><button type="button" class="cwpred-save" data-cwpred-action="save" '+(__cwPredSaving?'disabled':'')+'>'+(__cwPredSaving?'Сохраняем…':'Сохранить прогнозы')+'</button></div>':'';
+            const lockNote=locked?'<div class="cwpred-stage-lock-note">Прогнозы на этот тур откроются после завершения '+__cwPredEsc(previous)+'</div>':'';
+            return cover+controls+'<div class="section-title cwpred-stage-title"><h3>'+__cwPredEsc(group.label)+'</h3><span>'+(locked?'тур закрыт':'дедлайн −15 минут')+'</span></div>'+lockNote+'<div class="cwpred-cards">'+cards+'</div>'+save;
+          }
+          __cwPredExternalHtml=__cw23ExternalHtml;
+
+          function __cw23SerieHtml(){
+            const cover=__cwPredCoverHtml('serie_a');
+            const controls='<div class="cwpred-tournament-controls">'+__cwPredModeHtml()+__cw23SerieRoundBar()+'</div>';
+            if(!S?.round?.matches)return cover+controls+'<div class="cwpred-state">Загружаем тур…</div>';
+            const cards=S.round.matches.map(match=>__cwPredMode==='mine'?__cwPredSerieMineCard(match):__cwPredSerieEditCard(match)).join('');
+            const save=__cwPredMode==='edit'&&S.round.matches.some(match=>match.open)?'<div class="savebar cwpred-savebar"><button id="saveAll" class="save cwpred-save">Сохранить прогнозы</button></div>':'';
+            return cover+controls+'<div class="section-title cwpred-stage-title"><h3>'+Number(S.selected_round)+'-й тур</h3><span>дедлайн −15 минут</span></div><div class="matches cwpred-cards">'+cards+'</div>'+save;
+          }
+          __cwPredSerieHtml=__cw23SerieHtml;
+
+          try{const styleId='cw23-native-predictions-style';if(!document.getElementById(styleId)){const style=document.createElement('style');style.id=styleId;style.textContent='#ciao-miniapp-root .cwpred-stage-locked{opacity:.42!important;padding-right:12px!important;color:rgba(255,255,255,.48)!important;background:rgba(255,255,255,.025)!important;box-shadow:none!important;filter:saturate(.55)!important}#ciao-miniapp-root .cwpred-stage-locked::before{display:none!important}#ciao-miniapp-root .cwpred-stage-locked::after{display:none!important}#ciao-miniapp-root .cwpred-mine-card--v3{overflow:hidden!important}#ciao-miniapp-root .cwpred-mine-card--v3 .cwpred-mine-matchline{grid-template-columns:minmax(0,1fr) 94px minmax(0,1fr)!important;gap:8px!important}#ciao-miniapp-root .cwpred-mine-card--v3 .cwpred-team{min-width:0!important;width:100%!important;overflow:hidden!important}#ciao-miniapp-root .cwpred-mine-card--v3 .cwpred-team-name{display:block!important;max-width:100%!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}#ciao-miniapp-root .cwpred-mine-card--v3 .cwpred-mine-primary{min-width:0!important;max-width:94px!important;padding:7px 4px!important;overflow:hidden!important}#ciao-miniapp-root .cwpred-mine-card--v3 .cwpred-mine-primary b{font-size:18px!important;line-height:1!important;white-space:nowrap!important}#ciao-miniapp-root .cwpred-mine-missing{display:block;max-width:100%;margin-top:4px;color:rgba(255,255,255,.42);font-size:7px;font-weight:750;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#ciao-miniapp-root .cwpred-mine-card--v3 .cwpred-mine-result-strip{margin-top:10px!important;min-height:30px!important;padding-top:8px!important}@media(max-width:370px){#ciao-miniapp-root .cwpred-mine-card--v3 .cwpred-mine-matchline{grid-template-columns:minmax(0,1fr) 84px minmax(0,1fr)!important;gap:5px!important}#ciao-miniapp-root .cwpred-mine-card--v3 .cwpred-mine-primary{max-width:84px!important}#ciao-miniapp-root .cwpred-mine-card--v3 .cwpred-mine-primary b{font-size:16px!important}}';document.head.appendChild(style)}}catch(_e){}
+          /* /ciao-v23-native-predictions-20260908 */'''
+
+          html = replace_block(html, lock_start, lock_end, '')
+          html = replace_block(html, mine_start, mine_end, native)
+          path.write_text(html, encoding='utf-8')
+          PY
+      - name: Install dependencies
+        working-directory: cloudflare-production
+        run: npm install --no-audit --no-fund
+      - name: Verify focused v23 tests
+        working-directory: cloudflare-production
+        run: node --test test/v23-predictions.test.mjs test/v23-home.test.mjs test/v23-source.test.mjs test/v23-build.test.mjs
+      - name: Verify full test suite
+        working-directory: cloudflare-production
+        run: npm test
+      - name: Verify production build
+        working-directory: cloudflare-production
+        run: npm run build
+      - name: Commit native v23 prediction source
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add cloudflare-production/src/v23/index.html
+          git commit -m 'feat: migrate predictions into native v23 source'
+          git push origin HEAD:feat/v23-native-source
