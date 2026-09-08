@@ -1,0 +1,43 @@
+name: Apply v23 native source once
+
+on:
+  push:
+    branches: [feat/v23-native-source]
+    paths:
+      - '.github/workflows/apply-v23-native.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/v23-native-source
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply source migration
+        run: python3 cloudflare-production/scripts/migrate-v23-native.py
+      - name: Install
+        working-directory: cloudflare-production
+        run: npm install --no-audit --no-fund
+      - name: Test migrated source
+        working-directory: cloudflare-production
+        run: npm test
+      - name: Build migrated source
+        working-directory: cloudflare-production
+        run: npm run build
+      - name: Commit migrated v23 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add cloudflare-production/src/v23/index.html
+          git commit -m 'release: integrate native Home and Predictions into v23 source'
+          git push origin HEAD:feat/v23-native-source
