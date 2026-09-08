@@ -1,13 +1,19 @@
 // @ts-nocheck
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.112.4";
+import {
+  PRODUCTION_WORKER_URL,
+  LAUNCHER_BASE_URL,
+  contentRevision,
+  telegramAppUrl,
+} from "./release-revision.mjs";
+import { synchronizeRelease } from "./release-sync.mjs";
 
 const TOKEN=Deno.env.get("TELEGRAM_BOT_TOKEN")??"";
 const SB_URL=Deno.env.get("SUPABASE_URL")??"";
 const TG=`https://api.telegram.org/bot${TOKEN}`;
 const WEBHOOK_SECRET=Deno.env.get("TELEGRAM_WEBHOOK_SECRET")??`cp_${(TOKEN.split(":").pop()??"missing").slice(-40)}`;
-const APP_URL="https://dkefzepiiudehhzbbrjn.supabase.co/functions/v1/ciao-web-app?tg_rev=20260908-0525";
-const TELEGRAM_APP_URL=APP_URL;
+const INITIAL_RELEASE_REVISION="e833e3ab9551";
 const APP_TEST_URL="https://ciao-web-app-test.ciao-web.workers.dev/";
 const ADMIN_URL="https://dkefzepiiudehhzbbrjn.supabase.co/functions/v1/ciao-admin-web-v20";
 
@@ -26,6 +32,7 @@ function serviceKey(){
 
 const db=createClient(SB_URL,serviceKey(),{auth:{persistSession:false}});
 let menuUpdatedAt=0;
+let liveRevisionCache={revision:INITIAL_RELEASE_REVISION,at:0};
 
 async function tg(method,body={}){
   try{
@@ -42,9 +49,32 @@ async function tg(method,body={}){
   }
 }
 
-const miniKb=(admin=false)=>({
+async function fetchWorkerHtml(){
+  const url=new URL(PRODUCTION_WORKER_URL);
+  url.searchParams.set("release_probe",String(Date.now()));
+  const response=await fetch(url,{headers:{"cache-control":"no-cache"}});
+  if(!response.ok)throw new Error(`worker_http_${response.status}`);
+  return await response.text();
+}
+
+async function currentLiveRevision(force=false){
+  if(!force&&liveRevisionCache.revision&&Date.now()-liveRevisionCache.at<30000){
+    return liveRevisionCache.revision;
+  }
+  const html=await fetchWorkerHtml();
+  const revision=await contentRevision(html);
+  liveRevisionCache={revision,at:Date.now()};
+  return revision;
+}
+
+async function currentTelegramAppUrl(){
+  try{return telegramAppUrl(await currentLiveRevision(false));}
+  catch{return telegramAppUrl(liveRevisionCache.revision||INITIAL_RELEASE_REVISION);}
+}
+
+const miniKb=(appUrl,admin=false)=>({
   inline_keyboard:[
-    [{text:"⚽ Открыть Ciao, Web!",web_app:{url:TELEGRAM_APP_URL}}],
+    [{text:"⚽ Открыть Ciao, Web!",web_app:{url:appUrl}}],
     ...(admin?[[{text:"🧪 Ciao TEST",web_app:{url:APP_TEST_URL}}]]:[]),
   ],
 });
@@ -52,14 +82,15 @@ const adminKb=()=>({inline_keyboard:[[{text:"🛠 Открыть Ciao Admin",web
 
 async function ensureMenu(force=false){
   if(!force&&Date.now()-menuUpdatedAt<10*60*1000)return{ok:true,cached:true};
+  const appUrl=await currentTelegramAppUrl();
   const r=await tg("setChatMenuButton",{
-    menu_button:{type:"web_app",text:"⚽ Ciao Web",web_app:{url:TELEGRAM_APP_URL}},
+    menu_button:{type:"web_app",text:"⚽ Ciao Web",web_app:{url:appUrl}},
   });
   if(r.ok)menuUpdatedAt=Date.now();
   return r;
 }
 
-const send=(chat,text,reply_markup=miniKb(false))=>tg("sendMessage",{chat_id:chat,text,parse_mode:"HTML",reply_markup});
+const send=(chat,text,reply_markup)=>tg("sendMessage",{chat_id:chat,text,parse_mode:"HTML",reply_markup});
 const ack=(c,text="Открой Ciao, Web!")=>tg("answerCallbackQuery",{callback_query_id:c.id,text,show_alert:false});
 
 async function isAdmin(telegramId){
@@ -70,12 +101,16 @@ async function isAdmin(telegramId){
 
 async function appOnly(chat,telegramId){
   await ensureMenu();
+  const appUrl=await currentTelegramAppUrl();
   const admin=await isAdmin(telegramId);
-  return send(chat,"🇮🇹 <b>Ciao, Web!</b>\n\nЛига Прогнозов, матчи, live-статистика, таблица лучших прогнозистов.\nВсё о мире кальчо!",miniKb(admin));
+  return send(chat,"🇮🇹 <b>Ciao, Web!</b>\n\nЛига Прогнозов, матчи, live-статистика, таблица лучших прогнозистов.\nВсё о мире кальчо!",miniKb(appUrl,admin));
 }
 
 async function adminOnly(chat,telegramId){
-  if(!(await isAdmin(telegramId)))return send(chat,"Раздел недоступен.",miniKb(false));
+  if(!(await isAdmin(telegramId))){
+    const appUrl=await currentTelegramAppUrl();
+    return send(chat,"Раздел недоступен.",miniKb(appUrl,false));
+  }
   return send(chat,"🛠 <b>Ciao, Web! Admin</b>\n\nЗакрытая панель управления.",adminKb());
 }
 
@@ -91,7 +126,11 @@ async function setup(){
     tg("setMyShortDescription",{short_description:"Лига Прогнозов · матчи · live · Серия А"}),
     tg("setMyCommands",{commands:[{command:"start",description:"Открыть Ciao, Web!"}]}),
   ]);
-  const [menuCheck,info]=await Promise.all([tg("getChatMenuButton",{}),tg("getWebhookInfo")]);
+  const [menuCheck,info,appUrl]=await Promise.all([
+    tg("getChatMenuButton",{}),
+    tg("getWebhookInfo"),
+    currentTelegramAppUrl(),
+  ]);
   const criticalOk=!!(wh.ok&&info.ok&&menu.ok&&commands.ok);
   const brandingOk=!!(name.ok&&description.ok&&shortDescription.ok);
   const components={
@@ -112,8 +151,8 @@ async function setup(){
     pending_updates:info.result?.pending_update_count??0,
     last_error:info.result?.last_error_message??null,
     menu_url:menuCheck?.result?.web_app?.url??null,
-    app_url:TELEGRAM_APP_URL,
-    launcher_url:APP_URL,
+    app_url:appUrl,
+    launcher_url:LAUNCHER_BASE_URL,
     test_url:APP_TEST_URL,
     admin_url:ADMIN_URL,
   };
@@ -121,14 +160,38 @@ async function setup(){
 
 Deno.serve(async req=>{
   const url=new URL(req.url);
+
+  if(req.method==="GET"&&url.pathname.endsWith("/release-sync")){
+    const requestedRevision=String(url.searchParams.get("revision")??"");
+    try{
+      const result=await synchronizeRelease({
+        requestedRevision,
+        fetchWorkerHtml:()=>fetchWorkerHtml(),
+        setMenuButton:(appUrl)=>tg("setChatMenuButton",{
+          menu_button:{type:"web_app",text:"⚽ Ciao Web",web_app:{url:appUrl}},
+        }),
+      });
+      if(result.status===200){
+        liveRevisionCache={revision:requestedRevision,at:Date.now()};
+        menuUpdatedAt=Date.now();
+      }
+      return Response.json(result.body,{status:result.status});
+    }catch(e){
+      console.error("release_sync_error",e);
+      return Response.json({ok:false,error:"release_sync_failed"},{status:502});
+    }
+  }
+
   if(req.method==="GET"){
-    return Response.json(url.pathname.endsWith("/setup")?await setup():{
+    if(url.pathname.endsWith("/setup"))return Response.json(await setup());
+    const appUrl=await currentTelegramAppUrl();
+    return Response.json({
       ok:true,
       service:"Ciao Web Router",
-      version:60,
-      mode:"telegram_entry_revision_busted_production_plus_permanent_test",
-      app_url:TELEGRAM_APP_URL,
-      launcher_url:APP_URL,
+      version:61,
+      mode:"content_derived_release_revision",
+      app_url:appUrl,
+      launcher_url:LAUNCHER_BASE_URL,
       test_url:APP_TEST_URL,
       admin_url:ADMIN_URL,
       admin_command:true,
